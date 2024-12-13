@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 import os
 from typing import Optional
@@ -21,10 +22,21 @@ from flasgger import Swagger
 from bot_manager import BotManager
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://user:pass@db:5432/tetrix')
+# Use psycopg3 with SQLAlchemy 2.0
+db_url = os.getenv('DATABASE_URL', 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# Test database connection
+try:
+    with app.app_context():
+        db.session.execute('SELECT 1')
+        print("Database connection successful!")
+except SQLAlchemyError as e:
+    print(f"Database connection failed: {e}")
+    raise
 
 # Initialize TON client
 ton_client = TonClient()
