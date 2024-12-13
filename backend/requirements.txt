@@ -1,6 +1,6 @@
 Flask==2.3.3
 Flask-SQLAlchemy==3.1.1
-psycopg[binary]==3.1.18
+psycopg[binary]==3.2.3
 python-telegram-bot==20.7
 tonsdk==1.0.13
 Flask-Limiter==3.5.0
