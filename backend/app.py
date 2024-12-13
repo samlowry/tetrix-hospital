@@ -20,6 +20,7 @@ from flask_cors import CORS
 from flask_talisman import Talisman
 from flasgger import Swagger
 from bot_manager import BotManager
+from sqlalchemy import text
 
 app = Flask(__name__)
 # Use psycopg3 with SQLAlchemy 2.0
@@ -32,7 +33,7 @@ db = SQLAlchemy(app)
 # Test database connection
 try:
     with app.app_context():
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         print("Database connection successful!")
 except SQLAlchemyError as e:
     print(f"Database connection failed: {e}")
