@@ -8,10 +8,10 @@ import { Metrics } from './types';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-const App: React.FC = () => {
-    const [metrics, setMetrics] = React.useState<Metrics | null>(null);
+const App: FC = () => {
+    const [metrics, setMetrics] = useState<Metrics | null>(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const fetchMetrics = async () => {
             try {
                 const data = await api.getMetrics();

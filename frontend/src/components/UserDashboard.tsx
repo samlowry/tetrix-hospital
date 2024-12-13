@@ -4,12 +4,12 @@ import { api } from '../api';
 import { useTonConnect } from '@tonconnect/ui-react';
 import { Loading } from './Loading';
 
-export const UserDashboard: React.FC = () => {
+export const UserDashboard: FC = () => {
     const { wallet } = useTonConnect();
-    const [stats, setStats] = React.useState<User | null>(null);
-    const [loading, setLoading] = React.useState(false);
+    const [stats, setStats] = useState<User | null>(null);
+    const [loading, setLoading] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (wallet?.account.address) {
             setLoading(true);
             api.getUserStats(wallet.account.address)
