@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 import os
+from dotenv import load_dotenv
 from typing import Optional
 import secrets
 from ton_client import TonClient
@@ -21,6 +22,9 @@ from flask_talisman import Talisman
 from flasgger import Swagger
 from bot_manager import BotManager
 from sqlalchemy import text
+
+# Load environment variables from .env
+load_dotenv()
 
 app = Flask(__name__)
 # Use psycopg3 with SQLAlchemy 2.0
