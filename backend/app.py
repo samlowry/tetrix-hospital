@@ -28,7 +28,7 @@ load_dotenv()
 
 app = Flask(__name__)
 # Use psycopg3 with SQLAlchemy 2.0
-db_url = os.getenv('DATABASE_URL', 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix')
+db_url = os.getenv('DATABASE_URL').replace('postgresql://', 'postgresql+psycopg://')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

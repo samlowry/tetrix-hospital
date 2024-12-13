@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from typing import Optional
 import logging
+import asyncio
 
 logger = logging.getLogger('tetrix')
 
@@ -124,6 +125,14 @@ class BotManager:
             logger.error(f"Error connecting wallet: {e}")
             await update.message.reply_text("Error connecting wallet. Please try again later.")
 
+    async def start_bot(self):
+        await self.application.initialize()
+        await self.application.start()
+        await self.application.run_polling()
+
     def run(self):
-        """Start the bot"""
-        self.application.run_polling() 
+        # Create new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        # Run the bot
+        loop.run_until_complete(self.start_bot()) 
