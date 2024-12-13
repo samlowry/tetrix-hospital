@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import type { FC } from 'react';
 
 const LoadingWrapper = styled.div`
     display: flex;
@@ -23,7 +24,7 @@ const Spinner = styled.div`
     }
 `;
 
-export const Loading: React.FC = () => (
+export const Loading: FC = () => (
     <LoadingWrapper>
         <Spinner />
     </LoadingWrapper>
