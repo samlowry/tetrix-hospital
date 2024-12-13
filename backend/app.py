@@ -543,5 +543,11 @@ if __name__ == '__main__':
         import threading
         bot_thread = threading.Thread(target=bot_manager.run)
         bot_thread.start()
-        # Run Flask app
-        app.run(host='0.0.0.0', port=5000) 
+        try:
+            # Run Flask app
+            app.run(host='0.0.0.0', port=5000)
+        finally:
+            # Clean shutdown
+            bot_manager.stop()
+            scheduler.shutdown()
+            bot_thread.join() 

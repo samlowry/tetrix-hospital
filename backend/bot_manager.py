@@ -13,6 +13,7 @@ class BotManager:
         self.db = db
         self.User = User
         self.ton_client = ton_client
+        self.running = False
         self.setup_handlers()
 
     def setup_handlers(self):
@@ -128,11 +129,31 @@ class BotManager:
     async def start_bot(self):
         await self.application.initialize()
         await self.application.start()
-        await self.application.run_polling()
+        self.running = True
+        while self.running:
+            try:
+                await self.application.update_queue.get()
+            except Exception as e:
+                logger.error(f"Error in bot polling: {e}")
+                if not self.running:
+                    break
+                await asyncio.sleep(1)
 
     def run(self):
-        # Create new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        # Run the bot
-        loop.run_until_complete(self.start_bot()) 
+        try:
+            loop.run_until_complete(self.start_bot())
+        except KeyboardInterrupt:
+            self.running = False
+        finally:
+            loop.close()
+
+    def stop(self):
+        """Stop the bot"""
+        self.running = False
+
+    def validate_wallet_address(self, wallet_address: str) -> bool:
+        """Validate wallet address format"""
+        # Implement your validation logic here
+        return True
