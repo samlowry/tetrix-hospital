@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC, useState, useEffect } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { WalletConnect } from './components/WalletConnect';
 import { ProgressBar } from './components/ProgressBar';

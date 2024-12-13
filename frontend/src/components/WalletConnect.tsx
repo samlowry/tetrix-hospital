@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { TonConnectButton } from '@tonconnect/ui-react';
 import { useTonConnect } from '@tonconnect/ui-react';
 import { api } from '../api';
@@ -6,7 +6,7 @@ import { api } from '../api';
 export const WalletConnect: React.FC = () => {
     const { wallet } = useTonConnect();
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (wallet?.account.address) {
             api.connectWallet(wallet.account.address)
                 .then(response => {

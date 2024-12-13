@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC, useState, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../api';
 import { useTonConnect } from '@tonconnect/ui-react';

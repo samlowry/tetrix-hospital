@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import { Metrics } from '../types';
 
 interface Props {
