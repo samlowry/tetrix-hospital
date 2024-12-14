@@ -21,9 +21,11 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
+const manifestUrl = `${import.meta.env.VITE_APP_URL}/tonconnect-manifest.json`;
+
 root.render(
   <React.StrictMode>
-    <TonConnectUIProvider manifestUrl="https://d63a-109-245-96-58.ngrok-free.app/tonconnect-manifest.json">
+    <TonConnectUIProvider manifestUrl={manifestUrl}>
       <App />
     </TonConnectUIProvider>
   </React.StrictMode>

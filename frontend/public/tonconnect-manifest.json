@@ -1,9 +1,9 @@
 {
-  "url": "https://d63a-109-245-96-58.ngrok-free.app",
+  "url": "https://tetrix-bot.vercel.app",
   "name": "TETRIX Bot",
-  "iconUrl": "https://d63a-109-245-96-58.ngrok-free.app/logo192.png",
-  "termsOfUseUrl": "https://d63a-109-245-96-58.ngrok-free.app/terms.html",
-  "privacyPolicyUrl": "https://d63a-109-245-96-58.ngrok-free.app/privacy.html",
+  "iconUrl": "https://ton.org/download/ton_symbol.png",
+  "termsOfUseUrl": "https://tetrix-bot.vercel.app/terms.html",
+  "privacyPolicyUrl": "https://tetrix-bot.vercel.app/privacy.html",
   "manifest_version": 1,
   "version": "1.0.0",
   "permissions": [

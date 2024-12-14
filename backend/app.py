@@ -22,9 +22,11 @@ from flask_talisman import Talisman
 from flasgger import Swagger
 from bot_manager import BotManager
 from sqlalchemy import text
+from pathlib import Path
 
-# Load environment variables from .env
-load_dotenv()
+# Load environment variables from root .env
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(env_path)
 
 app = Flask(__name__)
 # Use psycopg3 with SQLAlchemy 2.0
