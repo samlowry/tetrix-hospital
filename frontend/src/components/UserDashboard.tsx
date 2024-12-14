@@ -13,7 +13,7 @@ export const UserDashboard: FC = () => {
         if (wallet?.account.address) {
             setLoading(true);
             api.getUserStats(wallet.account.address)
-                .then(setStats)
+                .then((data) => setStats(data))
                 .catch(console.error)
                 .finally(() => setLoading(false));
         }
@@ -28,23 +28,23 @@ export const UserDashboard: FC = () => {
             <div className="stats-grid">
                 <div className="stat-item">
                     <label>Points</label>
-                    <value>{stats.points}</value>
+                    <span className="stat-value">{stats.points}</span>
                 </div>
                 <div className="stat-item">
                     <label>TETRIX Balance</label>
-                    <value>{stats.tetrix_balance}</value>
+                    <span className="stat-value">{stats.tetrix_balance}</span>
                 </div>
                 <div className="stat-item">
                     <label>Invite Slots</label>
-                    <value>{stats.invite_slots}</value>
+                    <span className="stat-value">{stats.invite_slots}</span>
                 </div>
                 <div className="stat-item">
                     <label>Total Invites</label>
-                    <value>{stats.total_invites}</value>
+                    <span className="stat-value">{stats.total_invites}</span>
                 </div>
                 <div className="stat-item">
                     <label>Point Multiplier</label>
-                    <value>{stats.point_multiplier}x</value>
+                    <span className="stat-value">{stats.point_multiplier}x</span>
                 </div>
             </div>
         </div>

@@ -1,20 +1,16 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
-
-interface ApiResponse<T> {
-    data: T;
-    status: number;
-}
+import { User } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const handleError = (error: AxiosError) => {
-    if (error.response) {
-        throw new Error(error.response.data.error || 'API Error');
+    if (error.response?.data && typeof error.response.data === 'object' && 'error' in error.response.data) {
+        throw new Error((error.response.data as { error: string }).error);
     }
     throw error;
 };
 
-const handleResponse = <T>(response: AxiosResponse): T => response.data;
+const handleResponse = <T>(response: AxiosResponse<T>): T => response.data;
 
 export const api = {
     async connectWallet(address: string) {
@@ -28,7 +24,7 @@ export const api = {
         }
     },
 
-    async getUserStats(address: string) {
+    async getUserStats(address: string): Promise<User> {
         const response = await axios.get(`${API_URL}/user/${address}/stats`);
         return handleResponse(response);
     },

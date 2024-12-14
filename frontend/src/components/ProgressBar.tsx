@@ -5,7 +5,7 @@ interface Props {
     metrics: Metrics;
 }
 
-export const ProgressBar: React.FC<Props> = ({ metrics }) => {
+export const ProgressBar: FC<Props> = ({ metrics }) => {
     const healthPercentage = metrics.health;
     
     return (
