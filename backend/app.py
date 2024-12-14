@@ -180,7 +180,11 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
-Talisman(app, 
+
+# Configure Talisman based on environment
+is_development = os.getenv('FLASK_ENV') == 'development'
+Talisman(app,
+    force_https=not is_development,
     content_security_policy={
         'default-src': "'self'",
         'img-src': '*',
@@ -511,7 +515,7 @@ def health_check():
     """
     try:
         # Check database connection
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         
         # Check Redis connection
         redis_client.ping()
@@ -527,7 +531,7 @@ def health_check():
             'status': 'healthy',
             'database': 'connected',
             'redis': 'connected',
-            'last_metrics_update': metrics.last_updated.isoformat()
+            'last_metrics_update': metrics.last_updated.isoformat() if metrics.last_updated else None
         })
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
