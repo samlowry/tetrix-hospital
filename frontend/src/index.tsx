@@ -38,9 +38,6 @@ root.render(
         includeWallets: ['telegram-wallet'],
         excludeWallets: []
       }}
-      actionsConfiguration={{
-        twaReturnUrl: import.meta.env.VITE_APP_URL
-      }}
     >
       <App />
     </TonConnectUIProvider>
