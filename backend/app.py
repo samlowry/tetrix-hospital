@@ -343,9 +343,18 @@ async def update_metrics():
 
 # Setup scheduler for metrics update
 scheduler = BackgroundScheduler()
+
+def run_async(coro):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
 # Schedule metrics update every 5 minutes
 scheduler.add_job(
-    update_metrics,
+    lambda: run_async(update_metrics()),
     'interval',
     minutes=5,
     max_instances=1,
@@ -545,7 +554,8 @@ bot_manager = BotManager(
     token=os.getenv('TELEGRAM_BOT_TOKEN'),
     db=db,
     User=User,
-    ton_client=ton_client
+    ton_client=ton_client,
+    app=app
 )
 
 if __name__ == '__main__':
