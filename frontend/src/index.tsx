@@ -21,7 +21,7 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-const manifestUrl = `${import.meta.env.VITE_APP_URL}/tonconnect-manifest.json`;
+const manifestUrl = 'https://tetrix-hospital.pages.dev/tonconnect-manifest.json';
 
 // Debug info
 console.log('Environment:', {
