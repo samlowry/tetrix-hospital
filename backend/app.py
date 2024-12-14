@@ -64,7 +64,7 @@ limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=os.getenv('REDIS_URL', 'redis://redis:6379/0')
+    storage_uri=os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 )
 
 # Setup logging
@@ -171,8 +171,8 @@ class Metrics(db.Model):
 CORS(app, resources={
     r"/*": {
         "origins": [
-            "http://localhost:3000",  # React dev server
-            "https://your-app.com"    # Production URL
+            os.getenv('CORS_ORIGINS', 'https://your-app.com').split(','),
+            "https://your-app.com"
         ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
@@ -337,7 +337,14 @@ async def update_metrics():
 
 # Setup scheduler for metrics update
 scheduler = BackgroundScheduler()
-scheduler.add_job(update_metrics, 'interval', minutes=5)
+async def run_metrics_update():
+    while True:
+        await update_metrics()
+        await asyncio.sleep(300)  # 5 minutes
+
+@app.before_first_request
+def init_background_tasks():
+    asyncio.create_task(run_metrics_update())
 
 # Add new endpoints
 @app.route('/user/<wallet_address>/stats', methods=['GET'])
@@ -545,7 +552,10 @@ if __name__ == '__main__':
         bot_thread.start()
         try:
             # Run Flask app
-            app.run(host='0.0.0.0', port=5000)
+            app.run(
+                host=os.getenv('FLASK_HOST', '0.0.0.0'),
+                port=int(os.getenv('FLASK_PORT', 5000))
+            )
         finally:
             # Clean shutdown
             bot_manager.stop()
