@@ -1,9 +1,9 @@
 {
-  "url": "https://tetrix-bot.vercel.app",
+  "url": "https://tetrix-hospital.pages.dev",
   "name": "TETRIX Bot",
   "iconUrl": "https://ton.org/download/ton_symbol.png",
-  "termsOfUseUrl": "https://tetrix-bot.vercel.app/terms.html",
-  "privacyPolicyUrl": "https://tetrix-bot.vercel.app/privacy.html",
+  "termsOfUseUrl": "https://tetrix-hospital.pages.dev/terms.html",
+  "privacyPolicyUrl": "https://tetrix-hospital.pages.dev/privacy.html",
   "manifest_version": 1,
   "version": "1.0.0",
   "permissions": [
