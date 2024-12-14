@@ -23,12 +23,23 @@ const root = ReactDOM.createRoot(
 
 const manifestUrl = `${import.meta.env.VITE_APP_URL}/tonconnect-manifest.json`;
 
+// Debug info
+console.log('Environment:', {
+  mode: import.meta.env.MODE,
+  manifestUrl,
+  appUrl: import.meta.env.VITE_APP_URL
+});
+
 root.render(
   <React.StrictMode>
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
       walletsList={{
-        includeWallets: ['telegram-wallet']
+        includeWallets: ['telegram-wallet'],
+        excludeWallets: []
+      }}
+      actionsConfiguration={{
+        twaReturnUrl: import.meta.env.VITE_APP_URL
       }}
     >
       <App />
