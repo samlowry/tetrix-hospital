@@ -337,14 +337,14 @@ async def update_metrics():
 
 # Setup scheduler for metrics update
 scheduler = BackgroundScheduler()
-async def run_metrics_update():
-    while True:
-        await update_metrics()
-        await asyncio.sleep(300)  # 5 minutes
-
-@app.before_first_request
-def init_background_tasks():
-    asyncio.create_task(run_metrics_update())
+# Schedule metrics update every 5 minutes
+scheduler.add_job(
+    update_metrics,
+    'interval',
+    minutes=5,
+    max_instances=1,
+    coalesce=True
+)
 
 # Add new endpoints
 @app.route('/user/<wallet_address>/stats', methods=['GET'])
