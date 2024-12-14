@@ -3,9 +3,5 @@
   "name": "TETRIX Hospital",
   "iconUrl": "https://tetrix-hospital.pages.dev/tetrix-icon.png",
   "termsOfUseUrl": "https://tetrix-hospital.pages.dev/terms.html",
-  "privacyPolicyUrl": "https://tetrix-hospital.pages.dev/privacy.html",
-  "appVersion": "1.0.0",
-  "configVersion": "1.0.0",
-  "aboutUrl": "https://tetrix-hospital.pages.dev/about.html",
-  "universalUrl": "https://tetrix-hospital.pages.dev"
+  "privacyPolicyUrl": "https://tetrix-hospital.pages.dev/privacy.html"
 } 
