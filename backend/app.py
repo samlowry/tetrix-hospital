@@ -167,13 +167,15 @@ class Metrics(db.Model):
     capitalization = db.Column(db.Float, default=0)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Setup CORS origins
+cors_origins = os.getenv('CORS_ORIGINS', 'https://your-app.com').split(',')
+if "https://your-app.com" not in cors_origins:
+    cors_origins.append("https://your-app.com")
+
 # Initialize security and CORS
 CORS(app, resources={
     r"/*": {
-        "origins": [
-            os.getenv('CORS_ORIGINS', 'https://your-app.com').split(','),
-            "https://your-app.com"
-        ],
+        "origins": cors_origins,
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
