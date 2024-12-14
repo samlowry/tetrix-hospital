@@ -1,7 +1,12 @@
 {
-  "url": "https://your-app.com",
+  "url": "https://d63a-109-245-96-58.ngrok-free.app",
   "name": "TETRIX Bot",
-  "iconUrl": "https://your-app.com/logo.png",
-  "termsOfUseUrl": "https://your-app.com/terms",
-  "privacyPolicyUrl": "https://your-app.com/privacy"
+  "iconUrl": "https://d63a-109-245-96-58.ngrok-free.app/logo192.png",
+  "termsOfUseUrl": "https://d63a-109-245-96-58.ngrok-free.app/terms.html",
+  "privacyPolicyUrl": "https://d63a-109-245-96-58.ngrok-free.app/privacy.html",
+  "manifest_version": 1,
+  "version": "1.0.0",
+  "permissions": [
+    "tonClient"
+  ]
 } 
