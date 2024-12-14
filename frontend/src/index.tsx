@@ -27,8 +27,13 @@ root.render(
   <React.StrictMode>
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
-      walletsList={{
-        includeWallets: ['telegram-wallet']
+      uiPreferences={{
+        showAllWallets: true,
+        theme: 'SYSTEM'
+      }}
+      walletsListConfiguration={{
+        includeWallets: ['telegram-wallet', 'tonkeeper', 'tonhub', 'mytonwallet', 'openmask'],
+        excludeWallets: []
       }}
     >
       <App />
