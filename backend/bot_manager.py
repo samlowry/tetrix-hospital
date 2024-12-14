@@ -9,32 +9,50 @@ logger = logging.getLogger('tetrix')
 class BotManager:
     def __init__(self, token: str, db, User, ton_client):
         """Initialize bot with dependencies"""
+        logger.info("Initializing bot manager...")
         self.application = Application.builder().token(token).build()
         self.db = db
         self.User = User
         self.ton_client = ton_client
         self.running = False
         self.setup_handlers()
+        logger.info("Bot manager initialized successfully")
 
     def setup_handlers(self):
         """Setup bot command and callback handlers"""
+        logger.info("Setting up bot handlers...")
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("stats", self.stats))
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        logger.info("Bot handlers set up successfully")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
-        keyboard = [
-            [InlineKeyboardButton("Connect TON Wallet", callback_data='connect_wallet')],
-            [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')],
-            [InlineKeyboardButton("Check Stats", callback_data='check_stats')]
-        ]
+        logger.info(f"Received /start command from user {update.effective_user.id}")
+        
+        # Check if user is registered
+        user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
+        
+        if user:
+            keyboard = [
+                [InlineKeyboardButton("Reconnect TON Wallet", callback_data='reconnect_wallet')],
+                [InlineKeyboardButton("Check Stats", callback_data='check_stats')]
+            ]
+            message = "Welcome back to TETRIX! What would you like to do?"
+        else:
+            keyboard = [
+                [InlineKeyboardButton("Connect TON Wallet", callback_data='connect_wallet')],
+                [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
+            ]
+            message = "Welcome to TETRIX! Let's get started:"
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(
-            "Welcome to TETRIX! Let's get started:",
-            reply_markup=reply_markup
-        )
+        try:
+            await update.message.reply_text(message, reply_markup=reply_markup)
+            logger.info("Sent welcome message successfully")
+        except Exception as e:
+            logger.error(f"Error sending welcome message: {e}")
 
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /stats command"""
@@ -73,9 +91,13 @@ class BotManager:
         await query.answer()
         
         if query.data == 'connect_wallet':
-            # TODO: Implement wallet connection flow
             await query.edit_message_text(
-                "Please send your TON wallet address:"
+                "Please send your TON wallet address to connect:"
+            )
+            
+        elif query.data == 'reconnect_wallet':
+            await query.edit_message_text(
+                "Please send your TON wallet address to verify your identity:"
             )
             
         elif query.data == 'create_wallet':
@@ -103,17 +125,25 @@ class BotManager:
                 await update.message.reply_text("Invalid wallet address format. Please try again.")
                 return
             
-            # Check wallet balance
-            balance = await self.ton_client.get_tetrix_balance(wallet_address)
-            
-            # Create or update user
+            # Check if this is a reconnection attempt
             user = self.User.query.filter_by(telegram_id=telegram_id).first()
-            if not user:
-                user = self.User(wallet_address=wallet_address, telegram_id=telegram_id)
-                self.db.session.add(user)
-            else:
-                user.wallet_address = wallet_address
+            if user:
+                if user.wallet_address == wallet_address:
+                    await update.message.reply_text(
+                        "Identity verified! Your wallet is still connected.\n"
+                        "Use /stats to check your status"
+                    )
+                else:
+                    await update.message.reply_text(
+                        "❌ This wallet address doesn't match our records.\n"
+                        "Please use the wallet address you registered with."
+                    )
+                return
             
+            # This is a new connection
+            balance = await self.ton_client.get_tetrix_balance(wallet_address)
+            user = self.User(wallet_address=wallet_address, telegram_id=telegram_id)
+            self.db.session.add(user)
             self.db.session.commit()
             
             await update.message.reply_text(
@@ -123,31 +153,44 @@ class BotManager:
             )
             
         except Exception as e:
-            logger.error(f"Error connecting wallet: {e}")
-            await update.message.reply_text("Error connecting wallet. Please try again later.")
+            logger.error(f"Error handling wallet message: {e}")
+            await update.message.reply_text("Error processing wallet address. Please try again later.")
 
     async def start_bot(self):
-        await self.application.initialize()
-        await self.application.start()
-        self.running = True
-        while self.running:
-            try:
-                await self.application.update_queue.get()
-            except Exception as e:
-                logger.error(f"Error in bot polling: {e}")
-                if not self.running:
-                    break
+        logger.info("Starting bot...")
+        try:
+            await self.application.initialize()
+            await self.application.start()
+            self.running = True
+            logger.info("Bot started successfully")
+            
+            # Start polling for updates
+            await self.application.updater.start_polling()
+            logger.info("Bot polling started")
+            
+            # Keep the bot running
+            while self.running:
                 await asyncio.sleep(1)
+                
+        except Exception as e:
+            logger.error(f"Error starting bot: {e}")
+        finally:
+            if self.running:
+                await self.application.updater.stop()
+                await self.application.stop()
+                logger.info("Bot stopped")
 
     def run(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        logger.info("Setting up event loop for bot")
         try:
-            loop.run_until_complete(self.start_bot())
+            asyncio.run(self.start_bot())
+            logger.info("Bot event loop started")
         except KeyboardInterrupt:
+            logger.info("Bot shutdown requested")
             self.running = False
-        finally:
-            loop.close()
+        except Exception as e:
+            logger.error(f"Error in bot run: {e}")
+            raise
 
     def stop(self):
         """Stop the bot"""
