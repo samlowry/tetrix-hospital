@@ -323,25 +323,27 @@ async def check_balance(wallet_address):
 # Add metrics update function
 async def update_metrics():
     try:
-        # Get all users with TETRIX balance
-        holders = User.query.filter(User.tetrix_balance >= 1.0).count()
-        
-        # Calculate total capitalization (placeholder)
-        total_cap = sum([user.tetrix_balance for user in User.query.all()])
-        
-        metrics = Metrics.query.first()
-        if not metrics:
-            metrics = Metrics()
-            db.session.add(metrics)
+        with app.app_context():
+            # Get all users with TETRIX balance
+            holders = User.query.filter(User.tetrix_balance >= 1.0).count()
             
-        metrics.holder_count = holders
-        metrics.capitalization = total_cap
-        metrics.last_updated = datetime.utcnow()
-        
-        db.session.commit()
+            # Calculate total capitalization (placeholder)
+            total_cap = sum([user.tetrix_balance for user in User.query.all()])
+            
+            metrics = Metrics.query.first()
+            if not metrics:
+                metrics = Metrics()
+                db.session.add(metrics)
+                
+            metrics.holder_count = holders
+            metrics.capitalization = total_cap
+            metrics.last_updated = datetime.utcnow()
+            
+            db.session.commit()
     except Exception as e:
         print(f"Error updating metrics: {e}")
-        db.session.rollback()
+        with app.app_context():
+            db.session.rollback()
 
 # Setup scheduler for metrics update
 scheduler = BackgroundScheduler()
