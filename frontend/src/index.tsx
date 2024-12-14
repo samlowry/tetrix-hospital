@@ -25,7 +25,12 @@ const manifestUrl = `${import.meta.env.VITE_APP_URL}/tonconnect-manifest.json`;
 
 root.render(
   <React.StrictMode>
-    <TonConnectUIProvider manifestUrl={manifestUrl}>
+    <TonConnectUIProvider 
+      manifestUrl={manifestUrl}
+      walletsList={{
+        includeWallets: ['telegram-wallet']
+      }}
+    >
       <App />
     </TonConnectUIProvider>
   </React.StrictMode>

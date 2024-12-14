@@ -6,6 +6,10 @@ declare module '@tonconnect/ui-react' {
   export interface TonConnectUIProviderProps {
     manifestUrl: string;
     children: React.ReactNode;
+    walletsList?: {
+      includeWallets?: string[];
+      excludeWallets?: string[];
+    };
   }
   export const TonConnectUIProvider: React.FC<TonConnectUIProviderProps>;
   export const useTonConnect: () => {
