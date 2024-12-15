@@ -16,10 +16,25 @@ export const WalletConnect: React.FC = () => {
             try {
                 setError(null);
                 const { payload } = await api.getChallenge();
-                await api.connectWallet({
+                const result = await api.connectWallet({
                     address: wallet.account.address,
-                    proof: payload
+                    proof: {
+                        type: 'ton_proof',
+                        domain: {
+                            lengthBytes: 25,
+                            value: 'tetrix-hospital.pages.dev'
+                        },
+                        timestamp: Math.floor(Date.now() / 1000),
+                        payload: payload,
+                        signature: wallet.connectItems?.tonProof?.proof?.signature,
+                        state_init: wallet.account.walletStateInit,
+                        public_key: wallet.account.publicKey
+                    }
                 });
+
+                if (!result?.token) {
+                    throw new Error('Failed to verify wallet');
+                }
             } catch (e) {
                 if (e instanceof Error) {
                     setError(e.message);
