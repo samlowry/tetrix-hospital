@@ -13,10 +13,23 @@ const handleError = (error: AxiosError) => {
 const handleResponse = <T>(response: AxiosResponse<T>): T => response.data;
 
 export const api = {
-    async connectWallet(address: string) {
+    async getChallenge(address: string) {
+        try {
+            const response = await axios.post(`${API_URL}/get-challenge`, {
+                wallet_address: address
+            });
+            return handleResponse(response);
+        } catch (error) {
+            handleError(error as AxiosError);
+        }
+    },
+
+    async connectWallet(data: { address: string; signature: string; challenge: string }) {
         try {
             const response = await axios.post(`${API_URL}/register-user`, {
-                wallet_address: address
+                wallet_address: data.address,
+                signature: data.signature,
+                challenge: data.challenge
             });
             return handleResponse(response);
         } catch (error) {

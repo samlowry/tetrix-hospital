@@ -23,6 +23,8 @@ from flasgger import Swagger
 from bot_manager import BotManager
 from sqlalchemy import text
 from pathlib import Path
+from tonsdk.utils import Address
+from tonsdk.contract.wallet import WalletV3R2
 
 # Load environment variables from root .env
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -217,7 +219,7 @@ swagger = Swagger(app, template={
 @log_api_call
 def register_user():
     """
-    Register a new user with wallet
+    Register a new user with wallet verification
     ---
     tags:
       - users
@@ -228,10 +230,18 @@ def register_user():
           type: object
           required:
             - wallet_address
+            - signature
+            - challenge
           properties:
             wallet_address:
               type: string
               description: TON wallet address
+            signature:
+              type: string
+              description: Signed challenge
+            challenge:
+              type: string
+              description: Challenge that was signed
             invite_code:
               type: string
               description: Optional invite code
@@ -240,16 +250,42 @@ def register_user():
         description: User registered successfully
       400:
         description: Invalid input
+      401:
+        description: Invalid signature
       500:
         description: Server error
     """
     data = request.json
     wallet = data.get('wallet_address')
+    signature = data.get('signature')
+    challenge = data.get('challenge')
     invite_code = data.get('invite_code')
     
-    if not wallet:
-        return jsonify({'error': 'Wallet address required'}), 400
+    if not all([wallet, signature, challenge]):
+        return jsonify({'error': 'Wallet address, signature and challenge required'}), 400
         
+    # Verify challenge exists and hasn't expired
+    stored_challenge = redis_client.get(f"challenge:{wallet}")
+    if not stored_challenge or stored_challenge.decode() != challenge:
+        return jsonify({'error': 'Invalid or expired challenge'}), 401
+        
+    # Verify signature
+    try:
+        address = Address(wallet)
+        wallet_contract = WalletV3R2(address=address)
+        is_valid = wallet_contract.verify_signature(
+            data=challenge.encode(),
+            signature=bytes.fromhex(signature)
+        )
+        if not is_valid:
+            return jsonify({'error': 'Invalid signature'}), 401
+    except Exception as e:
+        logger.error(f"Signature verification error: {e}")
+        return jsonify({'error': 'Signature verification failed'}), 401
+        
+    # Delete used challenge
+    redis_client.delete(f"challenge:{wallet}")
+    
     # Check if user already exists
     existing_user = User.query.filter_by(wallet_address=wallet).first()
     if existing_user:
@@ -561,6 +597,51 @@ bot_manager = BotManager(
     ton_client=ton_client,
     app=app
 )
+
+# Add new route for challenge generation
+@app.route('/get-challenge', methods=['POST'])
+@limiter.limit("10 per minute")
+@log_api_call
+def get_challenge():
+    """
+    Generate a challenge for wallet verification
+    ---
+    tags:
+      - auth
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - wallet_address
+          properties:
+            wallet_address:
+              type: string
+              description: TON wallet address
+    responses:
+      200:
+        description: Challenge generated successfully
+      400:
+        description: Invalid input
+    """
+    data = request.json
+    wallet = data.get('wallet_address')
+    
+    if not wallet:
+        return jsonify({'error': 'Wallet address required'}), 400
+        
+    # Generate random challenge
+    challenge = secrets.token_hex(32)
+    
+    # Store challenge in Redis with 5 minute expiration
+    redis_client.setex(
+        f"challenge:{wallet}",
+        300,  # 5 minutes
+        challenge
+    )
+    
+    return jsonify({'challenge': challenge})
 
 if __name__ == '__main__':
     with app.app_context():

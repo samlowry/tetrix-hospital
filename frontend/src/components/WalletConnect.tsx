@@ -4,19 +4,36 @@ import { useTonConnect } from '@tonconnect/ui-react';
 import { api } from '../api';
 
 export const WalletConnect: React.FC = () => {
-    const { wallet } = useTonConnect();
+    const { wallet, connector } = useTonConnect();
 
     useEffect(() => {
-        if (wallet?.account.address) {
-            api.connectWallet(wallet.account.address)
-                .then(response => {
-                    console.log('Wallet connected:', response);
-                })
-                .catch(error => {
-                    console.error('Error connecting wallet:', error);
-                });
+        async function verifyWallet() {
+            if (wallet?.account.address) {
+                try {
+                    // Get challenge from backend
+                    const { challenge } = await api.getChallenge(wallet.account.address);
+                    
+                    // Sign challenge with wallet
+                    const signature = await connector.signMessage({
+                        message: challenge
+                    });
+                    
+                    // Verify signature and register wallet
+                    await api.connectWallet({
+                        address: wallet.account.address,
+                        signature,
+                        challenge
+                    });
+                    
+                    console.log('Wallet verified and connected');
+                } catch (error) {
+                    console.error('Error verifying wallet:', error);
+                }
+            }
         }
-    }, [wallet]);
+        
+        verifyWallet();
+    }, [wallet, connector]);
 
     return (
         <div className="wallet-connect">
