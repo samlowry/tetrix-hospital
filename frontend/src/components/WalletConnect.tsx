@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
+import { TonConnectButton, useTonConnect } from '@tonconnect/ui-react';
 import { api } from '../api';
 
 export const WalletConnect: React.FC = () => {
-    const [tonConnectUI] = useTonConnectUI();
+    const { connector } = useTonConnect();
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -14,32 +14,28 @@ export const WalletConnect: React.FC = () => {
 
             try {
                 setError(null);
-                // Get challenge from backend
-                const { challenge } = await api.getChallenge(wallet.account.address);
-                
-                // Sign challenge with wallet
-                const signature = await tonConnectUI.connector.signMessage({
-                    message: challenge
-                });
-                
-                // Verify signature and register wallet
-                await api.connectWallet({
-                    address: wallet.account.address,
-                    signature,
-                    challenge
-                });
+                if (wallet.connectItems?.tonProof && 'proof' in wallet.connectItems.tonProof) {
+                    await api.connectWallet({
+                        address: wallet.account.address,
+                        signature: wallet.connectItems.tonProof.proof,
+                        challenge: wallet.connectItems.tonProof.payload
+                    });
+                } else {
+                    setError('Wallet does not support TON Proof');
+                    connector.disconnect();
+                }
             } catch (e) {
                 if (e instanceof Error) {
                     setError(e.message);
                 } else {
                     setError('Failed to verify wallet');
                 }
-                tonConnectUI.disconnect();
+                connector.disconnect();
             }
         };
 
-        return tonConnectUI.onStatusChange(handleStatusChange);
-    }, [tonConnectUI]);
+        return connector.onStatusChange(handleStatusChange);
+    }, [connector]);
 
     return (
         <div className="wallet-connect">
