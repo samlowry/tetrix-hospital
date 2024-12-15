@@ -7,6 +7,7 @@ from utils.decorators import limiter, log_api_call
 
 auth = Blueprint('auth', __name__)
 payloads = {}  # In-memory storage for payloads
+DOMAIN = "tetrix-hospital.pages.dev"  # Domain constant
 
 @auth.route('/get-challenge', methods=['POST'])
 @limiter.limit("10 per minute")
@@ -23,15 +24,14 @@ def get_challenge():
       400:
         description: Invalid input
     """
-    domain = "tetrix-hospital.pages.dev"
     timestamp = int(time.time())
     
     # Generate tonProof payload
     payload = {
         "type": "ton_proof",
         "domain": {
-            "lengthBytes": len(domain),
-            "value": domain
+            "lengthBytes": len(DOMAIN),
+            "value": DOMAIN
         },
         "timestamp": timestamp,
         "payload": f"Authorize with TETRIX at {timestamp}"
@@ -65,7 +65,7 @@ def register_user():
 
         # Verify signature
         try:
-            message = f"ton-proof-item-v2/{len(domain)}/{domain}/{address}/{proof['timestamp']}/{proof['payload']}"
+            message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
             message_bytes = message.encode()
             signature = b64decode(proof['signature'])
             public_key = b64decode(proof['public_key'])
@@ -112,11 +112,8 @@ def check_proof():
         if not all([address, proof]):
             return jsonify({'error': 'Missing required fields'}), 400
             
-        # Verify proof
-        domain = "tetrix-hospital.pages.dev"
-        
         # Reconstruct message
-        message = f"ton-proof-item-v2/{len(domain)}/{domain}/{address}/{proof['timestamp']}/{proof['payload']}"
+        message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
         message_bytes = message.encode()
         
         # Verify signature
