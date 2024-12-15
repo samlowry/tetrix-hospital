@@ -18,10 +18,7 @@ export const WalletConnect: React.FC = () => {
                 const { payload } = await api.getChallenge();
                 await api.connectWallet({
                     address: wallet.account.address,
-                    proof: {
-                        type: 'ton_proof',
-                        ...payload
-                    }
+                    proof: payload
                 });
             } catch (e) {
                 if (e instanceof Error) {

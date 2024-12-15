@@ -1,6 +1,16 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { User } from '../types';
 
+export interface TonProofPayload {
+    type: 'ton_proof';
+    domain: {
+        lengthBytes: number;
+        value: string;
+    };
+    timestamp: number;
+    payload: string;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const handleError = (error: AxiosError) => {
@@ -16,13 +26,13 @@ export const api = {
     async getChallenge() {
         try {
             const response = await axios.post(`${API_URL}/auth/get-challenge`);
-            return handleResponse<{ payload: string }>(response);
+            return handleResponse<{ payload: TonProofPayload }>(response);
         } catch (error) {
             return handleError(error as AxiosError);
         }
     },
 
-    async connectWallet(data: { address: string; proof: any }) {
+    async connectWallet(data: { address: string; proof: TonProofPayload }) {
         try {
             const response = await axios.post(`${API_URL}/auth/register-user`, {
                 address: data.address,
