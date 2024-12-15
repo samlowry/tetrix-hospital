@@ -1,6 +1,8 @@
 import { FC } from 'react';
-import { TonConnectButton } from '@tonconnect/ui-react';
 import styled from 'styled-components';
+import { WalletConnect } from './components/WalletConnect';
+import { UserDashboard } from './components/UserDashboard';
+import { useTonConnect } from '@tonconnect/ui-react';
 
 const Container = styled.div`
     padding: 20px;
@@ -22,25 +24,8 @@ const Card = styled.div`
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 `;
 
-const TestInfo = styled.div`
-    margin-top: 20px;
-    padding: 20px;
-    background: var(--tg-theme-secondary-bg-color);
-    border-radius: 10px;
-    
-    .url-display {
-        word-break: break-all;
-        font-size: 14px;
-        background: var(--tg-theme-bg-color);
-        padding: 10px;
-        border-radius: 4px;
-        margin-top: 10px;
-    }
-`;
-
 const App: FC = () => {
-    // Extract base URL without query parameters
-    const baseUrl = window.location.origin + window.location.pathname;
+    const { wallet } = useTonConnect();
 
     return (
         <Container>
@@ -49,16 +34,14 @@ const App: FC = () => {
             <Card>
                 <h2>Connect Your Wallet</h2>
                 <p className="hint-text">Use the button below to connect your TON wallet:</p>
-                <TonConnectButton />
+                <WalletConnect />
             </Card>
 
-            <TestInfo>
-                <h3>Test Mode</h3>
-                <p className="hint-text">Frontend is running and accessible through Cloudflare Pages!</p>
-                <div className="url-display">
-                    Base URL: {baseUrl}
-                </div>
-            </TestInfo>
+            {wallet && (
+                <Card>
+                    <UserDashboard />
+                </Card>
+            )}
         </Container>
     );
 };
