@@ -29,6 +29,8 @@ import time
 from nacl.signing import VerifyKey
 from base64 import b64decode
 import json
+from secrets import token_bytes
+from base64 import b64encode
 
 # Load environment variables from root .env
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -218,107 +220,81 @@ swagger = Swagger(app, template={
 })
 
 # Core API endpoints
+payloads = {}  # In-memory storage for payloads, in production should use Redis
+
+@app.route('/get-challenge', methods=['POST'])
+@limiter.limit("10 per minute")
+@log_api_call
+def get_challenge():
+    """Generate payload for TON Proof"""
+    try:
+        # Generate random payload
+        payload = b64encode(token_bytes(64)).decode()
+        # Store payload with timestamp
+        payloads[payload] = int(time.time())
+        return jsonify({"payload": payload})
+    except Exception as e:
+        logger.error(f"Error generating payload: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/register-user', methods=['POST'])
 @limiter.limit("5 per hour")
 @log_api_call
 def register_user():
-    """
-    Register a new user with wallet verification
-    ---
-    tags:
-      - users
-    parameters:
-      - in: body
-        name: body
-        schema:
-          type: object
-          required:
-            - address
-            - proof
-          properties:
-            address:
-              type: string
-              description: TON wallet address
-            proof:
-              type: object
-              description: TON Connect proof object
-            invite_code:
-              type: string
-              description: Optional invite code
-    responses:
-      200:
-        description: User registered successfully
-      400:
-        description: Invalid input
-      401:
-        description: Invalid proof
-      500:
-        description: Server error
-    """
-    data = request.json
-    wallet = data.get('address')
-    proof = data.get('proof')
-    invite_code = data.get('invite_code')
-    
-    if not all([wallet, proof]):
-        return jsonify({'error': 'Wallet address and proof required'}), 400
-        
-    # Verify tonProof
+    """Register user with TON Proof verification"""
     try:
+        data = request.json
+        address = data.get('address')
+        proof = data.get('proof')
+        
+        if not all([address, proof]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
         # Verify proof
-        domain = "tetrix-hospital.pages.dev"
-        message = f"ton-proof-item-v2/{len(domain)}/{domain}/{wallet}/{proof['timestamp']}/{proof['payload']}"
-        message_bytes = message.encode()
-        
-        signature = b64decode(proof['signature'])
-        public_key = b64decode(proof['public_key'])
-        
-        verify_key = VerifyKey(public_key)
-        verify_key.verify(message_bytes, signature)
-        
-        # Check if user already exists
-        existing_user = User.query.filter_by(wallet_address=wallet).first()
+        payload = proof.get('payload')
+        if not payload or payload not in payloads:
+            return jsonify({'error': 'Invalid or expired payload'}), 400
+
+        # Remove old payloads
+        current_time = int(time.time())
+        payloads_to_remove = [p for p, t in payloads.items() if current_time - t > 600]  # 10 minutes expiry
+        for p in payloads_to_remove:
+            payloads.pop(p)
+
+        # Verify signature
+        try:
+            message = f"ton-proof-item-v2/proof.domain.length/proof.domain/{address}/{proof['timestamp']}/{payload}"
+            message_bytes = message.encode()
+            signature = b64decode(proof['signature'])
+            public_key = b64decode(proof['public_key'])
+            
+            verify_key = VerifyKey(public_key)
+            verify_key.verify(message_bytes, signature)
+        except Exception as e:
+            logger.error(f"Signature verification failed: {e}")
+            return jsonify({'error': 'Invalid signature'}), 401
+
+        # Remove used payload
+        payloads.pop(payload)
+
+        # Check if user exists
+        existing_user = User.query.filter_by(wallet_address=address).first()
         if existing_user:
             return jsonify({'error': 'Wallet already registered'}), 400
-        
-        # Validate invite code
-        inviter = None
-        if invite_code:
-            inviter = User.query.filter_by(invite_code=invite_code).first()
-            if not inviter:
-                return jsonify({'error': 'Invalid invite code'}), 400
-            if inviter.invite_slots <= 0:
-                return jsonify({'error': 'Inviter has no slots available'}), 400
-            
-            # Reset inviter slots if needed
-            inviter.reset_slots_if_needed()
-            if inviter.invite_slots <= 0:
-                return jsonify({'error': 'Inviter has no slots available'}), 400
-                
-            inviter.invite_slots -= 1
-            inviter.points += 1000  # Reward for inviting
-        
+
         # Create new user
-        user = User(wallet_address=wallet)
-        user.points = 2000 if inviter else 1000  # Extra points if invited
-        if inviter:
-            user.invited_by = inviter.id
+        user = User(wallet_address=address)
+        user.points = 1000  # Starting points
         
-        try:
-            db.session.add(user)
-            if inviter:
-                db.session.add(inviter)
-            db.session.commit()
-            
-            return jsonify({
-                'status': 'success',
-                'points': user.points,
-                'invite_code': user.invite_code
-            })
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'error': str(e)}), 500
-            
+        db.session.add(user)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'points': user.points,
+            'invite_code': user.invite_code
+        })
+
     except Exception as e:
         logger.error(f"Registration error: {e}")
         return jsonify({'error': str(e)}), 500

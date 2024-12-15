@@ -6,33 +6,46 @@ export const WalletConnect: React.FC = () => {
     const [tonConnectUI] = useTonConnectUI();
     const [error, setError] = useState<string | null>(null);
     const firstProofLoading = useRef<boolean>(true);
+    const refreshInterval = useRef<NodeJS.Timeout>();
 
-    useEffect(() => {
-        const setupProof = async () => {
-            if (firstProofLoading.current) {
-                tonConnectUI.setConnectRequestParameters({ state: 'loading' });
-                firstProofLoading.current = false;
-            }
+    // Function to generate and set proof payload
+    const recreateProofPayload = async () => {
+        if (firstProofLoading.current) {
+            tonConnectUI.setConnectRequestParameters({ state: 'loading' });
+            firstProofLoading.current = false;
+        }
 
-            try {
-                const { payload } = await api.getChallenge();
-                if (payload) {
-                    tonConnectUI.setConnectRequestParameters({ 
-                        state: 'ready',
-                        value: { tonProof: payload }
-                    });
-                } else {
-                    tonConnectUI.setConnectRequestParameters(null);
-                }
-            } catch (e) {
-                console.error('Error setting up proof:', e);
+        try {
+            const { payload } = await api.getChallenge();
+            if (payload) {
+                tonConnectUI.setConnectRequestParameters({ 
+                    state: 'ready',
+                    value: { tonProof: payload }
+                });
+            } else {
                 tonConnectUI.setConnectRequestParameters(null);
             }
-        };
+        } catch (e) {
+            console.error('Error setting up proof:', e);
+            tonConnectUI.setConnectRequestParameters(null);
+        }
+    };
 
-        setupProof();
+    // Setup periodic payload refresh
+    useEffect(() => {
+        recreateProofPayload();
+        
+        // Refresh payload every 9 minutes
+        refreshInterval.current = setInterval(recreateProofPayload, 9 * 60 * 1000);
+
+        return () => {
+            if (refreshInterval.current) {
+                clearInterval(refreshInterval.current);
+            }
+        };
     }, [tonConnectUI]);
 
+    // Handle wallet connection
     useEffect(() => {
         const handleStatusChange = async (wallet: any) => {
             if (!wallet?.account.address) {
