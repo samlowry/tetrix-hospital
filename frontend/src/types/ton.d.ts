@@ -17,12 +17,13 @@ declare module '@tonconnect/ui-react' {
     signMessage: (params: { message: string }) => Promise<string>;
   }
 
-  export const useTonConnect: () => {
-    wallet: {
-      account: {
-        address: string;
-      };
-    } | null;
+  interface Account {
+    address: string;
+  }
+
+  export const useConnector: () => {
+    connected: boolean;
+    account: Account | null;
     connector: TonConnector;
   };
 } 
