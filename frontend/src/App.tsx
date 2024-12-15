@@ -2,7 +2,7 @@ import { FC } from 'react';
 import styled from 'styled-components';
 import { WalletConnect } from './components/WalletConnect';
 import { UserDashboard } from './components/UserDashboard';
-import { useTonConnect } from '@tonconnect/ui-react';
+import { useConnector } from '@tonconnect/ui-react';
 
 const Container = styled.div`
     padding: 20px;
@@ -25,7 +25,7 @@ const Card = styled.div`
 `;
 
 const App: FC = () => {
-    const { wallet } = useTonConnect();
+    const { connected } = useConnector();
 
     return (
         <Container>
@@ -37,7 +37,7 @@ const App: FC = () => {
                 <WalletConnect />
             </Card>
 
-            {wallet && (
+            {connected && (
                 <Card>
                     <UserDashboard />
                 </Card>
