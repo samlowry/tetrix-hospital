@@ -13,7 +13,7 @@ from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
 
 from models import db, User
-from routes import auth, user, metrics
+from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
 from routes.metrics import update_metrics
 from utils import limiter, setup_logging
 from bot_manager import BotManager
@@ -104,9 +104,10 @@ swagger = Swagger(app, template={
 ton_client = TonClient()
 
 # Register blueprints
-app.register_blueprint(auth, url_prefix='/auth')
-app.register_blueprint(user, url_prefix='/user')
-app.register_blueprint(metrics, url_prefix='/')
+app.register_blueprint(auth_bp, url_prefix='/auth')
+app.register_blueprint(user_bp, url_prefix='/user')
+app.register_blueprint(metrics_bp, url_prefix='/')
+app.register_blueprint(ton_connect_bp)
 
 # Initialize bot manager
 bot_manager = BotManager(

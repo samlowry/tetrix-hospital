@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from backend.services.ton_proof_service import TonProofService
+from services.ton_proof_service import TonProofService
 import jwt
 import os
 
