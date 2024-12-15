@@ -1,23 +1,23 @@
 import { FC, useState, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../api';
-import { useTonConnect } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import { Loading } from './Loading';
 
 export const UserDashboard: FC = () => {
-    const { wallet } = useTonConnect();
+    const { account } = useTonConnectUI();
     const [stats, setStats] = useState<User | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (wallet?.account.address) {
+        if (account?.address) {
             setLoading(true);
-            api.getUserStats(wallet.account.address)
+            api.getUserStats(account.address)
                 .then((data) => setStats(data))
                 .catch(console.error)
                 .finally(() => setLoading(false));
         }
-    }, [wallet]);
+    }, [account]);
 
     if (loading) return <Loading />;
     if (!stats) return null;
