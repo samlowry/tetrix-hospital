@@ -15,7 +15,7 @@ const handleResponse = <T>(response: AxiosResponse<T>): T => response.data;
 export const api = {
     async getChallenge() {
         try {
-            const response = await axios.post(`${API_URL}/get-challenge`);
+            const response = await axios.post(`${API_URL}/auth/get-challenge`);
             return handleResponse<{ payload: string }>(response);
         } catch (error) {
             return handleError(error as AxiosError);
@@ -24,7 +24,7 @@ export const api = {
 
     async connectWallet(data: { address: string; proof: any }) {
         try {
-            const response = await axios.post(`${API_URL}/register-user`, {
+            const response = await axios.post(`${API_URL}/auth/register-user`, {
                 address: data.address,
                 proof: data.proof
             });
@@ -45,7 +45,7 @@ export const api = {
 
     async getMetrics() {
         try {
-            const response = await axios.get(`${API_URL}/get-metrics`);
+            const response = await axios.get(`${API_URL}/metrics`);
             return handleResponse(response);
         } catch (error) {
             return handleError(error as AxiosError);
@@ -54,7 +54,7 @@ export const api = {
 
     async getLeaderboard(type: 'points' | 'invites') {
         try {
-            const response = await axios.get(`${API_URL}/leaderboard/${type}`);
+            const response = await axios.get(`${API_URL}/user/leaderboard/${type}`);
             return handleResponse(response);
         } catch (error) {
             return handleError(error as AxiosError);
