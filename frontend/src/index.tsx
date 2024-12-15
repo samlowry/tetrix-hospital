@@ -52,10 +52,6 @@ root.render(
     <GlobalStyles />
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
-      walletsList={{
-        includeWallets: ['telegram-wallet'],
-        excludeWallets: []
-      }}
     >
       <App />
     </TonConnectUIProvider>
