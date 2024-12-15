@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
-import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
+import { TonConnectButton, useTonConnect } from '@tonconnect/ui-react';
 import { api } from '../api';
 
 export const WalletConnect: React.FC = () => {
-    const { connector, account } = useTonConnectUI();
+    const { wallet, connector } = useTonConnect();
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         async function verifyWallet() {
-            if (account?.address) {
+            if (wallet?.account.address) {
                 try {
                     setError(null);
                     // Get challenge from backend
-                    const { challenge } = await api.getChallenge(account.address);
+                    const { challenge } = await api.getChallenge(wallet.account.address);
                     
                     // Sign challenge with wallet
                     const signature = await connector.signMessage({
@@ -21,7 +21,7 @@ export const WalletConnect: React.FC = () => {
                     
                     // Verify signature and register wallet
                     await api.connectWallet({
-                        address: account.address,
+                        address: wallet.account.address,
                         signature,
                         challenge
                     });
@@ -35,14 +35,14 @@ export const WalletConnect: React.FC = () => {
         }
         
         verifyWallet();
-    }, [account, connector]);
+    }, [wallet, connector]);
 
     return (
         <div className="wallet-connect">
             <TonConnectButton />
-            {account && (
+            {wallet && (
                 <div className="wallet-info">
-                    <p>Connected: {account.address}</p>
+                    <p>Connected: {wallet.account.address}</p>
                 </div>
             )}
             {error && (
