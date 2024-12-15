@@ -20,7 +20,15 @@ export interface ConnectResponse {
     token: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = 'https://5fa5-109-245-96-58.ngrok-free.app';
+
+// Create axios instance with default headers
+const axiosInstance = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'ngrok-skip-browser-warning': 'true'
+    }
+});
 
 const handleError = (error: AxiosError) => {
     if (error.response?.data && typeof error.response.data === 'object' && 'error' in error.response.data) {
@@ -34,7 +42,7 @@ const handleResponse = <T>(response: AxiosResponse<T>): T => response.data;
 export const api = {
     async getChallenge() {
         try {
-            const response = await axios.post(`${API_URL}/api/generate_payload`);
+            const response = await axiosInstance.post('/api/generate_payload');
             return handleResponse<{ payload: string }>(response);
         } catch (error) {
             return handleError(error as AxiosError);
@@ -43,7 +51,7 @@ export const api = {
 
     async connectWallet(data: { address: string; proof: TonProofPayload }): Promise<ConnectResponse> {
         try {
-            const response = await axios.post(`${API_URL}/api/check_proof`, {
+            const response = await axiosInstance.post('/api/check_proof', {
                 address: data.address,
                 proof: data.proof,
                 public_key: data.proof.public_key
@@ -56,7 +64,7 @@ export const api = {
 
     async getUserStats(address: string): Promise<User> {
         try {
-            const response = await axios.get(`${API_URL}/user/${address}/stats`);
+            const response = await axiosInstance.get(`/user/${address}/stats`);
             return handleResponse(response);
         } catch (error) {
             return handleError(error as AxiosError);
@@ -65,7 +73,7 @@ export const api = {
 
     async getMetrics() {
         try {
-            const response = await axios.get(`${API_URL}/metrics`);
+            const response = await axiosInstance.get('/metrics');
             return handleResponse(response);
         } catch (error) {
             return handleError(error as AxiosError);
@@ -74,7 +82,7 @@ export const api = {
 
     async getLeaderboard(type: 'points' | 'invites') {
         try {
-            const response = await axios.get(`${API_URL}/user/leaderboard/${type}`);
+            const response = await axiosInstance.get(`/user/leaderboard/${type}`);
             return handleResponse(response);
         } catch (error) {
             return handleError(error as AxiosError);
