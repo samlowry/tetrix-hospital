@@ -9,27 +9,25 @@ metrics = Blueprint('metrics', __name__)
 async def update_metrics():
     """Update metrics in database"""
     try:
-        with current_app.app_context():
-            # Get all users with TETRIX balance
-            holders = User.query.filter(User.tetrix_balance >= 1.0).count()
+        # Get all users with TETRIX balance
+        holders = User.query.filter(User.tetrix_balance >= 1.0).count()
+        
+        # Calculate total capitalization
+        total_cap = sum([user.tetrix_balance for user in User.query.all()])
+        
+        metrics = Metrics.query.first()
+        if not metrics:
+            metrics = Metrics()
+            db.session.add(metrics)
             
-            # Calculate total capitalization
-            total_cap = sum([user.tetrix_balance for user in User.query.all()])
-            
-            metrics = Metrics.query.first()
-            if not metrics:
-                metrics = Metrics()
-                db.session.add(metrics)
-                
-            metrics.holder_count = holders
-            metrics.capitalization = total_cap
-            metrics.last_updated = datetime.utcnow()
-            
-            db.session.commit()
+        metrics.holder_count = holders
+        metrics.capitalization = total_cap
+        metrics.last_updated = datetime.utcnow()
+        
+        db.session.commit()
     except Exception as e:
         print(f"Error updating metrics: {e}")
-        with current_app.app_context():
-            db.session.rollback()
+        db.session.rollback()
 
 @metrics.route('/metrics', methods=['GET'])
 def get_metrics():

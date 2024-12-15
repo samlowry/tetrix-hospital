@@ -127,9 +127,14 @@ def run_async(coro):
     finally:
         loop.close()
 
+async def scheduled_metrics_update():
+    """Wrapper for update_metrics with app context"""
+    async with app.app_context():
+        await update_metrics()
+
 # Schedule metrics update every 5 minutes
 scheduler.add_job(
-    lambda: run_async(update_metrics()),
+    lambda: run_async(scheduled_metrics_update()),
     'interval',
     minutes=5,
     max_instances=1,
