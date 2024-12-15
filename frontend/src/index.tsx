@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import { GlobalStyles } from './styles/GlobalStyles';
 
 // Add global styles
 const style = document.createElement('style');
@@ -32,6 +33,7 @@ console.log('Environment:', {
 
 root.render(
   <React.StrictMode>
+    <GlobalStyles />
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
       walletsList={{
