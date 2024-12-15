@@ -12,11 +12,17 @@ declare module '@tonconnect/ui-react' {
     };
   }
   export const TonConnectUIProvider: React.FC<TonConnectUIProviderProps>;
+
+  interface TonConnector {
+    signMessage: (params: { message: string }) => Promise<string>;
+  }
+
   export const useTonConnect: () => {
     wallet: {
       account: {
         address: string;
       };
     } | null;
+    connector: TonConnector;
   };
 } 
