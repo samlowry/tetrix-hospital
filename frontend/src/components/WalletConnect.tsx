@@ -10,18 +10,12 @@ export const WalletConnect: React.FC = () => {
     useEffect(() => {
         const setupProof = async () => {
             if (firstProofLoading.current) {
-                connector.setConnectRequestParameters({ state: 'loading' });
+                connector.connect([]);
                 firstProofLoading.current = false;
             }
-
             const { challenge } = await api.getChallenge("init");
             if (challenge) {
-                connector.setConnectRequestParameters({ 
-                    state: 'ready', 
-                    value: challenge 
-                });
-            } else {
-                connector.setConnectRequestParameters(null);
+                connector.connect([{ bridgeUrl: challenge }]);
             }
         };
 
