@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonConnectUI, TonProofItemReplySuccess } from '@tonconnect/ui-react';
 import { useInterval } from '../hooks/useInterval';
+import { api } from '../api';
 
 const REFRESH_INTERVAL = 9 * 60 * 1000; // 9 minutes
 
@@ -10,11 +11,8 @@ export function TonConnect() {
 
     const generatePayload = useCallback(async () => {
         try {
-            const response = await fetch('/api/generate_payload', {
-                method: 'POST',
-            });
-            const data = await response.json();
-            return { tonProof: data.payload };
+            const { payload } = await api.getChallenge();
+            return { tonProof: payload };
         } catch (e) {
             console.error('Failed to generate payload:', e);
             return null;
@@ -35,40 +33,24 @@ export function TonConnect() {
         }
     }, [tonConnectUI, generatePayload]);
 
-    const checkProof = useCallback(async (proof: any, account: any) => {
+    const checkProof = useCallback(async (proof: TonProofItemReplySuccess['proof'], account: any) => {
         try {
             console.log('Checking proof:', { proof, account });
-            const reqBody = {
+            const result = await api.connectWallet({
                 address: account.address,
-                network: account.chain,
-                public_key: account.publicKey,
                 proof: {
-                    ...proof,
-                    signature: proof.signature,
-                    public_key: account.publicKey,
-                    state_init: account.walletStateInit,
-                    domain: {
-                        lengthBytes: proof.domain.lengthBytes,
-                        value: proof.domain.value
-                    },
+                    type: 'ton_proof',
+                    domain: proof.domain,
                     timestamp: proof.timestamp,
-                    payload: proof.payload
+                    payload: proof.payload,
+                    signature: proof.signature,
+                    state_init: account.walletStateInit,
+                    public_key: account.publicKey
                 }
-            };
-
-            console.log('Sending proof request:', reqBody);
-
-            const response = await fetch('/api/check_proof', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(reqBody),
             });
-
-            const data = await response.json();
-            if (data?.token) {
-                localStorage.setItem('auth_token', data.token);
+            
+            if (result?.token) {
+                localStorage.setItem('auth_token', result.token);
                 return true;
             }
             return false;

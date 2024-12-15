@@ -1,14 +1,23 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { User } from '../types';
 
+export interface TonProofDomain {
+    lengthBytes: number;
+    value: string;
+}
+
 export interface TonProofPayload {
     type: 'ton_proof';
-    domain: {
-        lengthBytes: number;
-        value: string;
-    };
+    domain: TonProofDomain;
     timestamp: number;
     payload: string;
+    signature?: string;
+    state_init?: string;
+    public_key?: string;
+}
+
+export interface ConnectResponse {
+    token: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -25,20 +34,21 @@ const handleResponse = <T>(response: AxiosResponse<T>): T => response.data;
 export const api = {
     async getChallenge() {
         try {
-            const response = await axios.post(`${API_URL}/auth/get-challenge`);
-            return handleResponse<{ payload: TonProofPayload }>(response);
+            const response = await axios.post(`${API_URL}/api/generate_payload`);
+            return handleResponse<{ payload: string }>(response);
         } catch (error) {
             return handleError(error as AxiosError);
         }
     },
 
-    async connectWallet(data: { address: string; proof: TonProofPayload }) {
+    async connectWallet(data: { address: string; proof: TonProofPayload }): Promise<ConnectResponse> {
         try {
-            const response = await axios.post(`${API_URL}/auth/register-user`, {
+            const response = await axios.post(`${API_URL}/api/check_proof`, {
                 address: data.address,
-                proof: data.proof
+                proof: data.proof,
+                public_key: data.proof.public_key
             });
-            return handleResponse(response);
+            return handleResponse<ConnectResponse>(response);
         } catch (error) {
             return handleError(error as AxiosError);
         }
