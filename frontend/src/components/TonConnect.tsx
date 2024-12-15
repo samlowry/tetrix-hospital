@@ -14,7 +14,7 @@ export function TonConnect() {
                 method: 'POST',
             });
             const data = await response.json();
-            return { tonProof: data.payload as string };
+            return { tonProof: data.payload };
         } catch (e) {
             console.error('Failed to generate payload:', e);
             return null;
@@ -37,15 +37,26 @@ export function TonConnect() {
 
     const checkProof = useCallback(async (proof: any, account: any) => {
         try {
+            console.log('Checking proof:', { proof, account });
             const reqBody = {
                 address: account.address,
                 network: account.chain,
                 public_key: account.publicKey,
                 proof: {
                     ...proof,
+                    signature: proof.signature,
+                    public_key: account.publicKey,
                     state_init: account.walletStateInit,
-                },
+                    domain: {
+                        lengthBytes: proof.domain.lengthBytes,
+                        value: proof.domain.value
+                    },
+                    timestamp: proof.timestamp,
+                    payload: proof.payload
+                }
             };
+
+            console.log('Sending proof request:', reqBody);
 
             const response = await fetch('/api/check_proof', {
                 method: 'POST',
@@ -83,6 +94,7 @@ export function TonConnect() {
             }
 
             if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
+                console.log('Wallet connected with proof:', w.connectItems.tonProof);
                 const success = await checkProof(w.connectItems.tonProof.proof, w.account);
                 if (!success) {
                     tonConnectUI.disconnect();

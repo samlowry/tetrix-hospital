@@ -1,10 +1,13 @@
 import hashlib
 from base64 import b64decode
 from typing import Optional
+import logging
 
 import nacl.signing
 from tonsdk.utils import Address
 from tonsdk.boc import Cell
+
+logger = logging.getLogger('tetrix')
 
 TON_PROOF_PREFIX = b'ton-proof-item-v2/'
 TON_CONNECT_PREFIX = b'ton-connect'
@@ -30,45 +33,56 @@ class TonProofService:
         Based on reference implementation from TON Connect docs.
         """
         try:
+            logger.info(f"Checking proof payload: {payload}")
+            
             # Parse and validate state init
             state_init = Cell.one_from_boc(b64decode(payload['proof']['state_init']))
             state_init_data = state_init.begin_parse()
+            logger.info("State init parsed successfully")
 
             # Get public key from state init or wallet
             public_key = bytes.fromhex(payload['public_key'])
+            logger.info(f"Using public key: {public_key.hex()}")
 
             # Verify address matches state init
             address = Address(payload['address'])
             if not address:
+                logger.error("Invalid address")
                 return False
 
             # Verify domain
-            if payload['proof']['domain']['value'] not in ALLOWED_DOMAINS:
+            domain = payload['proof']['domain']['value']
+            if domain not in ALLOWED_DOMAINS:
+                logger.error(f"Domain {domain} not in allowed list: {ALLOWED_DOMAINS}")
                 return False
 
             # Verify timestamp
             import time
             now = int(time.time())
-            if now - VALID_AUTH_TIME > payload['proof']['timestamp']:
+            timestamp = payload['proof']['timestamp']
+            if now - VALID_AUTH_TIME > timestamp:
+                logger.error(f"Timestamp {timestamp} is too old (current time: {now})")
                 return False
 
             # Prepare message components
             wc = address.wc.to_bytes(4, byteorder='big')
-            ts = payload['proof']['timestamp'].to_bytes(8, byteorder='little')
+            ts = timestamp.to_bytes(8, byteorder='little')
             dl = payload['proof']['domain']['lengthBytes'].to_bytes(4, byteorder='little')
-
+            
             # Construct message
             msg = b''.join([
                 TON_PROOF_PREFIX,
                 wc,
                 address.hash_part,
                 dl,
-                payload['proof']['domain']['value'].encode(),
+                domain.encode(),
                 ts,
                 payload['proof']['payload'].encode()
             ])
+            logger.info(f"Constructed message: {msg.hex()}")
 
             msg_hash = hashlib.sha256(msg).digest()
+            logger.info(f"Message hash: {msg_hash.hex()}")
 
             # Construct full message with prefix
             full_msg = b''.join([
@@ -76,15 +90,20 @@ class TonProofService:
                 TON_CONNECT_PREFIX,
                 msg_hash
             ])
+            logger.info(f"Full message: {full_msg.hex()}")
 
             result = hashlib.sha256(full_msg).digest()
+            logger.info(f"Final hash: {result.hex()}")
 
             # Verify signature
             verify_key = nacl.signing.VerifyKey(public_key)
             signature = b64decode(payload['proof']['signature'])
+            logger.info(f"Verifying signature: {signature.hex()}")
+            
             verify_key.verify(result, signature)
+            logger.info("Signature verified successfully")
             return True
 
         except Exception as e:
-            print(f"TON Proof verification error: {e}")
+            logger.error(f"TON Proof verification error: {e}")
             return False 
