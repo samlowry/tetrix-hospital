@@ -1,26 +1,35 @@
 import { FC, useState, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../api';
-import { useTonWallet, useIsConnectionRestored } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import { Loading } from './Loading';
 
 export const UserDashboard: FC = () => {
-    const wallet = useTonWallet();
-    const isConnectionRestored = useIsConnectionRestored();
+    const [tonConnectUI] = useTonConnectUI();
     const [stats, setStats] = useState<User | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!isConnectionRestored || !wallet?.account.address) {
-            return;
-        }
+        const handleStatusChange = async (wallet: any) => {
+            if (!wallet?.account.address) {
+                setStats(null);
+                return;
+            }
 
-        setLoading(true);
-        api.getUserStats(wallet.account.address)
-            .then((data) => setStats(data))
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, [wallet, isConnectionRestored]);
+            setLoading(true);
+            try {
+                const data = await api.getUserStats(wallet.account.address);
+                setStats(data);
+            } catch (error) {
+                console.error(error);
+                setStats(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        return tonConnectUI.onStatusChange(handleStatusChange);
+    }, [tonConnectUI]);
 
     if (loading) return <Loading />;
     if (!stats) return null;

@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
-import { TonConnectButton, useTonWallet, useTonConnectUI, useIsConnectionRestored } from '@tonconnect/ui-react';
+import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { api } from '../api';
 
 export const WalletConnect: React.FC = () => {
-    const wallet = useTonWallet();
     const [tonConnectUI] = useTonConnectUI();
-    const isConnectionRestored = useIsConnectionRestored();
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        async function verifyWallet() {
-            if (!isConnectionRestored || !wallet?.account.address) {
+        const handleStatusChange = async (wallet: any) => {
+            if (!wallet?.account.address) {
                 return;
             }
 
@@ -38,19 +36,14 @@ export const WalletConnect: React.FC = () => {
                 }
                 tonConnectUI.disconnect();
             }
-        }
-        
-        verifyWallet();
-    }, [wallet, tonConnectUI, isConnectionRestored]);
+        };
+
+        return tonConnectUI.onStatusChange(handleStatusChange);
+    }, [tonConnectUI]);
 
     return (
         <div className="wallet-connect">
             <TonConnectButton />
-            {wallet && (
-                <div className="wallet-info">
-                    <p>Connected: {wallet.account.address}</p>
-                </div>
-            )}
             {error && (
                 <div className="error-message">
                     {error}
