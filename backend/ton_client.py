@@ -1,5 +1,5 @@
 from tonsdk.contract.wallet import WalletVersionEnum, Wallets
-from tonsdk.utils import to_nano
+from tonsdk.utils import to_nano, Address
 import os
 from loguru import logger
 
@@ -9,10 +9,11 @@ class TonClient:
 
     async def get_balance(self, wallet_address: str) -> float:
         try:
+            address = Address(wallet_address)
             wallet = Wallets.create(
                 version=WalletVersionEnum.v3r2,
                 workchain=0,
-                public_key=wallet_address
+                address=address
             )
             balance = wallet.balance
             return float(balance) / 1e9

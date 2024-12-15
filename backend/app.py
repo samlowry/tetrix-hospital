@@ -24,7 +24,7 @@ from bot_manager import BotManager
 from sqlalchemy import text
 from pathlib import Path
 from tonsdk.utils import Address
-from tonsdk.contract.wallet import WalletV3R2
+from tonsdk.contract.wallet import WalletVersionEnum, Wallets
 
 # Load environment variables from root .env
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -272,7 +272,7 @@ def register_user():
     # Verify signature
     try:
         address = Address(wallet)
-        wallet_contract = WalletV3R2(address=address)
+        wallet_contract = Wallets(address=address)
         is_valid = wallet_contract.verify_signature(
             data=challenge.encode(),
             signature=bytes.fromhex(signature)
