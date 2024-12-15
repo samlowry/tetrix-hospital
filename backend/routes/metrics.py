@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, current_app
 from sqlalchemy import text
 from datetime import datetime
-from ..models import Metrics, User, db
-from ..utils.decorators import log_api_call
+from models import Metrics, User, db
+from utils.decorators import log_api_call
 
 metrics = Blueprint('metrics', __name__)
 

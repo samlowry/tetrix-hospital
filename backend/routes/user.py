@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_caching import Cache
-from ..models import User, db
-from ..utils.decorators import limiter, log_api_call
+from models import User, db
+from utils.decorators import limiter, log_api_call
 
 user = Blueprint('user', __name__)
 cache = Cache()

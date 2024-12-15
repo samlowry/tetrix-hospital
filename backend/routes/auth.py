@@ -2,8 +2,8 @@ from flask import Blueprint, request, jsonify
 from nacl.signing import VerifyKey
 from base64 import b64decode
 import time
-from ..models import User, db
-from ..utils.decorators import limiter, log_api_call
+from models import User, db
+from utils.decorators import limiter, log_api_call
 
 auth = Blueprint('auth', __name__)
 payloads = {}  # In-memory storage for payloads

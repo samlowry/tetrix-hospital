@@ -11,12 +11,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import asyncio
 from werkzeug.exceptions import HTTPException
 
-from .models import db, User
-from .routes import auth, user, metrics
-from .routes.metrics import update_metrics
-from .utils import limiter, setup_logging
-from .bot_manager import BotManager
-from .ton_client import TonClient
+from models import db, User
+from routes import auth, user, metrics
+from routes.metrics import update_metrics
+from utils import limiter, setup_logging
+from bot_manager import BotManager
+from ton_client import TonClient
 
 # Load environment variables
 env_path = Path(__file__).resolve().parent.parent / '.env'
