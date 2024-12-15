@@ -1,10 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { api } from '../api';
 
 export const WalletConnect: React.FC = () => {
     const [{ connector }] = useTonConnectUI();
     const [error, setError] = useState<string | null>(null);
+    const firstProofLoading = useRef<boolean>(true);
+
+    useEffect(() => {
+        const setupProof = async () => {
+            if (firstProofLoading.current) {
+                connector.setConnectRequestParameters({ state: 'loading' });
+                firstProofLoading.current = false;
+            }
+
+            const { challenge } = await api.getChallenge("init");
+            if (challenge) {
+                connector.setConnectRequestParameters({ 
+                    state: 'ready', 
+                    value: challenge 
+                });
+            } else {
+                connector.setConnectRequestParameters(null);
+            }
+        };
+
+        setupProof();
+    }, [connector]);
 
     useEffect(() => {
         const handleStatusChange = async (wallet: any) => {

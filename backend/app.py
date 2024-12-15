@@ -25,6 +25,10 @@ from sqlalchemy import text
 from pathlib import Path
 from tonsdk.utils import Address
 from tonsdk.contract.wallet import WalletVersionEnum, Wallets
+import time
+from nacl.signing import VerifyKey
+from base64 import b64decode
+import json
 
 # Load environment variables from root .env
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -229,19 +233,15 @@ def register_user():
         schema:
           type: object
           required:
-            - wallet_address
-            - signature
-            - challenge
+            - address
+            - proof
           properties:
-            wallet_address:
+            address:
               type: string
               description: TON wallet address
-            signature:
-              type: string
-              description: Signed challenge
-            challenge:
-              type: string
-              description: Challenge that was signed
+            proof:
+              type: object
+              description: TON Connect proof object
             invite_code:
               type: string
               description: Optional invite code
@@ -251,82 +251,76 @@ def register_user():
       400:
         description: Invalid input
       401:
-        description: Invalid signature
+        description: Invalid proof
       500:
         description: Server error
     """
     data = request.json
-    wallet = data.get('wallet_address')
-    signature = data.get('signature')
-    challenge = data.get('challenge')
+    wallet = data.get('address')
+    proof = data.get('proof')
     invite_code = data.get('invite_code')
     
-    if not all([wallet, signature, challenge]):
-        return jsonify({'error': 'Wallet address, signature and challenge required'}), 400
+    if not all([wallet, proof]):
+        return jsonify({'error': 'Wallet address and proof required'}), 400
         
-    # Verify challenge exists and hasn't expired
-    stored_challenge = redis_client.get(f"challenge:{wallet}")
-    if not stored_challenge or stored_challenge.decode() != challenge:
-        return jsonify({'error': 'Invalid or expired challenge'}), 401
-        
-    # Verify signature
+    # Verify tonProof
     try:
-        address = Address(wallet)
-        wallet_contract = Wallets(address=address)
-        is_valid = wallet_contract.verify_signature(
-            data=challenge.encode(),
-            signature=bytes.fromhex(signature)
-        )
-        if not is_valid:
-            return jsonify({'error': 'Invalid signature'}), 401
-    except Exception as e:
-        logger.error(f"Signature verification error: {e}")
-        return jsonify({'error': 'Signature verification failed'}), 401
+        # Verify proof
+        domain = "tetrix-hospital.pages.dev"
+        message = f"ton-proof-item-v2/{len(domain)}/{domain}/{wallet}/{proof['timestamp']}/{proof['payload']}"
+        message_bytes = message.encode()
         
-    # Delete used challenge
-    redis_client.delete(f"challenge:{wallet}")
-    
-    # Check if user already exists
-    existing_user = User.query.filter_by(wallet_address=wallet).first()
-    if existing_user:
-        return jsonify({'error': 'Wallet already registered'}), 400
-    
-    # Validate invite code
-    inviter = None
-    if invite_code:
-        inviter = User.query.filter_by(invite_code=invite_code).first()
-        if not inviter:
-            return jsonify({'error': 'Invalid invite code'}), 400
-        if inviter.invite_slots <= 0:
-            return jsonify({'error': 'Inviter has no slots available'}), 400
+        signature = b64decode(proof['signature'])
+        public_key = b64decode(proof['public_key'])
         
-        # Reset inviter slots if needed
-        inviter.reset_slots_if_needed()
-        if inviter.invite_slots <= 0:
-            return jsonify({'error': 'Inviter has no slots available'}), 400
+        verify_key = VerifyKey(public_key)
+        verify_key.verify(message_bytes, signature)
+        
+        # Check if user already exists
+        existing_user = User.query.filter_by(wallet_address=wallet).first()
+        if existing_user:
+            return jsonify({'error': 'Wallet already registered'}), 400
+        
+        # Validate invite code
+        inviter = None
+        if invite_code:
+            inviter = User.query.filter_by(invite_code=invite_code).first()
+            if not inviter:
+                return jsonify({'error': 'Invalid invite code'}), 400
+            if inviter.invite_slots <= 0:
+                return jsonify({'error': 'Inviter has no slots available'}), 400
             
-        inviter.invite_slots -= 1
-        inviter.points += 1000  # Reward for inviting
-    
-    # Create new user
-    user = User(wallet_address=wallet)
-    user.points = 2000 if inviter else 1000  # Extra points if invited
-    if inviter:
-        user.invited_by = inviter.id
-    
-    try:
-        db.session.add(user)
-        if inviter:
-            db.session.add(inviter)
-        db.session.commit()
+            # Reset inviter slots if needed
+            inviter.reset_slots_if_needed()
+            if inviter.invite_slots <= 0:
+                return jsonify({'error': 'Inviter has no slots available'}), 400
+                
+            inviter.invite_slots -= 1
+            inviter.points += 1000  # Reward for inviting
         
-        return jsonify({
-            'status': 'success',
-            'points': user.points,
-            'invite_code': user.invite_code
-        })
+        # Create new user
+        user = User(wallet_address=wallet)
+        user.points = 2000 if inviter else 1000  # Extra points if invited
+        if inviter:
+            user.invited_by = inviter.id
+        
+        try:
+            db.session.add(user)
+            if inviter:
+                db.session.add(inviter)
+            db.session.commit()
+            
+            return jsonify({
+                'status': 'success',
+                'points': user.points,
+                'invite_code': user.invite_code
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
+            
     except Exception as e:
-        db.session.rollback()
+        logger.error(f"Registration error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get-metrics', methods=['GET'])
@@ -608,40 +602,89 @@ def get_challenge():
     ---
     tags:
       - auth
-    parameters:
-      - in: body
-        name: body
-        schema:
-          type: object
-          required:
-            - wallet_address
-          properties:
-            wallet_address:
-              type: string
-              description: TON wallet address
     responses:
       200:
         description: Challenge generated successfully
       400:
         description: Invalid input
     """
-    data = request.json
-    wallet = data.get('wallet_address')
+    domain = "tetrix-hospital.pages.dev"
+    timestamp = int(time.time())
     
-    if not wallet:
-        return jsonify({'error': 'Wallet address required'}), 400
+    # Generate tonProof payload
+    payload = {
+        "type": "ton_proof",
+        "domain": {
+            "lengthBytes": len(domain),
+            "value": domain
+        },
+        "timestamp": timestamp,
+        "payload": f"Authorize with TETRIX at {timestamp}"
+    }
+    
+    return jsonify({"payload": payload})
+
+# Add new endpoint for proof verification
+@app.route('/check_proof', methods=['POST'])
+@limiter.limit("10 per minute")
+@log_api_call
+def check_proof():
+    """
+    Verify TON Connect proof
+    ---
+    tags:
+      - auth
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - address
+            - proof
+          properties:
+            address:
+              type: string
+            proof:
+              type: object
+    responses:
+      200:
+        description: Proof verified successfully
+      400:
+        description: Invalid input
+      401:
+        description: Invalid proof
+    """
+    try:
+        data = request.json
+        address = data.get('address')
+        proof = data.get('proof')
         
-    # Generate random challenge
-    challenge = secrets.token_hex(32)
-    
-    # Store challenge in Redis with 5 minute expiration
-    redis_client.setex(
-        f"challenge:{wallet}",
-        300,  # 5 minutes
-        challenge
-    )
-    
-    return jsonify({'challenge': challenge})
+        if not all([address, proof]):
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        # Verify proof
+        domain = "tetrix-hospital.pages.dev"
+        
+        # Reconstruct message
+        message = f"ton-proof-item-v2/{len(domain)}/{domain}/{address}/{proof['timestamp']}/{proof['payload']}"
+        message_bytes = message.encode()
+        
+        # Verify signature
+        signature = b64decode(proof['signature'])
+        public_key = b64decode(proof['public_key'])
+        
+        verify_key = VerifyKey(public_key)
+        try:
+            verify_key.verify(message_bytes, signature)
+            return jsonify({'status': 'success'})
+        except Exception as e:
+            logger.error(f"Signature verification failed: {e}")
+            return jsonify({'error': 'Invalid signature'}), 401
+            
+    except Exception as e:
+        logger.error(f"Proof verification error: {e}")
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     with app.app_context():
