@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import asyncio
 from werkzeug.exceptions import HTTPException
+from contextlib import contextmanager
 
 from models import db, User
 from routes import auth, user, metrics
@@ -129,7 +130,7 @@ def run_async(coro):
 
 async def scheduled_metrics_update():
     """Wrapper for update_metrics with app context"""
-    async with app.app_context():
+    with app.app_context():
         await update_metrics()
 
 # Schedule metrics update every 5 minutes
