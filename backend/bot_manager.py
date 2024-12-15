@@ -46,7 +46,7 @@ class BotManager:
                 message = "Welcome back to TETRIX! What would you like to do?"
             else:
                 keyboard = [
-                    [InlineKeyboardButton("Connect TON Wallet", callback_data='connect_wallet')],
+                    [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
                     [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
                 ]
                 message = "Welcome to TETRIX! Let's get started:"
@@ -96,16 +96,7 @@ class BotManager:
         query = update.callback_query
         await query.answer()
         
-        if query.data == 'connect_wallet':
-            keyboard = [[InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                "Please connect your TON wallet using our secure web interface:",
-                reply_markup=reply_markup
-            )
-            
-        elif query.data == 'reconnect_wallet':
+        if query.data == 'reconnect_wallet':
             keyboard = [[InlineKeyboardButton("Reconnect Wallet", web_app={"url": self.frontend_url})]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -115,14 +106,17 @@ class BotManager:
             )
             
         elif query.data == 'create_wallet':
+            keyboard = [[InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await query.edit_message_text(
                 "To create a TON wallet:\n\n"
-                "1. Download TON Wallet app\n"
-                "2. Create new wallet\n"
-                "3. Return here and click 'Connect TON Wallet'\n\n"
-                "Download links:\n"
-                "iOS: https://apps.apple.com/us/app/ton-wallet/id1473849522\n"
-                "Android: https://play.google.com/store/apps/details?id=org.ton.wallet"
+                "1. Open @wallet in Telegram\n"
+                "2. Click 'Create Wallet'\n"
+                "3. Follow the setup instructions\n"
+                "4. Return here and connect your wallet\n\n"
+                "Click the button below when you're ready to connect:",
+                reply_markup=reply_markup
             )
             
         elif query.data == 'check_stats':
