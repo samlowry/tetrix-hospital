@@ -1,11 +1,11 @@
 import { FC, useState, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../api';
-import { useTonConnect } from '@tonconnect/ui-react';
+import { useTonWallet } from '@tonconnect/ui-react';
 import { Loading } from './Loading';
 
 export const UserDashboard: FC = () => {
-    const { wallet } = useTonConnect();
+    const wallet = useTonWallet();
     const [stats, setStats] = useState<User | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -26,7 +26,7 @@ export const UserDashboard: FC = () => {
         <div>
             <h2>Your Stats</h2>
             <p>Points: {stats.points}</p>
-            <p>Invites: {stats.invites}</p>
+            <p>Total Invites: {stats.total_invites}</p>
         </div>
     );
 }; 

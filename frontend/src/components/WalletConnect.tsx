@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { TonConnectButton, useTonConnect } from '@tonconnect/ui-react';
+import { TonConnectButton, useTonWallet } from '@tonconnect/ui-react';
 import { api } from '../api';
 
 export const WalletConnect: React.FC = () => {
-    const { wallet, connector } = useTonConnect();
+    const wallet = useTonWallet();
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -15,7 +15,7 @@ export const WalletConnect: React.FC = () => {
                     const { challenge } = await api.getChallenge(wallet.account.address);
                     
                     // Sign challenge with wallet
-                    const signature = await connector.signMessage({
+                    const signature = await wallet.connector.signMessage({
                         message: challenge
                     });
                     
@@ -36,7 +36,7 @@ export const WalletConnect: React.FC = () => {
         }
         
         verifyWallet();
-    }, [wallet, connector]);
+    }, [wallet]);
 
     return (
         <div className="wallet-connect">
