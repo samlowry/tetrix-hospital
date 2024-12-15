@@ -16,17 +16,29 @@ export const WalletConnect: React.FC = () => {
             try {
                 setError(null);
                 const { payload } = await api.getChallenge();
+
+                // Set the connection parameters with proof request
+                tonConnectUI.setConnectRequestParameters({
+                    state: 'ready',
+                    value: {
+                        tonProof: payload
+                    }
+                });
+
+                // Wait for proof from wallet
+                if (!wallet.connectItems?.tonProof || !('proof' in wallet.connectItems.tonProof)) {
+                    throw new Error('Failed to get proof from wallet');
+                }
+
+                const proof = wallet.connectItems.tonProof.proof;
                 const result = await api.connectWallet({
                     address: wallet.account.address,
                     proof: {
                         type: 'ton_proof',
-                        domain: {
-                            lengthBytes: 25,
-                            value: 'tetrix-hospital.pages.dev'
-                        },
-                        timestamp: Math.floor(Date.now() / 1000),
-                        payload: payload,
-                        signature: wallet.connectItems?.tonProof?.proof?.signature,
+                        domain: proof.domain,
+                        timestamp: proof.timestamp,
+                        payload: proof.payload,
+                        signature: proof.signature,
                         state_init: wallet.account.walletStateInit,
                         public_key: wallet.account.publicKey
                     }
