@@ -3,8 +3,6 @@ import { useTonConnectUI, TonProofItemReplySuccess } from '@tonconnect/ui-react'
 import { useInterval } from '../hooks/useInterval';
 import { api } from '../api';
 
-const REFRESH_INTERVAL = 9 * 60 * 1000;
-
 export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
     const [tonConnectUI] = useTonConnectUI();
@@ -33,57 +31,44 @@ export function TonConnect() {
         }
     }, [tonConnectUI, generatePayload]);
 
-    const checkProof = useCallback(async (proof: TonProofItemReplySuccess['proof'], account: any) => {
-        try {
-            console.log('Checking proof:', { proof, account });
-            const result = await api.connectWallet({
-                address: account.address,
-                proof: {
-                    type: 'ton_proof',
-                    domain: proof.domain,
-                    timestamp: proof.timestamp,
-                    payload: proof.payload,
-                    signature: proof.signature,
-                    state_init: account.walletStateInit,
-                    public_key: account.publicKey
-                }
-            });
-            
-            if (result?.token) {
-                localStorage.setItem('auth_token', result.token);
-                return true;
-            }
-            return false;
-        } catch (e) {
-            console.error('Failed to check proof:', e);
-            return false;
-        }
-    }, []);
-
+    // Initial payload generation
     useEffect(() => {
         if (firstProofLoading.current) {
             recreateProofPayload();
         }
     }, [recreateProofPayload]);
 
-    useInterval(recreateProofPayload, REFRESH_INTERVAL);
+    // Refresh payload periodically
+    useInterval(recreateProofPayload, api.refreshIntervalMs);
 
+    // Handle wallet connection
     useEffect(() => {
         return tonConnectUI.onStatusChange(async (w) => {
             if (!w) {
-                localStorage.removeItem('auth_token');
+                api.reset();
                 return;
             }
 
             if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
-                console.log('Wallet connected with proof:', w.connectItems.tonProof);
-                const success = await checkProof(w.connectItems.tonProof.proof, w.account);
-                if (!success) {
-                    tonConnectUI.disconnect();
-                }
+                await api.connectWallet({
+                    address: w.account.address,
+                    proof: {
+                        type: 'ton_proof',
+                        domain: w.connectItems.tonProof.proof.domain,
+                        timestamp: w.connectItems.tonProof.proof.timestamp,
+                        payload: w.connectItems.tonProof.proof.payload,
+                        signature: w.connectItems.tonProof.proof.signature,
+                        state_init: w.account.walletStateInit,
+                        public_key: w.account.publicKey
+                    }
+                });
+            }
+
+            if (!api.accessToken) {
+                tonConnectUI.disconnect();
             }
         });
-    }, [tonConnectUI, checkProof]);
+    }, [tonConnectUI]);
 
     return null;
 } 
