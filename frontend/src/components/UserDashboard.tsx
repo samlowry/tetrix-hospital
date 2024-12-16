@@ -3,28 +3,21 @@ import styled from 'styled-components';
 import { useTonAddress } from '@tonconnect/ui-react';
 import { api } from '../api';
 
-const DashboardContainer = styled.div`
+const Card = styled.div`
   padding: 20px;
-  background: #1c1c1c;
+  background: var(--tg-theme-section-bg-color);
   border-radius: 12px;
-  margin: 20px 0;
-  color: #ffffff;
-`;
-
-const InfoBlock = styled.div`
-  margin-bottom: 15px;
-  padding: 15px;
-  background: #2a2a2a;
-  border-radius: 8px;
+  margin-bottom: 20px;
+  color: var(--tg-theme-text-color);
 `;
 
 const Title = styled.h3`
-  color: #ffffff;
+  color: var(--tg-theme-text-color);
   margin-bottom: 10px;
 `;
 
 const Text = styled.p`
-  color: #b3b3b3;
+  color: var(--tg-theme-hint-color);
   margin: 5px 0;
 `;
 
@@ -51,20 +44,21 @@ export function UserDashboard() {
   }, [userAddress]);
 
   return (
-    <DashboardContainer>
-      <InfoBlock>
+    <>
+      <Card>
+        <Text>{userAddress}</Text>
         <Title>Wallet Status</Title>
         <Text>Wallet Connected Successfully</Text>
         <Text>{userAddress}</Text>
         {isFirstBacker && (
           <HighlightText>🌟 Congratulations! You are among our first backers!</HighlightText>
         )}
-      </InfoBlock>
+      </Card>
 
-      <InfoBlock>
+      <Card>
         <Title>Next Steps</Title>
         <Text>Please use the Telegram bot to register your wallet and start earning TETRIX tokens.</Text>
-      </InfoBlock>
-    </DashboardContainer>
+      </Card>
+    </>
   );
 } 

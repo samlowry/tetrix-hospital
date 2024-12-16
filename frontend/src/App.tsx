@@ -17,11 +17,10 @@ const Header = styled.header`
 `;
 
 const Card = styled.div`
-    background: var(--tg-theme-bg-color);
+    background: var(--tg-theme-section-bg-color);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 `;
 
 const App: FC = () => {
@@ -39,11 +38,7 @@ const App: FC = () => {
                 <WalletConnect />
             </Card>
 
-            {wallet && (
-                <Card>
-                    <UserDashboard />
-                </Card>
-            )}
+            {wallet && <UserDashboard />}
         </Container>
     );
 };
