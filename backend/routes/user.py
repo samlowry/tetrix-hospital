@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
+import os
 
 user = Blueprint('user', __name__)
 cache = Cache()
@@ -49,4 +50,23 @@ def get_invite_leaderboard():
             } for idx, (user, invite_count) in enumerate(top_inviters)]
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+@user.route('/api/check_first_backer', methods=['POST'])
+def check_first_backer():
+    data = request.get_json()
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'Address is required'}), 400
+        
+    # Read first backers list
+    try:
+        with open('first_backers.txt', 'r') as f:
+            first_backers = set(line.strip() for line in f)
+            
+        is_first_backer = address in first_backers
+        return jsonify({'isFirstBacker': is_first_backer})
+        
+    except FileNotFoundError:
+        return jsonify({'error': 'First backers list not found'}), 500 
