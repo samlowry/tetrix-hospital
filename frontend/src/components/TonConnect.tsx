@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useTonConnectUI, TonProofItemReplySuccess } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import { useInterval } from '../hooks/useInterval';
 import { api } from '../api';
 
