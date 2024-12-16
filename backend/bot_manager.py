@@ -26,7 +26,6 @@ class BotManager:
         """Setup bot command and callback handlers"""
         logger.info("Setting up bot handlers...")
         self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("stats", self.stats))
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
         logger.info("Bot handlers set up successfully")
 
@@ -76,38 +75,6 @@ class BotManager:
                 except Exception as e:
                     logger.error(f"Error sending welcome message: {e}")
 
-    async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /stats command"""
-        with self.flask_app.app_context():
-            try:
-                user = self.User.query.filter_by(
-                    telegram_id=update.effective_user.id
-                ).first()
-                
-                if not user:
-                    await update.message.reply_text(
-                        "Please connect your wallet first using /start"
-                    )
-                    return
-                    
-                stats = user.get_stats()
-                message = (
-                    f"🏆 Your Stats:\n\n"
-                    f"Points: {stats['points']}\n"
-                    f"TETRIX Balance: {stats['tetrix_balance']}\n"
-                    f"Invite Slots: {stats['invite_slots']}\n"
-                    f"Total Invites: {stats['total_invites']}\n"
-                    f"Point Multiplier: {stats['point_multiplier']}x"
-                )
-                
-                await update.message.reply_text(message)
-                
-            except Exception as e:
-                logger.error(f"Error in stats command: {e}")
-                await update.message.reply_text(
-                    "Sorry, couldn't fetch your stats. Please try again later."
-                )
-
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle button callbacks"""
         query = update.callback_query
@@ -152,7 +119,8 @@ class BotManager:
             )
             
         elif query.data == 'check_stats':
-            await self.stats(update, context)
+            # Use the same dashboard display function
+            await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
             
         elif query.data == 'show_invites':
             with self.flask_app.app_context():
@@ -167,9 +135,9 @@ class BotManager:
                 code_lines = []
                 for code_info in codes:
                     if code_info['status'] == 'used_today':
-                        code_lines.append(f"~~{code_info['code']}~~")
+                        code_lines.append(f"~~```\n{code_info['code']}\n```~~ (Used)")
                     else:
-                        code_lines.append(f"```{code_info['code']}```")
+                        code_lines.append(f"```\n{code_info['code']}\n```")
                 
                 while len(code_lines) < 5:
                     code_lines.append("*empty*")
@@ -181,12 +149,12 @@ class BotManager:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 # Join codes with double newlines for separate copy blocks
-                message = "Your Invite Codes:"+"\n".join(code_lines)+"\n"
+                message = "Your Invite Codes:\n\n" + "\n\n".join(code_lines) + "\n\n"
                 await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
             
         elif query.data == 'back_to_menu':
             # Show dashboard for registered users
-            await self.display_user_dashboard(update.effective_user.id)
+            await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
 
     async def handle_wallet_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle wallet address messages"""
@@ -204,10 +172,8 @@ class BotManager:
                 user = self.User.query.filter_by(telegram_id=telegram_id).first()
                 if user:
                     if user.wallet_address == wallet_address:
-                        await update.message.reply_text(
-                            "Identity verified! Your wallet is still connected.\n"
-                            "Use /stats to check your status"
-                        )
+                        # Show dashboard instead of old stats message
+                        await self.display_user_dashboard(telegram_id)
                     else:
                         await update.message.reply_text(
                             " This wallet address doesn't match our records.\n"
@@ -221,11 +187,8 @@ class BotManager:
                 self.db.session.add(user)
                 self.db.session.commit()
                 
-                await update.message.reply_text(
-                    f"Wallet connected successfully!\n"
-                    f"TETRIX Balance: {balance}\n"
-                    f"Use /stats to check your status"
-                )
+                # Show dashboard instead of old stats message
+                await self.display_user_dashboard(telegram_id)
                 
             except Exception as e:
                 logger.error(f"Error handling wallet message: {e}")
