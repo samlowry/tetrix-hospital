@@ -3,6 +3,14 @@ from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
 import os
+import sys
+
+def normalize_address(address):
+    # Remove '0:' prefix if present
+    if address.startswith('0:'):
+        address = address[2:]
+    # Convert to uppercase and remove any non-hex characters
+    return address.upper().strip()
 
 user = Blueprint('user', __name__)
 cache = Cache()
@@ -52,7 +60,7 @@ def get_invite_leaderboard():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@user.route('/api/check_first_backer', methods=['POST'])
+@user.route('/check_first_backer', methods=['POST'])
 def check_first_backer():
     data = request.get_json()
     address = data.get('address')
@@ -60,13 +68,19 @@ def check_first_backer():
     if not address:
         return jsonify({'error': 'Address is required'}), 400
         
+    # Normalize the input address
+    normalized_address = normalize_address(address)
+    print(f"Checking address: {normalized_address}", file=sys.stderr)  # Debug log
+        
     # Read first backers list
     try:
         with open('first_backers.txt', 'r') as f:
-            first_backers = set(line.strip() for line in f)
+            # Normalize all addresses from the file
+            first_backers = set(normalize_address(line.strip()) for line in f)
             
-        is_first_backer = address in first_backers
+        is_first_backer = normalized_address in first_backers
+        print(f"First backer status: {is_first_backer}", file=sys.stderr)  # Debug log
         return jsonify({'isFirstBacker': is_first_backer})
         
     except FileNotFoundError:
-        return jsonify({'error': 'First backers list not found'}), 500 
+        return jsonify({'error': 'First backers list not found'}), 500

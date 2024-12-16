@@ -40,7 +40,7 @@ export function UserDashboard() {
   React.useEffect(() => {
     if (userAddress) {
       // Check if user is among first backers
-      fetch('/api/check_first_backer', {
+      fetch('/user/check_first_backer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
