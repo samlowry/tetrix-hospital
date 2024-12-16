@@ -22,7 +22,7 @@ const Text = styled.p`
 `;
 
 const HighlightText = styled.p`
-  color: #00ff00;
+  color: var(--tg-theme-accent-text-color);
   margin: 5px 0;
   font-weight: bold;
 `;
@@ -30,24 +30,39 @@ const HighlightText = styled.p`
 export function UserDashboard() {
   const userAddress = useTonAddress();
   const [isFirstBacker, setIsFirstBacker] = React.useState<boolean>(false);
+  const [isRegistered, setIsRegistered] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    if (userAddress) {
-      api.checkFirstBacker(userAddress)
-        .then(data => {
-          setIsFirstBacker(data.isFirstBacker);
-        })
-        .catch(error => {
-          console.error('Error checking first backer status:', error);
-        });
+    async function checkAndRegister() {
+      if (!userAddress) return;
+
+      try {
+        const { isFirstBacker } = await api.checkFirstBacker(userAddress);
+        setIsFirstBacker(isFirstBacker);
+
+        if (isFirstBacker) {
+          const { success } = await api.registerEarlyBacker(userAddress);
+          if (success) {
+            setIsRegistered(true);
+            // Close WebApp after 3 seconds
+            setTimeout(() => {
+              window.Telegram.WebApp.close();
+            }, 3000);
+          }
+        }
+      } catch (error) {
+        console.error('Error in registration process:', error);
+      }
     }
+
+    checkAndRegister();
   }, [userAddress]);
 
   return (
     <>
       <Card>
-        <Title>Wallet Status</Title>
-        <Text>Wallet Connected Successfully</Text>
+        <Title>User Status</Title>
+        <Text>{isRegistered ? 'Registered Successfully' : 'Wallet Connected Successfully'}</Text>
         {isFirstBacker && (
           <HighlightText>🌟 Congratulations! You are among our first backers!</HighlightText>
         )}
@@ -55,7 +70,7 @@ export function UserDashboard() {
 
       <Card>
         <Title>Next Steps</Title>
-        <Text>Please use the Telegram bot to register your wallet and start earning TETRIX tokens.</Text>
+        <Text>Please use the Telegram bot to continue...</Text>
       </Card>
     </>
   );

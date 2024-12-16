@@ -20,7 +20,7 @@ export interface ConnectResponse {
     token: string;
 }
 
-class ApiService {
+export class ApiService {
     private localStorageKey = 'tetrix-auth-token';
     private baseURL = 'https://5fa5-109-245-96-58.ngrok-free.app';
     public accessToken: string | null = null;
@@ -124,6 +124,15 @@ class ApiService {
         } catch (error) {
             return this.handleError(error as AxiosError);
         }
+    }
+
+    async registerEarlyBacker(address: string): Promise<{ success: boolean }> {
+        const tgWebAppData = window.Telegram.WebApp.initData;
+        const response = await axios.post('/api/register_early_backer', {
+            address,
+            tg_init_data: tgWebAppData
+        });
+        return response.data;
     }
 }
 

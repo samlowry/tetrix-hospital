@@ -4,6 +4,9 @@ from models import User, db
 from utils.decorators import limiter, log_api_call
 import os
 import sys
+import asyncio
+from telegram import parse_init_data
+from telegram.ext import Application
 
 def normalize_address(address):
     # Remove '0:' prefix if present
@@ -84,3 +87,42 @@ def check_first_backer():
         
     except FileNotFoundError:
         return jsonify({'error': 'First backers list not found'}), 500
+
+@user.route('/register_early_backer', methods=['POST'])
+@log_api_call
+def register_early_backer():
+    try:
+        data = request.get_json()
+        address = data.get('address')
+        tg_init_data = data.get('tg_init_data')
+        
+        if not all([address, tg_init_data]):
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        # Verify Telegram WebApp data
+        try:
+            init_data = parse_init_data(tg_init_data)
+            telegram_id = init_data['user']['id']
+        except Exception as e:
+            logger.error(f"Invalid Telegram init data: {e}")
+            return jsonify({'error': 'Invalid Telegram data'}), 400
+            
+        # Register user
+        user = User.query.filter_by(wallet_address=address).first()
+        if not user:
+            user = User(wallet_address=address, telegram_id=telegram_id)
+            user.points = 1000  # Early backer bonus
+            db.session.add(user)
+        else:
+            user.telegram_id = telegram_id
+            
+        db.session.commit()
+        
+        # Trigger dashboard display
+        asyncio.create_task(current_app.bot_manager.display_user_dashboard(telegram_id))
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logger.error(f"Error registering early backer: {e}")
+        return jsonify({'error': str(e)}), 500

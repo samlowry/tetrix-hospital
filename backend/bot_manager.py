@@ -209,3 +209,49 @@ class BotManager:
         """Validate wallet address format"""
         # Implement your validation logic here
         return True
+
+    async def display_user_dashboard(self, telegram_id: int):
+        """Display user dashboard with points and stats"""
+        with self.flask_app.app_context():
+            try:
+                user = self.User.query.filter_by(telegram_id=telegram_id).first()
+                if not user:
+                    return
+                
+                stats = user.get_stats()
+                
+                # Create ASCII health bar
+                health_percentage = (stats['holder_count'] / 100000) * 100 if 'holder_count' in stats else 0
+                bar_length = 20
+                filled = int((health_percentage / 100) * bar_length)
+                health_bar = "[" + "=" * filled + " " * (bar_length - filled) + "]"
+                
+                # Format message with monospace for invite links
+                message = f"""
+TETRIX health status:
+{health_bar} {health_percentage:.1f}%
+
+Total user points:
+{stats['points']}
+
+Points Breakdown:
+For holding: {int(stats['tetrix_balance'] * 100)} points
+For invites: {stats['total_invites'] * 200} points
+Early backer bonus: 1000 points
+
+Your Invite Links:
+`{stats['invite_links'][0]}`
+`{stats['invite_links'][1]}`
+`{stats['invite_links'][2]}`
+`{stats['invite_links'][3]}`
+`{stats['invite_links'][4]}`
+"""
+                
+                await self.application.bot.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode='Markdown'
+                )
+                
+            except Exception as e:
+                logger.error(f"Error displaying dashboard: {e}")
