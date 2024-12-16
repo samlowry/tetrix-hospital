@@ -133,7 +133,7 @@ def check_first_backer():
     except FileNotFoundError:
         return jsonify({'error': 'First backers list not found'}), 500
 
-@user.route('/api/register_early_backer', methods=['POST'])
+@user.route('/register_early_backer', methods=['POST'])
 @log_api_call
 def register_early_backer():
     try:
