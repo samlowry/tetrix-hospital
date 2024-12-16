@@ -124,6 +124,9 @@ bot_manager = BotManager(
     app=app
 )
 
+# Add bot manager to app context
+app.bot_manager = bot_manager
+
 # Setup scheduler for metrics update
 scheduler = BackgroundScheduler()
 

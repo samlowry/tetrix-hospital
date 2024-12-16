@@ -127,12 +127,16 @@ export class ApiService {
     }
 
     async registerEarlyBacker(address: string): Promise<{ success: boolean }> {
-        const tgWebAppData = window.Telegram.WebApp.initData;
-        const response = await axios.post('/api/register_early_backer', {
-            address,
-            tg_init_data: tgWebAppData
-        });
-        return response.data;
+        try {
+            const tgWebAppData = window.Telegram.WebApp.initData;
+            const response = await this.axiosInstance.post('/api/register_early_backer', {
+                address,
+                tg_init_data: tgWebAppData
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
     }
 }
 

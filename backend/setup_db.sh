@@ -9,6 +9,6 @@ fi
 
 # Run the setup script
 echo "Setting up database..."
-psql postgres -f db_setup.sql
+psql postgres -f setup_db.sql
 
 echo "Database setup complete!" 

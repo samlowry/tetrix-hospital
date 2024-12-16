@@ -141,13 +141,18 @@ def register_early_backer():
         address = data.get('address')
         tg_init_data = data.get('tg_init_data')
         
+        logger.info(f"Received registration request for address: {address}")
+        logger.info(f"Telegram init data received: {tg_init_data[:100]}...")  # Log first 100 chars
+        
         if not all([address, tg_init_data]):
+            logger.error("Missing fields - Address or init_data")
             return jsonify({'error': 'Missing required fields'}), 400
             
         # Verify Telegram WebApp data
         try:
             init_data = parse_init_data(tg_init_data)
             telegram_id = init_data['user']['id']
+            logger.info(f"Successfully parsed init data. Telegram ID: {telegram_id}")
         except Exception as e:
             logger.error(f"Invalid Telegram init data: {e}")
             return jsonify({'error': 'Invalid Telegram data'}), 400
@@ -155,15 +160,19 @@ def register_early_backer():
         # Register user
         user = User.query.filter_by(wallet_address=address).first()
         if not user:
+            logger.info(f"Creating new user for address {address}")
             user = User(wallet_address=address, telegram_id=telegram_id)
             user.points = 1000  # Early backer bonus
             db.session.add(user)
         else:
+            logger.info(f"Updating existing user {address} with telegram_id {telegram_id}")
             user.telegram_id = telegram_id
             
         db.session.commit()
+        logger.info(f"User saved to database successfully")
         
         # Trigger dashboard display
+        logger.info(f"Triggering dashboard display for telegram_id {telegram_id}")
         asyncio.create_task(current_app.bot_manager.display_user_dashboard(telegram_id))
         
         return jsonify({'success': True})

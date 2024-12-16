@@ -37,15 +37,22 @@ export function UserDashboard() {
       if (!userAddress) return;
 
       try {
+        console.log('Checking first backer status for:', userAddress);
         const { isFirstBacker } = await api.checkFirstBacker(userAddress);
+        console.log('First backer status:', isFirstBacker);
         setIsFirstBacker(isFirstBacker);
 
         if (isFirstBacker) {
+          console.log('Attempting to register early backer...');
+          console.log('Telegram init data:', window.Telegram.WebApp.initData);
           const { success } = await api.registerEarlyBacker(userAddress);
+          console.log('Registration result:', success);
           if (success) {
             setIsRegistered(true);
+            console.log('Registration successful, closing WebApp in 3 seconds...');
             // Close WebApp after 3 seconds
             setTimeout(() => {
+              console.log('Closing WebApp...');
               window.Telegram.WebApp.close();
             }, 3000);
           }
