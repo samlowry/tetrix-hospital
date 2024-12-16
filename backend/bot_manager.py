@@ -221,36 +221,43 @@ class BotManager:
                 stats = user.get_stats()
                 
                 # Create ASCII health bar
-                health_percentage = (stats['holder_count'] / 100000) * 100 if 'holder_count' in stats else 0
+                health_percentage = 42.0  # Dummy value for now
                 bar_length = 20
                 filled = int((health_percentage / 100) * bar_length)
                 health_bar = "[" + "=" * filled + " " * (bar_length - filled) + "]"
                 
-                # Format message with monospace for invite links
+                # Format invite codes with status
+                code_lines = []
+                for code_info in stats['invite_codes']:
+                    if code_info['status'] == 'used_today':
+                        # Strike-through for used codes
+                        code_lines.append(f"~`{code_info['code']}`~ (Used)")
+                    else:
+                        code_lines.append(f"`{code_info['code']}`")
+                
+                while len(code_lines) < 5:  # Pad with empty slots
+                    code_lines.append("_empty slot_")
+                
+                # Format message
                 message = f"""
 TETRIX health status:
 {health_bar} {health_percentage:.1f}%
 
-Total user points:
-{stats['points']}
+Total Points: {stats['points']}
 
 Points Breakdown:
-For holding: {int(stats['tetrix_balance'] * 100)} points
-For invites: {stats['total_invites'] * 200} points
-Early backer bonus: 1000 points
+For holding: {stats['points_breakdown']['holding']} points
+For invites: {stats['points_breakdown']['invites']} points
+Early backer bonus: {stats['points_breakdown']['early_backer_bonus']} points
 
-Your Invite Links:
-`{stats['invite_links'][0]}`
-`{stats['invite_links'][1]}`
-`{stats['invite_links'][2]}`
-`{stats['invite_links'][3]}`
-`{stats['invite_links'][4]}`
+Your Invite Codes:
+{chr(10).join(code_lines)}
 """
                 
                 await self.application.bot.send_message(
                     telegram_id,
                     message,
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
                 
             except Exception as e:

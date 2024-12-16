@@ -55,10 +55,11 @@ def register_user():
         data = request.json
         address = data.get('address')
         proof = data.get('proof')
+        invite_code = data.get('invite_code')  # Optional invite code
         
         logger.info(f"Received registration request - Address: {address}")
         logger.info(f"Received proof: {proof}")
-        logger.info(f"Current payloads: {payloads}")
+        logger.info(f"Invite code: {invite_code}")
 
         if not all([address, proof]):
             logger.error("Missing required fields")
@@ -66,24 +67,19 @@ def register_user():
 
         # Verify proof
         payload = proof.get('payload')
-        logger.info(f"Extracted payload: {payload}")
-        logger.info(f"Payload exists in storage: {payload in payloads}")
-        
         if not payload or payload not in payloads:
             logger.error(f"Invalid or expired payload. Payload: {payload}")
             return jsonify({'error': 'Invalid or expired payload'}), 400
 
         # Remove old payloads
         current_time = int(time.time())
-        payloads_to_remove = [p for p, t in payloads.items() if current_time - t > 600]  # 10 minutes expiry
-        logger.info(f"Payloads to remove due to expiry: {payloads_to_remove}")
+        payloads_to_remove = [p for p, t in payloads.items() if current_time - t > 600]
         for p in payloads_to_remove:
             payloads.pop(p)
 
         # Verify signature
         try:
             message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
-            logger.info(f"Constructed message for verification: {message}")
             message_bytes = message.encode()
             signature = b64decode(proof['signature'])
             public_key = b64decode(proof['public_key'])
@@ -97,7 +93,6 @@ def register_user():
 
         # Remove used payload
         payloads.pop(payload)
-        logger.info(f"Removed used payload. Remaining payloads: {payloads}")
 
         # Check if user exists
         existing_user = User.query.filter_by(wallet_address=address).first()
@@ -105,18 +100,28 @@ def register_user():
             logger.error(f"Wallet already registered: {address}")
             return jsonify({'error': 'Wallet already registered'}), 400
 
+        # Verify invite code if provided
+        if invite_code:
+            invite = User.verify_invite_code(invite_code)
+            if not invite:
+                logger.error(f"Invalid invite code: {invite_code}")
+                return jsonify({'error': 'Invalid invite code'}), 400
+
         # Create new user
         user = User(wallet_address=address)
-        user.points = 1000  # Starting points
-        
         db.session.add(user)
         db.session.commit()
+
+        # Use invite code if provided
+        if invite_code and invite:
+            User.use_invite_code(invite_code, user.id)
+            logger.info(f"Used invite code {invite_code} for user {user.id}")
+
         logger.info(f"Successfully registered new user with address: {address}")
         
         return jsonify({
             'status': 'success',
-            'points': user.points,
-            'invite_code': user.invite_code
+            'user_id': user.id
         })
 
     except Exception as e:

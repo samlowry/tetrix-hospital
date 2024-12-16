@@ -162,7 +162,6 @@ def register_early_backer():
         if not user:
             logger.info(f"Creating new user for address {address}")
             user = User(wallet_address=address, telegram_id=telegram_id)
-            user.points = 1000  # Early backer bonus
             db.session.add(user)
         else:
             logger.info(f"Updating existing user {address} with telegram_id {telegram_id}")
