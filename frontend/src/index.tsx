@@ -52,33 +52,6 @@ root.render(
     <GlobalStyles />
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
-      walletsListConfiguration={{
-        includeWallets: [
-          {
-            appName: "telegram-wallet",
-            name: "Wallet",
-            imageUrl: "https://wallet.tg/images/logo-288.png",
-            aboutUrl: "https://wallet.tg/",
-            universalLink: "https://t.me/wallet?attach=wallet",
-            bridgeUrl: "https://bridge.ton.space/bridge",
-            platforms: ["ios", "android", "macos", "windows", "linux"]
-          },
-          {
-            appName: "tonkeeper",
-            name: "Tonkeeper",
-            imageUrl: "https://tonkeeper.com/assets/tonconnect-icon.png",
-            aboutUrl: "https://tonkeeper.com",
-            universalLink: "https://app.tonkeeper.com/ton-connect",
-            bridgeUrl: "https://bridge.tonapi.io/bridge",
-            platforms: ["ios", "android", "macos", "windows", "linux"]
-          }
-        ]
-      }}
-      actionsConfiguration={{
-        twaReturnUrl: window.Telegram.WebApp.initDataUnsafe.start_param 
-          ? `https://t.me/${window.Telegram.WebApp.initDataUnsafe.start_param}`
-          : undefined
-      }}
     >
       <App />
     </TonConnectUIProvider>
