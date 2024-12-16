@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useInterval } from '../hooks/useInterval';
 import { api } from '../api';
 
 export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
     const [tonConnectUI] = useTonConnectUI();
+    const wallet = useTonWallet();
+    const [isConnected, setIsConnected] = useState(false);
 
     const generatePayload = useCallback(async () => {
         try {
@@ -19,6 +21,12 @@ export function TonConnect() {
     }, []);
 
     const recreateProofPayload = useCallback(async () => {
+        // Don't generate payload if already connected
+        if (isConnected) {
+            console.log('Already connected, skipping payload generation');
+            return;
+        }
+
         if (firstProofLoading.current) {
             tonConnectUI.setConnectRequestParameters({ state: 'loading' });
             firstProofLoading.current = false;
@@ -31,17 +39,17 @@ export function TonConnect() {
         } else {
             tonConnectUI.setConnectRequestParameters(null);
         }
-    }, [tonConnectUI, generatePayload]);
+    }, [tonConnectUI, generatePayload, isConnected]);
 
-    // Initial payload generation
+    // Initial payload generation only if not connected
     useEffect(() => {
-        if (firstProofLoading.current) {
+        if (firstProofLoading.current && !isConnected) {
             recreateProofPayload();
         }
-    }, [recreateProofPayload]);
+    }, [recreateProofPayload, isConnected]);
 
-    // Refresh payload periodically
-    useInterval(recreateProofPayload, api.refreshIntervalMs);
+    // Refresh payload periodically only when not connected
+    useInterval(recreateProofPayload, isConnected ? null : api.refreshIntervalMs);
 
     // Handle wallet connection
     useEffect(() => {
@@ -49,6 +57,14 @@ export function TonConnect() {
             console.log('Wallet status changed:', w);
             if (!w) {
                 api.reset();
+                setIsConnected(false);
+                return;
+            }
+
+            // If we have a valid wallet connection, mark as connected
+            if (wallet && !w.connectItems?.tonProof) {
+                console.log('Restored connection without proof');
+                setIsConnected(true);
                 return;
             }
 
@@ -67,16 +83,18 @@ export function TonConnect() {
                             public_key: w.account.publicKey
                         }
                     });
+                    setIsConnected(true);
                 } catch (error) {
                     console.error('Wallet verification failed:', error);
                     tonConnectUI.disconnect();
+                    setIsConnected(false);
                 }
             } else {
                 console.log('No proof in wallet connection, requesting new proof');
                 await recreateProofPayload();
             }
         });
-    }, [tonConnectUI, recreateProofPayload]);
+    }, [tonConnectUI, recreateProofPayload, wallet]);
 
     return null;
 } 
