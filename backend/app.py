@@ -53,8 +53,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
 db.init_app(app)
-limiter.init_app(app)
-logger = setup_logging()
 
 # Initialize Redis and Cache
 redis_client = redis.Redis(
@@ -62,12 +60,18 @@ redis_client = redis.Redis(
     port=int(os.getenv('REDIS_PORT', 6379))
 )
 
+# Configure limiter with Redis storage
+limiter.init_app(app, storage_uri=os.getenv('REDIS_URL', 'redis://redis:6379/0'))
+
+# Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
     'CACHE_REDIS_URL': os.getenv('REDIS_URL', 'redis://redis:6379/0'),
     'CACHE_DEFAULT_TIMEOUT': 300
 })
 cache.init_app(app)
+
+logger = setup_logging()
 
 # Setup CORS
 cors_origins = [
