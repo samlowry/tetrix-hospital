@@ -10,7 +10,7 @@ logger = logging.getLogger('tetrix')
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=os.getenv('REDIS_URL', 'redis://redis:6379/0')
+    storage_uri=os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 )
 
 def log_api_call(f):

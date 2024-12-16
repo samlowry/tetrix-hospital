@@ -133,7 +133,7 @@ def check_first_backer():
     except FileNotFoundError:
         return jsonify({'error': 'First backers list not found'}), 500
 
-@user.route('/register_early_backer', methods=['POST'])
+@user.route('/api/register_early_backer', methods=['POST'])
 @log_api_call
 def register_early_backer():
     try:
@@ -147,6 +147,19 @@ def register_early_backer():
         if not all([address, tg_init_data]):
             logger.error("Missing fields - Address or init_data")
             return jsonify({'error': 'Missing required fields'}), 400
+            
+        # Verify if it's really an early backer
+        normalized_address = normalize_address(address)
+        try:
+            with open('first_backers.txt', 'r') as f:
+                first_backers = set(normalize_address(line.strip()) for line in f)
+                
+            if normalized_address not in first_backers:
+                logger.error(f"Address {normalized_address} is not in first_backers.txt")
+                return jsonify({'error': 'Not an early backer'}), 403
+        except FileNotFoundError:
+            logger.error("first_backers.txt not found")
+            return jsonify({'error': 'Could not verify early backer status'}), 500
             
         # Verify Telegram WebApp data
         try:

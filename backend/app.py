@@ -56,14 +56,14 @@ db.init_app(app)
 
 # Initialize Redis and Cache
 redis_client = redis.Redis(
-    host=os.getenv('REDIS_HOST', 'redis'),
+    host=os.getenv('REDIS_HOST', 'localhost'),
     port=int(os.getenv('REDIS_PORT', 6379))
 )
 
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_URL': os.getenv('REDIS_URL', 'redis://redis:6379/0'),
+    'CACHE_REDIS_URL': os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
     'CACHE_DEFAULT_TIMEOUT': 300
 })
 cache.init_app(app)
