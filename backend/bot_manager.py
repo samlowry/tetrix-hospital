@@ -18,7 +18,7 @@ class BotManager:
         self.running = False
         self.flask_app = app
         self.frontend_url = os.getenv('FRONTEND_URL', 'https://tetrix-bot.vercel.app')
-        self.last_button_messages = {}  # Store last button message IDs
+        self.redis = app.extensions['redis']  # Get Redis from Flask app
         self.setup_handlers()
         logger.info("Bot manager initialized successfully")
 
@@ -29,6 +29,24 @@ class BotManager:
         self.application.add_handler(CommandHandler("stats", self.stats))
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
         logger.info("Bot handlers set up successfully")
+
+    def _get_message_key(self, user_id: int) -> str:
+        """Get Redis key for storing message ID"""
+        return f"bot:message:{user_id}"
+
+    async def _store_message_id(self, user_id: int, message_id: int):
+        """Store message ID in Redis"""
+        key = self._get_message_key(user_id)
+        self.redis.set(key, str(message_id), ex=3600)  # Expire after 1 hour
+        logger.info(f"Stored message ID {message_id} for user {user_id} in Redis")
+
+    async def _get_message_id(self, user_id: int) -> Optional[int]:
+        """Get message ID from Redis"""
+        key = self._get_message_key(user_id)
+        message_id = self.redis.get(key)
+        if message_id:
+            return int(message_id)
+        return None
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
@@ -53,9 +71,8 @@ class BotManager:
                 
                 try:
                     sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-                    # Store the message ID
-                    self.last_button_messages[update.effective_user.id] = sent_message.message_id
-                    logger.info(f"Stored button message ID {sent_message.message_id} for user {update.effective_user.id}")
+                    # Store the message ID in Redis
+                    await self._store_message_id(update.effective_user.id, sent_message.message_id)
                 except Exception as e:
                     logger.error(f"Error sending welcome message: {e}")
 
@@ -106,7 +123,10 @@ class BotManager:
             )
             
         elif query.data == 'create_wallet':
-            keyboard = [[InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})]]
+            keyboard = [
+                [InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})],
+                [InlineKeyboardButton("Return", callback_data='return_to_start')]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await query.edit_message_text(
@@ -119,8 +139,53 @@ class BotManager:
                 reply_markup=reply_markup
             )
             
+        elif query.data == 'return_to_start':
+            keyboard = [
+                [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
+                [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "Welcome to TETRIX! Let's get started:",
+                reply_markup=reply_markup
+            )
+            
         elif query.data == 'check_stats':
             await self.stats(update, context)
+            
+        elif query.data == 'show_invites':
+            with self.flask_app.app_context():
+                user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
+                if not user:
+                    await query.edit_message_text("Please connect your wallet first.")
+                    return
+                
+                codes = user.get_invite_codes()
+                
+                # Format invite codes
+                code_lines = []
+                for code_info in codes:
+                    if code_info['status'] == 'used_today':
+                        code_lines.append(f"~{code_info['code']}~ (Used)")
+                    else:
+                        code_lines.append(f"{code_info['code']}")
+                
+                while len(code_lines) < 5:
+                    code_lines.append("_empty slot_")
+                
+                keyboard = [
+                    [InlineKeyboardButton("Back to Menu", callback_data='back_to_menu')],
+                    [InlineKeyboardButton("Refresh Codes", callback_data='show_invites')]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                message = "Your Invite Codes:\n\n" + "\n".join(code_lines)
+                await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        elif query.data == 'back_to_menu':
+            # Show dashboard for registered users
+            await self.display_user_dashboard(update.effective_user.id)
 
     async def handle_wallet_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle wallet address messages"""
@@ -144,7 +209,7 @@ class BotManager:
                         )
                     else:
                         await update.message.reply_text(
-                            "�� This wallet address doesn't match our records.\n"
+                            " This wallet address doesn't match our records.\n"
                             "Please use the wallet address you registered with."
                         )
                     return
@@ -210,27 +275,13 @@ class BotManager:
         # Implement your validation logic here
         return True
 
-    async def display_user_dashboard(self, telegram_id: int):
+    async def display_user_dashboard(self, telegram_id: int, message_id: Optional[int] = None):
         """Display user dashboard with points and stats"""
         with self.flask_app.app_context():
             try:
                 user = self.User.query.filter_by(telegram_id=telegram_id).first()
                 if not user:
                     return
-                
-                # Try to delete the last message with buttons
-                try:
-                    if telegram_id in self.last_button_messages:
-                        last_message_id = self.last_button_messages[telegram_id]
-                        await self.application.bot.delete_message(
-                            chat_id=telegram_id,
-                            message_id=last_message_id
-                        )
-                        del self.last_button_messages[telegram_id]  # Clean up
-                        logger.info(f"Deleted message {last_message_id} for user {telegram_id}")
-                except Exception as e:
-                    logger.error(f"Error deleting previous message: {e}")
-                    # Continue even if deletion fails
                 
                 stats = user.get_stats()
                 
@@ -239,18 +290,6 @@ class BotManager:
                 bar_length = 20
                 filled = int((health_percentage / 100) * bar_length)
                 health_bar = "\\[" + "\\=" * filled + " " * (bar_length - filled) + "\\]"
-                
-                # Format invite codes with status
-                code_lines = []
-                for code_info in stats['invite_codes']:
-                    if code_info['status'] == 'used_today':
-                        # Strike-through for used codes
-                        code_lines.append(f"~`{code_info['code']}`~ \\(Used\\)")
-                    else:
-                        code_lines.append(f"`{code_info['code']}`")
-                
-                while len(code_lines) < 5:  # Pad with empty slots
-                    code_lines.append("\\_empty slot\\_")
                 
                 # Escape special characters for MarkdownV2
                 def escape_md(text):
@@ -270,17 +309,49 @@ Total Points: {escape_md(str(stats['points']))}
 Points Breakdown:
 For holding: {escape_md(str(stats['points_breakdown']['holding']))} points
 For invites: {escape_md(str(stats['points_breakdown']['invites']))} points
-Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))} points
+Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))} points"""
 
-Your Invite Codes:
-{chr(10).join(code_lines)}
-"""
+                # Add buttons for actions
+                keyboard = [
+                    [InlineKeyboardButton("Show Invite Codes", callback_data='show_invites')],
+                    [InlineKeyboardButton("Refresh Stats", callback_data='check_stats')]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await self.application.bot.send_message(
-                    telegram_id,
-                    message,
-                    parse_mode='MarkdownV2'
-                )
+                # Try to get message ID from Redis if not provided
+                if not message_id:
+                    message_id = await self._get_message_id(telegram_id)
+                    if message_id:
+                        logger.info(f"Using message ID {message_id} from Redis for user {telegram_id}")
+                
+                if message_id:
+                    # Edit existing message
+                    try:
+                        await self.application.bot.edit_message_text(
+                            chat_id=telegram_id,
+                            message_id=message_id,
+                            text=message,
+                            parse_mode='MarkdownV2',
+                            reply_markup=reply_markup
+                        )
+                        logger.info(f"Successfully edited message {message_id} for user {telegram_id}")
+                    except Exception as e:
+                        logger.error(f"Error editing message: {e}")
+                        # If editing fails, send a new message
+                        await self.application.bot.send_message(
+                            telegram_id,
+                            message,
+                            parse_mode='MarkdownV2',
+                            reply_markup=reply_markup
+                        )
+                else:
+                    # Send new message
+                    await self.application.bot.send_message(
+                        telegram_id,
+                        message,
+                        parse_mode='MarkdownV2',
+                        reply_markup=reply_markup
+                    )
                 
             except Exception as e:
                 logger.error(f"Error displaying dashboard: {e}")

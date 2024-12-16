@@ -44,8 +44,9 @@ export function UserDashboard() {
 
         if (isFirstBacker) {
           console.log('Attempting to register early backer...');
-          console.log('Telegram init data:', window.Telegram.WebApp.initData);
-          const { success } = await api.registerEarlyBacker(userAddress);
+          const messageId = window.Telegram.WebApp.initDataUnsafe?.start_param;
+          console.log('Message ID from start_param:', messageId);
+          const { success } = await api.registerEarlyBacker(userAddress, messageId);
           console.log('Registration result:', success);
           if (success) {
             setIsRegistered(true);

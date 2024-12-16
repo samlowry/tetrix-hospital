@@ -17,11 +17,16 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     wallet_address = db.Column(db.String(255), unique=True, nullable=False)
     registration_date = db.Column(db.DateTime, default=datetime.utcnow)
-    last_slot_reset = db.Column(db.DateTime, default=datetime.utcnow)
+    last_slot_reset = db.Column(db.DateTime)  # Will be set in __init__
     telegram_id = db.Column(db.BigInteger, unique=True, nullable=True)
     max_invite_slots = db.Column(db.Integer, default=5)  # Custom slot number
     ignore_slot_reset = db.Column(db.Boolean, default=False)  # Option to ignore daily reset
     
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Set last_slot_reset to 25 hours ago to ensure first invites are available
+        self.last_slot_reset = datetime.utcnow() - timedelta(hours=25)
+        
     # Relationships
     created_codes = db.relationship('InviteCode', 
                                   foreign_keys='InviteCode.creator_id',
@@ -50,25 +55,11 @@ class User(db.Model):
             InviteCode.used_at.between(today_start, today_end)
         ).all()
         
-        # Check if we need to generate new codes
-        should_generate = False
-        if self.ignore_slot_reset:
-            # For users with ignore_slot_reset, only check total unused codes
-            should_generate = len(unused_codes) < self.max_invite_slots
-        else:
-            # For regular users, check if it's a new day and we have less than max slots
-            if self.last_slot_reset.date() < today:
-                total_slots = len(unused_codes) + len(used_today)
-                should_generate = total_slots < self.max_invite_slots
+        # Always generate codes if we have less than max_invite_slots
+        should_generate = len(unused_codes) < self.max_invite_slots
         
         if should_generate:
-            if not self.ignore_slot_reset:
-                # Set last_slot_reset to the start of current day
-                self.last_slot_reset = today_start
-            
             codes_needed = self.max_invite_slots - len(unused_codes)
-            if not self.ignore_slot_reset:
-                codes_needed -= len(used_today)
             
             if codes_needed > 0:
                 for _ in range(codes_needed):

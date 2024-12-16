@@ -165,7 +165,8 @@ def register_early_backer():
         try:
             init_data = parse_init_data(tg_init_data)
             telegram_id = init_data['user']['id']
-            logger.info(f"Successfully parsed init data. Telegram ID: {telegram_id}")
+            message_id = init_data.get('start_param')  # Get message_id from start_param
+            logger.info(f"Successfully parsed init data. Telegram ID: {telegram_id}, Message ID: {message_id}")
         except Exception as e:
             logger.error(f"Invalid Telegram init data: {e}")
             return jsonify({'error': 'Invalid Telegram data'}), 400
@@ -188,7 +189,7 @@ def register_early_backer():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(current_app.bot_manager.display_user_dashboard(telegram_id))
+            loop.run_until_complete(current_app.bot_manager.display_user_dashboard(telegram_id, message_id))
         finally:
             loop.close()
         

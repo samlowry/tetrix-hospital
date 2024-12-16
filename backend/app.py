@@ -60,6 +60,9 @@ redis_client = redis.Redis(
     port=int(os.getenv('REDIS_PORT', 6379))
 )
 
+# Add Redis to Flask extensions
+app.extensions['redis'] = redis_client
+
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
