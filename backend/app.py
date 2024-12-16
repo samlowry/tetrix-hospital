@@ -70,12 +70,18 @@ cache = Cache(config={
 cache.init_app(app)
 
 # Setup CORS
-cors_origins = os.getenv('CORS_ORIGINS', 'https://your-app.com').split(',')
+cors_origins = [
+    'http://localhost:3000',
+    'https://tetrix-hospital.pages.dev',
+    'https://5fa5-109-245-96-58.ngrok-free.app'
+]
 CORS(app, resources={
     r"/*": {
         "origins": cors_origins,
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
     }
 })
 
