@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import secrets
 from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
@@ -19,6 +19,8 @@ class User(db.Model):
     registration_date = db.Column(db.DateTime, default=datetime.utcnow)
     last_slot_reset = db.Column(db.DateTime, default=datetime.utcnow)
     telegram_id = db.Column(db.BigInteger, unique=True, nullable=True)
+    max_invite_slots = db.Column(db.Integer, default=5)  # Custom slot number
+    ignore_slot_reset = db.Column(db.Boolean, default=False)  # Option to ignore daily reset
     
     # Relationships
     created_codes = db.relationship('InviteCode', 
@@ -48,11 +50,25 @@ class User(db.Model):
             InviteCode.used_at.between(today_start, today_end)
         ).all()
         
-        # If it's a new day and we have less than 5 total codes (used today + unused), generate new ones
-        if self.last_slot_reset.date() < today:
-            self.last_slot_reset = datetime.utcnow()
-            total_slots = len(unused_codes) + len(used_today)
-            codes_needed = 5 - total_slots
+        # Check if we need to generate new codes
+        should_generate = False
+        if self.ignore_slot_reset:
+            # For users with ignore_slot_reset, only check total unused codes
+            should_generate = len(unused_codes) < self.max_invite_slots
+        else:
+            # For regular users, check if it's a new day and we have less than max slots
+            if self.last_slot_reset.date() < today:
+                total_slots = len(unused_codes) + len(used_today)
+                should_generate = total_slots < self.max_invite_slots
+        
+        if should_generate:
+            if not self.ignore_slot_reset:
+                # Set last_slot_reset to the start of current day
+                self.last_slot_reset = today_start
+            
+            codes_needed = self.max_invite_slots - len(unused_codes)
+            if not self.ignore_slot_reset:
+                codes_needed -= len(used_today)
             
             if codes_needed > 0:
                 for _ in range(codes_needed):
@@ -147,7 +163,9 @@ class User(db.Model):
                 'invites': invite_points,
                 'early_backer_bonus': early_backer_bonus
             },
-            'invite_codes': codes
+            'invite_codes': codes,
+            'max_invite_slots': self.max_invite_slots,
+            'ignore_slot_reset': self.ignore_slot_reset
         }
 
     @classmethod

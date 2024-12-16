@@ -224,31 +224,38 @@ class BotManager:
                 health_percentage = 42.0  # Dummy value for now
                 bar_length = 20
                 filled = int((health_percentage / 100) * bar_length)
-                health_bar = "[" + "=" * filled + " " * (bar_length - filled) + "]"
+                health_bar = "\\[" + "=" * filled + " " * (bar_length - filled) + "\\]"
                 
                 # Format invite codes with status
                 code_lines = []
                 for code_info in stats['invite_codes']:
                     if code_info['status'] == 'used_today':
                         # Strike-through for used codes
-                        code_lines.append(f"~`{code_info['code']}`~ (Used)")
+                        code_lines.append(f"~`{code_info['code']}`~ \\(Used\\)")
                     else:
                         code_lines.append(f"`{code_info['code']}`")
                 
                 while len(code_lines) < 5:  # Pad with empty slots
                     code_lines.append("_empty slot_")
                 
-                # Format message
+                # Escape special characters for MarkdownV2
+                def escape_md(text):
+                    chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                    for char in chars:
+                        text = text.replace(char, f"\\{char}")
+                    return text
+                
+                # Format message with escaped characters
                 message = f"""
 TETRIX health status:
-{health_bar} {health_percentage:.1f}%
+{health_bar} {escape_md(f"{health_percentage:.1f}")}%
 
-Total Points: {stats['points']}
+Total Points: {escape_md(str(stats['points']))}
 
 Points Breakdown:
-For holding: {stats['points_breakdown']['holding']} points
-For invites: {stats['points_breakdown']['invites']} points
-Early backer bonus: {stats['points_breakdown']['early_backer_bonus']} points
+For holding: {escape_md(str(stats['points_breakdown']['holding']))} points
+For invites: {escape_md(str(stats['points_breakdown']['invites']))} points
+Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))} points
 
 Your Invite Codes:
 {chr(10).join(code_lines)}
