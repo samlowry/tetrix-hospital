@@ -220,11 +220,11 @@ class BotManager:
                 
                 stats = user.get_stats()
                 
-                # Create ASCII health bar
+                # Create ASCII health bar (escape all special chars)
                 health_percentage = 42.0  # Dummy value for now
                 bar_length = 20
                 filled = int((health_percentage / 100) * bar_length)
-                health_bar = "\\[" + "=" * filled + " " * (bar_length - filled) + "\\]"
+                health_bar = "\\[" + "\\=" * filled + " " * (bar_length - filled) + "\\]"
                 
                 # Format invite codes with status
                 code_lines = []
@@ -236,14 +236,15 @@ class BotManager:
                         code_lines.append(f"`{code_info['code']}`")
                 
                 while len(code_lines) < 5:  # Pad with empty slots
-                    code_lines.append("_empty slot_")
+                    code_lines.append("\\_empty slot\\_")
                 
                 # Escape special characters for MarkdownV2
                 def escape_md(text):
                     chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                    escaped = str(text)
                     for char in chars:
-                        text = text.replace(char, f"\\{char}")
-                    return text
+                        escaped = escaped.replace(char, f"\\{char}")
+                    return escaped
                 
                 # Format message with escaped characters
                 message = f"""
@@ -269,3 +270,4 @@ Your Invite Codes:
                 
             except Exception as e:
                 logger.error(f"Error displaying dashboard: {e}")
+                logger.error(f"Message that failed: {message}")  # Log the message that failed
