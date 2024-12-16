@@ -183,9 +183,14 @@ def register_early_backer():
         db.session.commit()
         logger.info(f"User saved to database successfully")
         
-        # Trigger dashboard display
-        logger.info(f"Triggering dashboard display for telegram_id {telegram_id}")
-        asyncio.create_task(current_app.bot_manager.display_user_dashboard(telegram_id))
+        # Schedule dashboard display in background
+        logger.info(f"Scheduling dashboard display for telegram_id {telegram_id}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(current_app.bot_manager.display_user_dashboard(telegram_id))
+        finally:
+            loop.close()
         
         return jsonify({'success': True})
         
