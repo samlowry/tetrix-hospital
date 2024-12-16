@@ -43,15 +43,22 @@ export function TonConnect() {
     // Refresh payload periodically
     useInterval(recreateProofPayload, api.refreshIntervalMs);
 
-    // Handle wallet connection
+    // Handle wallet connection and token restoration
     useEffect(() => {
-        if (!wallet) {
-            api.reset();
-            setAuthorized(false);
-            return;
-        }
+        const checkConnection = async () => {
+            if (!wallet) {
+                api.reset();
+                setAuthorized(false);
+                return;
+            }
 
-        const checkProof = async () => {
+            // If we have a token but no proof, consider it authorized
+            if (api.accessToken) {
+                setAuthorized(true);
+                return;
+            }
+
+            // If we have proof, verify it
             if (wallet.connectItems?.tonProof && 'proof' in wallet.connectItems.tonProof) {
                 await api.connectWallet({
                     address: wallet.account.address,
@@ -65,18 +72,22 @@ export function TonConnect() {
                         public_key: wallet.account.publicKey
                     }
                 });
-            }
 
-            if (!api.accessToken) {
+                if (!api.accessToken) {
+                    tonConnectUI.disconnect();
+                    setAuthorized(false);
+                    return;
+                }
+
+                setAuthorized(true);
+            } else {
+                // No proof and no token, need to reconnect
                 tonConnectUI.disconnect();
                 setAuthorized(false);
-                return;
             }
-
-            setAuthorized(true);
         };
 
-        checkProof();
+        checkConnection();
     }, [wallet, tonConnectUI]);
 
     if (!authorized) {
