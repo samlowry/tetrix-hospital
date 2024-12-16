@@ -14,6 +14,12 @@ declare global {
   }
 }
 
+// Configure Telegram Web App
+if (window.Telegram?.WebApp) {
+  window.Telegram.WebApp.expand();
+  window.Telegram.WebApp.enableClosingConfirmation();
+}
+
 // Add global styles
 const style = document.createElement('style');
 style.textContent = `
