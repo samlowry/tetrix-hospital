@@ -7,7 +7,10 @@ export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
     const [tonConnectUI] = useTonConnectUI();
     const wallet = useTonWallet();
-    const [isConnected, setIsConnected] = useState(false);
+    const [isConnected, setIsConnected] = useState(() => {
+        // Initialize connection state based on stored token
+        return !!api.accessToken;
+    });
 
     const generatePayload = useCallback(async () => {
         try {
@@ -41,9 +44,19 @@ export function TonConnect() {
         }
     }, [tonConnectUI, generatePayload, isConnected]);
 
+    // Check connection status on mount and when wallet changes
+    useEffect(() => {
+        if (wallet && api.accessToken) {
+            console.log('Found existing connection');
+            setIsConnected(true);
+            firstProofLoading.current = false;
+        }
+    }, [wallet]);
+
     // Initial payload generation only if not connected
     useEffect(() => {
         if (firstProofLoading.current && !isConnected) {
+            console.log('No existing connection, generating initial payload');
             recreateProofPayload();
         }
     }, [recreateProofPayload, isConnected]);
@@ -61,9 +74,9 @@ export function TonConnect() {
                 return;
             }
 
-            // If we have a valid wallet connection, mark as connected
-            if (wallet && !w.connectItems?.tonProof) {
-                console.log('Restored connection without proof');
+            // If we have a valid wallet connection and token, mark as connected
+            if (wallet && api.accessToken && !w.connectItems?.tonProof) {
+                console.log('Restored connection with existing token');
                 setIsConnected(true);
                 return;
             }
@@ -89,12 +102,12 @@ export function TonConnect() {
                     tonConnectUI.disconnect();
                     setIsConnected(false);
                 }
-            } else {
+            } else if (!isConnected) {
                 console.log('No proof in wallet connection, requesting new proof');
                 await recreateProofPayload();
             }
         });
-    }, [tonConnectUI, recreateProofPayload, wallet]);
+    }, [tonConnectUI, recreateProofPayload, wallet, isConnected]);
 
     return null;
 } 
