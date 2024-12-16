@@ -6,10 +6,52 @@ import os
 import sys
 import asyncio
 import logging
-from telegram import parse_init_data
-from telegram.ext import Application
+import hashlib
+import hmac
+import json
+from urllib.parse import parse_qs
 
 logger = logging.getLogger('tetrix')
+
+def parse_init_data(init_data: str) -> dict:
+    """Parse and validate Telegram WebApp init data"""
+    try:
+        # Get bot token from environment
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        if not bot_token:
+            raise ValueError("Bot token not found")
+
+        # Parse the data
+        parsed_data = dict(parse_qs(init_data))
+        data_check_string = '\n'.join(
+            f'{k}={v[0]}' for k, v in sorted(parsed_data.items()) if k != 'hash'
+        )
+
+        # Calculate secret key
+        secret_key = hmac.new(
+            'WebAppData'.encode(),
+            bot_token.encode(),
+            hashlib.sha256
+        ).digest()
+
+        # Calculate data hash
+        data_hash = hmac.new(
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        # Verify hash
+        if data_hash != parsed_data.get('hash', [None])[0]:
+            raise ValueError("Invalid hash")
+
+        # Parse user data
+        user_data = json.loads(parsed_data.get('user', ['{}'])[0])
+        return {'user': user_data}
+
+    except Exception as e:
+        logger.error(f"Error parsing init data: {e}")
+        raise ValueError("Invalid init data")
 
 def normalize_address(address):
     # Remove '0:' prefix if present
