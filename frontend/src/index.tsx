@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { GlobalStyles } from './styles/GlobalStyles';
+import './patch-local-storage';
 
 // Initialize Telegram Web App
 declare global {
@@ -52,6 +53,10 @@ root.render(
     <GlobalStyles />
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
+      restoreConnection={true}
+      actionsConfiguration={{
+        twaReturnUrl: 'https://t.me/tetrix_bot/app'
+      }}
     >
       <App />
     </TonConnectUIProvider>
