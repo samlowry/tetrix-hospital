@@ -1,44 +1,40 @@
-import { FC, useState, useEffect } from 'react';
-import { User } from '../types';
-import { api } from '../api';
+import { FC } from 'react';
 import { useTonWallet } from '@tonconnect/ui-react';
-import { Loading } from './Loading';
+import styled from 'styled-components';
+
+const InfoPanel = styled.div`
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--tg-theme-hint-color);
+`;
+
+const Address = styled.div`
+    font-family: monospace;
+    word-break: break-all;
+    background: var(--tg-theme-secondary-bg-color);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+`;
+
+const HintText = styled.p`
+    color: var(--tg-theme-hint-color);
+    font-size: 14px;
+    margin-top: 10px;
+`;
 
 export const UserDashboard: FC = () => {
     const wallet = useTonWallet();
-    const [stats, setStats] = useState<User | null>(null);
-    const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const loadStats = async () => {
-            if (!wallet?.account.address) {
-                setStats(null);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                const data = await api.getUserStats(wallet.account.address);
-                setStats(data);
-            } catch (error) {
-                console.error(error);
-                setStats(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadStats();
-    }, [wallet]);
-
-    if (loading) return <Loading />;
-    if (!stats) return null;
+    if (!wallet) return null;
 
     return (
-        <div>
-            <h2>Your Stats</h2>
-            <p>Points: {stats.points}</p>
-            <p>Total Invites: {stats.total_invites}</p>
-        </div>
+        <InfoPanel>
+            <h3>Wallet Connected Successfully</h3>
+            <Address>{wallet.account.address}</Address>
+            <HintText>
+                Please use the Telegram bot to register your wallet and start earning TETRIX tokens.
+            </HintText>
+        </InfoPanel>
     );
 }; 
