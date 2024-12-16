@@ -40,27 +40,24 @@ class BotManager:
             user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
             
             if user:
-                keyboard = [
-                    [InlineKeyboardButton("Reconnect TON Wallet", callback_data='reconnect_wallet')],
-                    [InlineKeyboardButton("Check Stats", callback_data='check_stats')]
-                ]
-                message = "Welcome back to TETRIX! What would you like to do?"
+                # Show dashboard for registered users
+                await self.display_user_dashboard(update.effective_user.id)
             else:
                 keyboard = [
                     [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
                     [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
                 ]
                 message = "Welcome to TETRIX! Let's get started:"
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            try:
-                sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-                # Store the message ID
-                self.last_button_messages[update.effective_user.id] = sent_message.message_id
-                logger.info(f"Stored button message ID {sent_message.message_id} for user {update.effective_user.id}")
-            except Exception as e:
-                logger.error(f"Error sending welcome message: {e}")
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                try:
+                    sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
+                    # Store the message ID
+                    self.last_button_messages[update.effective_user.id] = sent_message.message_id
+                    logger.info(f"Stored button message ID {sent_message.message_id} for user {update.effective_user.id}")
+                except Exception as e:
+                    logger.error(f"Error sending welcome message: {e}")
 
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /stats command"""
@@ -147,7 +144,7 @@ class BotManager:
                         )
                     else:
                         await update.message.reply_text(
-                            "❌ This wallet address doesn't match our records.\n"
+                            "�� This wallet address doesn't match our records.\n"
                             "Please use the wallet address you registered with."
                         )
                     return
