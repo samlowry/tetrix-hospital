@@ -167,20 +167,21 @@ class BotManager:
                 code_lines = []
                 for code_info in codes:
                     if code_info['status'] == 'used_today':
-                        code_lines.append(f"~{code_info['code']}~ (Used)")
+                        code_lines.append(f"~~{code_info['code']}~~")
                     else:
-                        code_lines.append(f"{code_info['code']}")
+                        code_lines.append(f"```{code_info['code']}```")
                 
                 while len(code_lines) < 5:
-                    code_lines.append("_empty slot_")
+                    code_lines.append("*empty*")
                 
                 keyboard = [
-                    [InlineKeyboardButton("Back to Menu", callback_data='back_to_menu')],
-                    [InlineKeyboardButton("Refresh Codes", callback_data='show_invites')]
+                    [InlineKeyboardButton("Refresh Codes", callback_data='show_invites')],
+                    [InlineKeyboardButton("Back to Stats", callback_data='back_to_menu')]                    
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                message = "Your Invite Codes:\n\n" + "\n".join(code_lines)
+                # Join codes with double newlines for separate copy blocks
+                message = "Your Invite Codes:"+"\n".join(code_lines)+"\n"
                 await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
             
         elif query.data == 'back_to_menu':
@@ -313,8 +314,8 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
 
                 # Add buttons for actions
                 keyboard = [
-                    [InlineKeyboardButton("Show Invite Codes", callback_data='show_invites')],
-                    [InlineKeyboardButton("Refresh Stats", callback_data='check_stats')]
+                    [InlineKeyboardButton("Refresh Stats", callback_data='check_stats')],
+                    [InlineKeyboardButton("Show Invite Codes", callback_data='show_invites')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
