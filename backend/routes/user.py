@@ -1,12 +1,15 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
 import os
 import sys
 import asyncio
+import logging
 from telegram import parse_init_data
 from telegram.ext import Application
+
+logger = logging.getLogger('tetrix')
 
 def normalize_address(address):
     # Remove '0:' prefix if present
