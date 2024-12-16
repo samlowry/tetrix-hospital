@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { WalletConnect } from './components/WalletConnect';
 import { UserDashboard } from './components/UserDashboard';
 import { useTonWallet } from '@tonconnect/ui-react';
+import { TonConnect } from './components/TonConnect';
 
 const Container = styled.div`
     padding: 20px;
@@ -28,6 +29,7 @@ const App: FC = () => {
 
     return (
         <Container>
+            <TonConnect />
             <Header>
                 <h1>TETRIX</h1>
             </Header>

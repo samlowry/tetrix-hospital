@@ -10,6 +10,7 @@ export function TonConnect() {
     const generatePayload = useCallback(async () => {
         try {
             const { payload } = await api.getChallenge();
+            console.log('Generated payload:', payload);
             return { tonProof: payload };
         } catch (e) {
             console.error('Failed to generate payload:', e);
@@ -25,6 +26,7 @@ export function TonConnect() {
 
         const payload = await generatePayload();
         if (payload) {
+            console.log('Setting proof request:', payload);
             tonConnectUI.setConnectRequestParameters({ state: 'ready', value: payload });
         } else {
             tonConnectUI.setConnectRequestParameters(null);
@@ -44,12 +46,14 @@ export function TonConnect() {
     // Handle wallet connection
     useEffect(() => {
         return tonConnectUI.onStatusChange(async (w) => {
+            console.log('Wallet status changed:', w);
             if (!w) {
                 api.reset();
                 return;
             }
 
             if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
+                console.log('Got proof from wallet:', w.connectItems.tonProof);
                 try {
                     await api.connectWallet({
                         address: w.account.address,
@@ -67,9 +71,12 @@ export function TonConnect() {
                     console.error('Wallet verification failed:', error);
                     tonConnectUI.disconnect();
                 }
+            } else {
+                console.log('No proof in wallet connection, requesting new proof');
+                await recreateProofPayload();
             }
         });
-    }, [tonConnectUI]);
+    }, [tonConnectUI, recreateProofPayload]);
 
     return null;
 } 
