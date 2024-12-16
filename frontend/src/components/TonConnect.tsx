@@ -3,7 +3,7 @@ import { useTonConnectUI, TonProofItemReplySuccess } from '@tonconnect/ui-react'
 import { useInterval } from '../hooks/useInterval';
 import { api } from '../api';
 
-const REFRESH_INTERVAL = 9 * 60 * 1000; // 9 minutes
+const REFRESH_INTERVAL = 9 * 60 * 1000;
 
 export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
@@ -59,18 +59,6 @@ export function TonConnect() {
             return false;
         }
     }, []);
-
-    // Handle initial connection restore
-    useEffect(() => {
-        const wallet = tonConnectUI.wallet;
-        if (wallet && !localStorage.getItem('auth_token')) {
-            if (wallet.connectItems?.tonProof && 'proof' in wallet.connectItems.tonProof) {
-                checkProof(wallet.connectItems.tonProof.proof, wallet.account);
-            } else {
-                recreateProofPayload();
-            }
-        }
-    }, [tonConnectUI.wallet, checkProof, recreateProofPayload]);
 
     useEffect(() => {
         if (firstProofLoading.current) {
