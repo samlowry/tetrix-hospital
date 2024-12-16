@@ -49,12 +49,12 @@ export function UserDashboard() {
           console.log('Registration result:', success);
           if (success) {
             setIsRegistered(true);
-            console.log('Registration successful, closing WebApp in 3 seconds...');
-            // Close WebApp after 3 seconds
+            console.log('Registration successful, closing WebApp in 6 seconds...');
+            // Close WebApp after 6 seconds
             setTimeout(() => {
               console.log('Closing WebApp...');
               window.Telegram.WebApp.close();
-            }, 3000);
+            }, 6000);
           }
         }
       } catch (error) {
