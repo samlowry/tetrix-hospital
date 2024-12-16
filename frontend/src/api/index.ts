@@ -28,6 +28,11 @@ class ApiService {
 
     constructor() {
         this.accessToken = localStorage.getItem(this.localStorageKey);
+        
+        // If no token is found, prepare for a new connection
+        if (!this.accessToken) {
+            this.getChallenge().catch(console.error);
+        }
     }
 
     private get axiosInstance() {
@@ -106,6 +111,8 @@ class ApiService {
     reset() {
         this.accessToken = null;
         localStorage.removeItem(this.localStorageKey);
+        // Prepare for new connection immediately
+        this.getChallenge().catch(console.error);
     }
 }
 
