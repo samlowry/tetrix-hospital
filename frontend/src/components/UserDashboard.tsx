@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useTonAddress } from '@tonconnect/ui-react';
+import { api } from '../api';
 
 const DashboardContainer = styled.div`
   padding: 20px;
@@ -39,15 +40,7 @@ export function UserDashboard() {
 
   React.useEffect(() => {
     if (userAddress) {
-      // Check if user is among first backers
-      fetch('/user/check_first_backer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ address: userAddress }),
-      })
-        .then(response => response.json())
+      api.checkFirstBacker(userAddress)
         .then(data => {
           setIsFirstBacker(data.isFirstBacker);
         })

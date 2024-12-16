@@ -114,6 +114,17 @@ class ApiService {
         // Prepare for new connection immediately
         this.getChallenge().catch(console.error);
     }
+
+    async checkFirstBacker(address: string) {
+        try {
+            const response = await this.axiosInstance.post('/user/check_first_backer', {
+                address
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
+    }
 }
 
 export const api = new ApiService(); 
