@@ -60,6 +60,18 @@ export function TonConnect() {
         }
     }, []);
 
+    // Handle initial connection restore
+    useEffect(() => {
+        const wallet = tonConnectUI.wallet;
+        if (wallet && !localStorage.getItem('auth_token')) {
+            if (wallet.connectItems?.tonProof && 'proof' in wallet.connectItems.tonProof) {
+                checkProof(wallet.connectItems.tonProof.proof, wallet.account);
+            } else {
+                recreateProofPayload();
+            }
+        }
+    }, [tonConnectUI.wallet, checkProof, recreateProofPayload]);
+
     useEffect(() => {
         if (firstProofLoading.current) {
             recreateProofPayload();

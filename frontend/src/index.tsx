@@ -52,6 +52,7 @@ root.render(
     <GlobalStyles />
     <TonConnectUIProvider 
       manifestUrl={manifestUrl}
+      restoreConnection={true}
     >
       <App />
     </TonConnectUIProvider>
