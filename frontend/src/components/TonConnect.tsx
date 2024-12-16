@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useInterval } from '../hooks/useInterval';
 import { api } from '../api';
 
 export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
     const [tonConnectUI] = useTonConnectUI();
+    const wallet = useTonWallet();
+    const [authorized, setAuthorized] = useState(false);
 
     const generatePayload = useCallback(async () => {
         try {
@@ -43,32 +45,48 @@ export function TonConnect() {
 
     // Handle wallet connection
     useEffect(() => {
-        return tonConnectUI.onStatusChange(async (w) => {
-            if (!w) {
-                api.reset();
-                return;
-            }
+        if (!wallet) {
+            api.reset();
+            setAuthorized(false);
+            return;
+        }
 
-            if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
+        const checkProof = async () => {
+            if (wallet.connectItems?.tonProof && 'proof' in wallet.connectItems.tonProof) {
                 await api.connectWallet({
-                    address: w.account.address,
+                    address: wallet.account.address,
                     proof: {
                         type: 'ton_proof',
-                        domain: w.connectItems.tonProof.proof.domain,
-                        timestamp: w.connectItems.tonProof.proof.timestamp,
-                        payload: w.connectItems.tonProof.proof.payload,
-                        signature: w.connectItems.tonProof.proof.signature,
-                        state_init: w.account.walletStateInit,
-                        public_key: w.account.publicKey
+                        domain: wallet.connectItems.tonProof.proof.domain,
+                        timestamp: wallet.connectItems.tonProof.proof.timestamp,
+                        payload: wallet.connectItems.tonProof.proof.payload,
+                        signature: wallet.connectItems.tonProof.proof.signature,
+                        state_init: wallet.account.walletStateInit,
+                        public_key: wallet.account.publicKey
                     }
                 });
             }
 
             if (!api.accessToken) {
                 tonConnectUI.disconnect();
+                setAuthorized(false);
+                return;
             }
-        });
-    }, [tonConnectUI]);
 
-    return null;
+            setAuthorized(true);
+        };
+
+        checkProof();
+    }, [wallet, tonConnectUI]);
+
+    if (!authorized) {
+        return null;
+    }
+
+    return (
+        <div style={{ display: 'none' }}>
+            {/* Hidden component that maintains the connection */}
+            Connected and authorized
+        </div>
+    );
 } 

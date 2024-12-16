@@ -1,16 +1,16 @@
 import { FC, useState, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../api';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonWallet } from '@tonconnect/ui-react';
 import { Loading } from './Loading';
 
 export const UserDashboard: FC = () => {
-    const [tonConnectUI] = useTonConnectUI();
+    const wallet = useTonWallet();
     const [stats, setStats] = useState<User | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const handleStatusChange = async (wallet: any) => {
+        const loadStats = async () => {
             if (!wallet?.account.address) {
                 setStats(null);
                 return;
@@ -28,8 +28,8 @@ export const UserDashboard: FC = () => {
             }
         };
 
-        return tonConnectUI.onStatusChange(handleStatusChange);
-    }, [tonConnectUI]);
+        loadStats();
+    }, [wallet]);
 
     if (loading) return <Loading />;
     if (!stats) return null;

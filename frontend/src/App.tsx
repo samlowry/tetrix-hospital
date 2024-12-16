@@ -1,8 +1,8 @@
-import { FC, useState, useEffect } from 'react';
+import { FC } from 'react';
 import styled from 'styled-components';
 import { WalletConnect } from './components/WalletConnect';
 import { UserDashboard } from './components/UserDashboard';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonWallet } from '@tonconnect/ui-react';
 
 const Container = styled.div`
     padding: 20px;
@@ -24,14 +24,7 @@ const Card = styled.div`
 `;
 
 const App: FC = () => {
-    const [tonConnectUI] = useTonConnectUI();
-    const [isConnected, setIsConnected] = useState(false);
-
-    useEffect(() => {
-        return tonConnectUI.onStatusChange((wallet) => {
-            setIsConnected(!!wallet);
-        });
-    }, [tonConnectUI]);
+    const wallet = useTonWallet();
 
     return (
         <Container>
@@ -44,7 +37,7 @@ const App: FC = () => {
                 <WalletConnect />
             </Card>
 
-            {isConnected && (
+            {wallet && (
                 <Card>
                     <UserDashboard />
                 </Card>
