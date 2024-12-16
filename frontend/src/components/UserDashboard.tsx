@@ -46,10 +46,8 @@ export function UserDashboard() {
   return (
     <>
       <Card>
-        <Text>{userAddress}</Text>
         <Title>Wallet Status</Title>
         <Text>Wallet Connected Successfully</Text>
-        <Text>{userAddress}</Text>
         {isFirstBacker && (
           <HighlightText>🌟 Congratulations! You are among our first backers!</HighlightText>
         )}
