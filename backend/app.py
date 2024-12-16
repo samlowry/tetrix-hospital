@@ -60,9 +60,6 @@ redis_client = redis.Redis(
     port=int(os.getenv('REDIS_PORT', 6379))
 )
 
-# Configure limiter with Redis storage
-limiter.init_app(app, storage_uri=os.getenv('REDIS_URL', 'redis://redis:6379/0'))
-
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
@@ -70,6 +67,7 @@ cache = Cache(config={
     'CACHE_DEFAULT_TIMEOUT': 300
 })
 cache.init_app(app)
+limiter.init_app(app)
 
 logger = setup_logging()
 
