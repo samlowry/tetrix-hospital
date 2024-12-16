@@ -18,6 +18,7 @@ class BotManager:
         self.running = False
         self.flask_app = app
         self.frontend_url = os.getenv('FRONTEND_URL', 'https://tetrix-bot.vercel.app')
+        self.last_button_messages = {}  # Store last button message IDs
         self.setup_handlers()
         logger.info("Bot manager initialized successfully")
 
@@ -54,8 +55,10 @@ class BotManager:
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             try:
-                await update.message.reply_text(message, reply_markup=reply_markup)
-                logger.info("Sent welcome message successfully")
+                sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
+                # Store the message ID
+                self.last_button_messages[update.effective_user.id] = sent_message.message_id
+                logger.info(f"Stored button message ID {sent_message.message_id} for user {update.effective_user.id}")
             except Exception as e:
                 logger.error(f"Error sending welcome message: {e}")
 
@@ -217,6 +220,20 @@ class BotManager:
                 user = self.User.query.filter_by(telegram_id=telegram_id).first()
                 if not user:
                     return
+                
+                # Try to delete the last message with buttons
+                try:
+                    if telegram_id in self.last_button_messages:
+                        last_message_id = self.last_button_messages[telegram_id]
+                        await self.application.bot.delete_message(
+                            chat_id=telegram_id,
+                            message_id=last_message_id
+                        )
+                        del self.last_button_messages[telegram_id]  # Clean up
+                        logger.info(f"Deleted message {last_message_id} for user {telegram_id}")
+                except Exception as e:
+                    logger.error(f"Error deleting previous message: {e}")
+                    # Continue even if deletion fails
                 
                 stats = user.get_stats()
                 
