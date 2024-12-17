@@ -31,6 +31,9 @@ class BotManager:
         logger.info("Setting up bot handlers...")
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        # Add message handler for invite codes
+        from telegram.ext import MessageHandler, filters
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         logger.info("Bot handlers set up successfully")
 
     def _get_message_key(self, user_id: int) -> str:
@@ -436,3 +439,41 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
 
         except Exception as e:
             logger.error(f"Error requesting invite code: {e}")
+
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle text messages (invite codes)"""
+        with self.flask_app.app_context():
+            text = update.message.text.strip()  # Trim whitespace and newlines
+            telegram_id = update.effective_user.id
+            
+            # Check if user exists but not fully registered (needs invite code)
+            user = self.User.query.filter_by(telegram_id=telegram_id).first()
+            if not user:
+                # Ignore messages from unregistered users
+                return
+                
+            # Verify invite code
+            try:
+                if self.User.verify_invite_code(text):
+                    # Use the invite code
+                    self.User.use_invite_code(text, user.id)
+                    
+                    # Show success message and dashboard
+                    await update.message.reply_text(
+                        "✨ Invite code accepted! Welcome to TETRIX!",
+                        reply_markup=None
+                    )
+                    await self.display_user_dashboard(telegram_id)
+                else:
+                    # Invalid code, let them try again
+                    keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text(
+                        "❌ Invalid invite code. Please try again.",
+                        reply_markup=reply_markup
+                    )
+            except Exception as e:
+                logger.error(f"Error processing invite code: {e}")
+                await update.message.reply_text(
+                    "Error processing invite code. Please try again later."
+                )
