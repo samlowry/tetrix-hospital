@@ -296,15 +296,14 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     [InlineKeyboardButton("Show Invite Codes", callback_data='show_invites')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
+
                 # Try to get message ID from Redis if not provided
                 if not message_id:
                     message_id = await self._get_message_id(telegram_id)
                     if message_id:
                         logger.info(f"Using message ID {message_id} from Redis for user {telegram_id}")
-                
+
                 if message_id:
-                    # Edit existing message
                     try:
                         await self.application.bot.edit_message_text(
                             chat_id=telegram_id,
@@ -317,21 +316,69 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     except Exception as e:
                         logger.error(f"Error editing message: {e}")
                         # If editing fails, send a new message
-                        await self.application.bot.send_message(
+                        sent_message = await self.application.bot.send_message(
                             telegram_id,
                             message,
                             parse_mode='MarkdownV2',
                             reply_markup=reply_markup
                         )
+                        await self._store_message_id(telegram_id, sent_message.message_id)
                 else:
                     # Send new message
-                    await self.application.bot.send_message(
+                    sent_message = await self.application.bot.send_message(
                         telegram_id,
                         message,
                         parse_mode='MarkdownV2',
                         reply_markup=reply_markup
                     )
+                    await self._store_message_id(telegram_id, sent_message.message_id)
                 
             except Exception as e:
                 logger.error(f"Error displaying dashboard: {e}")
                 logger.error(f"Message that failed: {message}")  # Log the message that failed
+
+    async def show_congratulations(self, telegram_id: int, message_id: Optional[int] = None, is_early_backer: bool = False):
+        """Show congratulations message after successful registration"""
+        try:
+            # Escape special characters for MarkdownV2
+            def escape_md(text):
+                chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                escaped = str(text)
+                for char in chars:
+                    escaped = escaped.replace(char, f"\\{char}")
+                return escaped
+
+            # Format congratulations message
+            message = "🎉 *Congratulations\\!*\n\n"
+            message += "Your wallet has been successfully connected\\."
+            
+            if is_early_backer:
+                message += "\n\n🌟 *You are an Early Backer\\!*\n"
+                message += "You'll receive special bonuses and privileges\\."
+
+            # Add button to view dashboard
+            keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if message_id:
+                try:
+                    await self.application.bot.edit_message_text(
+                        chat_id=telegram_id,
+                        message_id=message_id,
+                        text=message,
+                        parse_mode='MarkdownV2',
+                        reply_markup=reply_markup
+                    )
+                except Exception as e:
+                    logger.error(f"Error editing congratulations message: {e}")
+            else:
+                sent_message = await self.application.bot.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode='MarkdownV2',
+                    reply_markup=reply_markup
+                )
+                await self._store_message_id(telegram_id, sent_message.message_id)
+
+        except Exception as e:
+            logger.error(f"Error showing congratulations: {e}")

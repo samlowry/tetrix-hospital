@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useInterval } from '../hooks/useInterval';
-import { api } from '../api';
+import { api, TonProofPayload } from '../api';
 
 export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
     const [tonConnectUI] = useTonConnectUI();
     const wallet = useTonWallet();
     const [isConnected, setIsConnected] = useState(() => {
-        // Initialize connection state based on stored token
         return !!api.accessToken;
     });
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    useEffect(() => {
+        if (showSuccess) {
+            // Close the WebApp after 7 seconds
+            const timer = setTimeout(() => {
+                window.Telegram.WebApp.close();
+            }, 7000);
+            return () => clearTimeout(timer);
+        }
+    }, [showSuccess]);
 
     const generatePayload = useCallback(async () => {
         try {
@@ -24,7 +34,6 @@ export function TonConnect() {
     }, []);
 
     const recreateProofPayload = useCallback(async () => {
-        // Don't generate payload if already connected
         if (isConnected) {
             console.log('Already connected, skipping payload generation');
             return;
@@ -44,7 +53,6 @@ export function TonConnect() {
         }
     }, [tonConnectUI, generatePayload, isConnected]);
 
-    // Check connection status on mount and when wallet changes
     useEffect(() => {
         if (wallet && api.accessToken) {
             console.log('Found existing connection');
@@ -53,7 +61,6 @@ export function TonConnect() {
         }
     }, [wallet]);
 
-    // Initial payload generation only if not connected
     useEffect(() => {
         if (firstProofLoading.current && !isConnected) {
             console.log('No existing connection, generating initial payload');
@@ -61,10 +68,8 @@ export function TonConnect() {
         }
     }, [recreateProofPayload, isConnected]);
 
-    // Refresh payload periodically only when not connected
     useInterval(recreateProofPayload, isConnected ? null : api.refreshIntervalMs);
 
-    // Handle wallet connection
     useEffect(() => {
         return tonConnectUI.onStatusChange(async (w) => {
             console.log('Wallet status changed:', w);
@@ -74,7 +79,6 @@ export function TonConnect() {
                 return;
             }
 
-            // If we have a valid wallet connection and token, mark as connected
             if (wallet && api.accessToken && !w.connectItems?.tonProof) {
                 console.log('Restored connection with existing token');
                 setIsConnected(true);
@@ -84,21 +88,45 @@ export function TonConnect() {
             if (w.connectItems?.tonProof && 'proof' in w.connectItems.tonProof) {
                 console.log('Got proof from wallet:', w.connectItems.tonProof);
                 try {
+                    const proof: TonProofPayload = {
+                        type: 'ton_proof' as const,
+                        domain: w.connectItems.tonProof.proof.domain,
+                        timestamp: w.connectItems.tonProof.proof.timestamp,
+                        payload: w.connectItems.tonProof.proof.payload,
+                        signature: w.connectItems.tonProof.proof.signature,
+                        state_init: w.account.walletStateInit,
+                        public_key: w.account.publicKey
+                    };
+
+                    // First verify the wallet
                     await api.connectWallet({
                         address: w.account.address,
-                        proof: {
-                            type: 'ton_proof',
-                            domain: w.connectItems.tonProof.proof.domain,
-                            timestamp: w.connectItems.tonProof.proof.timestamp,
-                            payload: w.connectItems.tonProof.proof.payload,
-                            signature: w.connectItems.tonProof.proof.signature,
-                            state_init: w.account.walletStateInit,
-                            public_key: w.account.publicKey
-                        }
+                        proof
                     });
+
+                    // Check if user is a first backer
+                    const { isFirstBacker } = await api.checkFirstBacker(w.account.address);
+                    
+                    if (isFirstBacker) {
+                        // Register as early backer if eligible
+                        await api.registerEarlyBacker(w.account.address, proof);
+                    }
+
                     setIsConnected(true);
+                    setShowSuccess(true);
+                    window.Telegram.WebApp.showPopup({
+                        title: 'Success!',
+                        message: 'Wallet connected successfully. This window will close in 7 seconds.',
+                        buttons: [{ type: 'ok' }]
+                    });
+
                 } catch (error) {
                     console.error('Wallet verification failed:', error);
+                    window.Telegram.WebApp.showPopup({
+                        title: 'Error',
+                        message: error instanceof Error ? error.message : 'Connection failed',
+                        buttons: [{ type: 'ok' }]
+                    });
                     tonConnectUI.disconnect();
                     setIsConnected(false);
                 }

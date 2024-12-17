@@ -210,12 +210,16 @@ def register_early_backer():
         db.session.commit()
         logger.info(f"User saved to database successfully")
         
-        # Schedule dashboard display in background
-        logger.info(f"Scheduling dashboard display for telegram_id {telegram_id}")
+        # Show congratulations message
+        logger.info(f"Showing congratulations for telegram_id {telegram_id}")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(current_app.bot_manager.display_user_dashboard(telegram_id, message_id))
+            loop.run_until_complete(current_app.bot_manager.show_congratulations(
+                telegram_id=telegram_id,
+                message_id=message_id,
+                is_early_backer=True  # Since this endpoint is only for early backers
+            ))
         finally:
             loop.close()
         
