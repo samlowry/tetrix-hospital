@@ -268,7 +268,33 @@ class BotManager:
         # Implement your validation logic here
         return True
 
-    async def display_user_dashboard(self, telegram_id: int, message_id: Optional[int] = None):
+    async def _should_edit_message(self, telegram_id: int, message_id: int, update: Update = None) -> bool:
+        """Check if we should edit the message or send a new one.
+        Returns True if we should edit, False if we should send new message."""
+        if not message_id:
+            return False
+            
+        try:
+            # First check if it's a callback query (button press)
+            if not (update and update.callback_query):
+                logger.info("Not a button press, will send new message")
+                return False
+                
+            # Then check if there are newer messages
+            chat = await self.application.bot.get_chat(telegram_id)
+            latest_messages = await chat.get_history(limit=1)
+            if latest_messages and latest_messages[0].message_id > message_id:
+                logger.info(f"Found newer messages after {message_id}, will send new message")
+                return False
+                
+            # If it's a button press and no newer messages, edit the message
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking message status: {e}")
+            return False
+
+    async def display_user_dashboard(self, telegram_id: int, message_id: Optional[int] = None, update: Update = None):
         """Display user dashboard with points and stats"""
         with self.flask_app.app_context():
             try:
@@ -314,10 +340,10 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                 # Try to get message ID from Redis if not provided
                 if not message_id:
                     message_id = await self._get_message_id(telegram_id)
-                    if message_id:
-                        logger.info(f"Using message ID {message_id} from Redis for user {telegram_id}")
 
-                if message_id:
+                should_edit = await self._should_edit_message(telegram_id, message_id, update)
+                
+                if should_edit:
                     try:
                         await self.application.bot.edit_message_text(
                             chat_id=telegram_id,
@@ -351,7 +377,7 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                 logger.error(f"Error displaying dashboard: {e}")
                 logger.error(f"Message that failed: {message}")  # Log the message that failed
 
-    async def show_congratulations(self, telegram_id: int, message_id: Optional[int] = None, is_early_backer: bool = False):
+    async def show_congratulations(self, telegram_id: int, message_id: Optional[int] = None, is_early_backer: bool = False, update: Update = None):
         """Show congratulations message after successful registration"""
         try:
             # Escape special characters for MarkdownV2
@@ -374,30 +400,19 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
             keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            if message_id:
-                try:
-                    await self.application.bot.edit_message_text(
-                        chat_id=telegram_id,
-                        message_id=message_id,
-                        text=message,
-                        parse_mode='MarkdownV2',
-                        reply_markup=reply_markup
-                    )
-                except Exception as e:
-                    logger.error(f"Error editing congratulations message: {e}")
-            else:
-                sent_message = await self.application.bot.send_message(
-                    telegram_id,
-                    message,
-                    parse_mode='MarkdownV2',
-                    reply_markup=reply_markup
-                )
-                await self._store_message_id(telegram_id, sent_message.message_id)
+            # Always send new message for congratulations
+            sent_message = await self.application.bot.send_message(
+                telegram_id,
+                message,
+                parse_mode='MarkdownV2',
+                reply_markup=reply_markup
+            )
+            await self._store_message_id(telegram_id, sent_message.message_id)
 
         except Exception as e:
             logger.error(f"Error showing congratulations: {e}")
 
-    async def request_invite_code(self, telegram_id: int, message_id: Optional[int] = None):
+    async def request_invite_code(self, telegram_id: int, message_id: Optional[int] = None, update: Update = None):
         """Request invite code from user who is not an early backer"""
         try:
             # Escape special characters for MarkdownV2
@@ -417,25 +432,14 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
             keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            if message_id:
-                try:
-                    await self.application.bot.edit_message_text(
-                        chat_id=telegram_id,
-                        message_id=message_id,
-                        text=message,
-                        parse_mode='MarkdownV2',
-                        reply_markup=reply_markup
-                    )
-                except Exception as e:
-                    logger.error(f"Error editing invite code request message: {e}")
-            else:
-                sent_message = await self.application.bot.send_message(
-                    telegram_id,
-                    message,
-                    parse_mode='MarkdownV2',
-                    reply_markup=reply_markup
-                )
-                await self._store_message_id(telegram_id, sent_message.message_id)
+            # Always send new message for invite code request
+            sent_message = await self.application.bot.send_message(
+                telegram_id,
+                message,
+                parse_mode='MarkdownV2',
+                reply_markup=reply_markup
+            )
+            await self._store_message_id(telegram_id, sent_message.message_id)
 
         except Exception as e:
             logger.error(f"Error requesting invite code: {e}")
@@ -473,11 +477,13 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                         message = "🎉 *Congratulations\\!*\n\n"
                         message += "Your invite code has been accepted\\. Welcome to TETRIX\\!"
                         
-                        await update.message.reply_text(
+                        # Always send new message for invite code acceptance
+                        sent_message = await update.message.reply_text(
                             message,
                             parse_mode='MarkdownV2',
                             reply_markup=reply_markup
                         )
+                        await self._store_message_id(telegram_id, sent_message.message_id)
                     else:
                         logger.error(f"Failed to use invite code {text}")
                         keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
