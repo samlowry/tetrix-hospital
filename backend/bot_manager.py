@@ -57,9 +57,27 @@ class BotManager:
             user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
             
             if user:
-                # Show dashboard for registered users
-                await self.display_user_dashboard(update.effective_user.id)
+                # Check registration status
+                if user.is_fully_registered or user.is_early_backer:
+                    # Show dashboard for fully registered users
+                    await self.display_user_dashboard(update.effective_user.id)
+                else:
+                    # Show invite code prompt for users who need to complete registration
+                    logger.info(f"User {update.effective_user.id} needs to complete registration with invite code")
+                    message = "✨ *Welcome back\\!*\n\n"
+                    message += "To complete your registration, please enter an invite code\\.\n"
+                    message += "You can get an invite code from an existing TETRIX member\\."
+                    
+                    keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.message.reply_text(
+                        message,
+                        parse_mode='MarkdownV2',
+                        reply_markup=reply_markup
+                    )
             else:
+                # Show initial wallet connection prompt for new users
                 keyboard = [
                     [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
                     [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
@@ -75,6 +93,14 @@ class BotManager:
         await query.answer()
         
         try:
+            # For stats and invite-related callbacks, check registration status first
+            if query.data in ['check_stats', 'show_invites', 'back_to_menu']:
+                with self.flask_app.app_context():
+                    user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
+                    if not user or not (user.is_fully_registered or user.is_early_backer):
+                        logger.info(f"Ignoring {query.data} callback for non-fully registered user")
+                        return
+            
             if query.data == 'enter_invite_code':
                 # Show message asking to enter invite code
                 message = "Please enter your invite code:"
@@ -137,10 +163,12 @@ class BotManager:
                     # Format invite codes
                     code_lines = []
                     for code_info in codes:
+                        # Escape special characters for MarkdownV2
+                        code = code_info['code'].replace('-', '\\-')  # Escape dashes
                         if code_info['status'] == 'used_today':
-                            code_lines.append(f"~~```\n{code_info['code']}\n```~~ (Used)")
+                            code_lines.append(f"~{code}~\n")
                         else:
-                            code_lines.append(f"```\n{code_info['code']}\n```")
+                            code_lines.append(f"```\n{code}\n```")
                     
                     while len(code_lines) < 5:
                         code_lines.append("*empty*")
@@ -152,11 +180,11 @@ class BotManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     # Send new message with codes
-                    message = "Your Invite Codes:\n\n" + "\n\n".join(code_lines) + "\n\n"
+                    message = "Your Invite Codes:\n\n" + "\n".join(code_lines) + "\n"
                     await self.application.bot.send_message(
                         update.effective_user.id,
                         message,
-                        parse_mode='Markdown',
+                        parse_mode='MarkdownV2',
                         reply_markup=reply_markup
                     )
                 
@@ -293,10 +321,10 @@ class BotManager:
                 stats = user.get_stats()
                 
                 # Create ASCII health bar (escape all special chars)
-                health_percentage = 42.0  # Dummy value for now
+                health_percentage = 1.0  # Set to 1%
                 bar_length = 20
-                filled = int((health_percentage / 100) * bar_length)
-                health_bar = "\\[" + "\\=" * filled + " " * (bar_length - filled) + "\\]"
+                filled = max(1, int((health_percentage / 100) * bar_length))  # At least 1 bar if percentage > 0
+                health_bar = "\\[" + "█" * filled + "░" * (bar_length - filled) + "\\]"
                 
                 # Escape special characters for MarkdownV2
                 def escape_md(text):
@@ -477,7 +505,7 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                         keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         
-                        message = "🎉 *Congratulations\\!*\n\n"
+                        message = "✨ *Congratulations\\!*\n\n"
                         message += "Your invite code has been accepted\\. Welcome to TETRIX\\!"
                         
                         # Always send new message for invite code acceptance
@@ -488,26 +516,17 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                         )
                     else:
                         logger.error(f"Failed to use invite code {text}")
-                        keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
-                        reply_markup = InlineKeyboardMarkup(keyboard)
                         await update.message.reply_text(
-                            "Error using invite code. Please try again.",
-                            reply_markup=reply_markup
+                            "❌ Error using invite code. Please try another one."
                         )
                 else:
                     # Invalid code, let them try again
-                    logger.info("Invalid code, showing retry button")
-                    keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    logger.info("Invalid code")
                     await update.message.reply_text(
-                        "❌ Invalid invite code. Please try again.",
-                        reply_markup=reply_markup
+                        "❌ Invalid invite code. Please try another one."
                     )
             except Exception as e:
                 logger.error(f"Error processing invite code: {e}")
-                keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(
-                    "Error processing invite code. Please try again later.",
-                    reply_markup=reply_markup
+                    "❌ Error processing invite code. Please try again later."
                 )
