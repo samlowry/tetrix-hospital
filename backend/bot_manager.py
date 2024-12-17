@@ -18,7 +18,7 @@ class BotManager:
         self.ton_client = ton_client
         self.running = False
         self.flask_app = app
-        self.frontend_url = os.getenv('FRONTEND_URL', 'https://tetrix-bot.vercel.app')
+        self.frontend_url = os.getenv('FRONTEND_URL')
         self.redis = app.extensions['redis']  # Get Redis from Flask app
         self.setup_handlers()
         logger.info("Bot manager initialized successfully")
