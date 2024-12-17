@@ -18,6 +18,15 @@ ALLOWED_DOMAINS = [
 ]
 VALID_AUTH_TIME = 15 * 60  # 15 minutes
 
+def verify_proof_signature(message_bytes: bytes, signature: bytes, public_key: bytes) -> bool:
+    """Verify TON Connect proof signature using NaCl."""
+    try:
+        verify_key = nacl.signing.VerifyKey(public_key)
+        verify_key.verify(message_bytes, signature)
+        return True
+    except Exception as e:
+        logger.error(f"Signature verification failed: {e}")
+        return False
 
 class TonProofService:
     @staticmethod

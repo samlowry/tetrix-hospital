@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
-from services.ton_proof_service import VerifyKey
+from services.ton_proof_service import verify_proof_signature
 import os
 import sys
 import asyncio
@@ -166,8 +166,9 @@ def register_early_backer():
             signature = b64decode(proof['signature'])
             public_key = b64decode(proof['public_key'])
             
-            verify_key = VerifyKey(public_key)
-            verify_key.verify(message_bytes, signature)
+            if not verify_proof_signature(message_bytes, signature, public_key):
+                logger.error("TON Proof signature verification failed")
+                return jsonify({'error': 'Invalid TON Proof signature'}), 401
             logger.info("TON Proof verification successful")
         except Exception as e:
             logger.error(f"TON Proof verification failed: {e}")
