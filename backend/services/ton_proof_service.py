@@ -86,7 +86,6 @@ class TonProofService:
             wc = address.wc.to_bytes(4, byteorder='big')
             ts = timestamp.to_bytes(8, byteorder='little')
             dl = payload['proof']['domain']['lengthBytes'].to_bytes(4, byteorder='little')
-            domain = payload['proof']['domain']['value']
             
             # Construct message
             msg = b''.join([
@@ -115,11 +114,11 @@ class TonProofService:
             logger.info(f"Final hash: {result.hex()}")
 
             # Verify signature
-            verify_key = nacl.signing.VerifyKey(public_key)
+            verify_key = nacl.signing.VerifyKey(bytes.fromhex(payload['public_key']))
             signature = b64decode(payload['proof']['signature'])
             logger.info(f"Verifying signature: {signature.hex()}")
             
-            verify_key.verify(signature, result)
+            verify_key.verify(result, signature)  # Verify the final hash with the signature
             logger.info("Signature verified successfully")
             return True
 
