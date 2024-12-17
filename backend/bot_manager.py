@@ -337,7 +337,7 @@ class BotManager:
                 # Format message with escaped characters
                 message = f"""
 TETRIX health status:
-{health_bar} {escape_md(f"{health_percentage:.1f}")}%
+`{health_bar} {escape_md(f"{health_percentage:.1f}")}%`
 
 Total Points: {escape_md(str(stats['points']))}
 
