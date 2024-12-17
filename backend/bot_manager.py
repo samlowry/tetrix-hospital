@@ -18,7 +18,7 @@ class BotManager:
         self.ton_client = ton_client
         self.running = False
         self.flask_app = app
-        self.frontend_url = os.getenv('FRONTEND_URL', 'https://tetrix-bot.vercel.app')
+        self.frontend_url = os.getenv('FRONTEND_URL')
         self.redis = app.extensions['redis']  # Get Redis from Flask app
         self.setup_handlers()
         logger.info("Bot manager initialized successfully")
@@ -82,7 +82,15 @@ class BotManager:
         await query.answer()
         
         try:
-            if query.data == 'reconnect_wallet':
+            if query.data == 'enter_invite_code':
+                # Show message asking to enter invite code
+                message = "Please enter your invite code:"
+                await query.edit_message_text(
+                    text=message,
+                    reply_markup=None  # Remove buttons while waiting for code
+                )
+                
+            elif query.data == 'reconnect_wallet':
                 keyboard = [[InlineKeyboardButton("Reconnect Wallet", web_app={"url": self.frontend_url})]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -296,15 +304,14 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     [InlineKeyboardButton("Show Invite Codes", callback_data='show_invites')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
+
                 # Try to get message ID from Redis if not provided
                 if not message_id:
                     message_id = await self._get_message_id(telegram_id)
                     if message_id:
                         logger.info(f"Using message ID {message_id} from Redis for user {telegram_id}")
-                
+
                 if message_id:
-                    # Edit existing message
                     try:
                         await self.application.bot.edit_message_text(
                             chat_id=telegram_id,
@@ -317,21 +324,112 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     except Exception as e:
                         logger.error(f"Error editing message: {e}")
                         # If editing fails, send a new message
-                        await self.application.bot.send_message(
+                        sent_message = await self.application.bot.send_message(
                             telegram_id,
                             message,
                             parse_mode='MarkdownV2',
                             reply_markup=reply_markup
                         )
+                        await self._store_message_id(telegram_id, sent_message.message_id)
                 else:
                     # Send new message
-                    await self.application.bot.send_message(
+                    sent_message = await self.application.bot.send_message(
                         telegram_id,
                         message,
                         parse_mode='MarkdownV2',
                         reply_markup=reply_markup
                     )
+                    await self._store_message_id(telegram_id, sent_message.message_id)
                 
             except Exception as e:
                 logger.error(f"Error displaying dashboard: {e}")
                 logger.error(f"Message that failed: {message}")  # Log the message that failed
+
+    async def show_congratulations(self, telegram_id: int, message_id: Optional[int] = None, is_early_backer: bool = False):
+        """Show congratulations message after successful registration"""
+        try:
+            # Escape special characters for MarkdownV2
+            def escape_md(text):
+                chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                escaped = str(text)
+                for char in chars:
+                    escaped = escaped.replace(char, f"\\{char}")
+                return escaped
+
+            # Format congratulations message
+            message = "🎉 *Congratulations\\!*\n\n"
+            message += "Your wallet has been successfully connected\\."
+            
+            if is_early_backer:
+                message += "\n\n🌟 *You are an Early Backer\\!*\n"
+                message += "You'll receive special bonuses and privileges\\."
+
+            # Add button to view dashboard
+            keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if message_id:
+                try:
+                    await self.application.bot.edit_message_text(
+                        chat_id=telegram_id,
+                        message_id=message_id,
+                        text=message,
+                        parse_mode='MarkdownV2',
+                        reply_markup=reply_markup
+                    )
+                except Exception as e:
+                    logger.error(f"Error editing congratulations message: {e}")
+            else:
+                sent_message = await self.application.bot.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode='MarkdownV2',
+                    reply_markup=reply_markup
+                )
+                await self._store_message_id(telegram_id, sent_message.message_id)
+
+        except Exception as e:
+            logger.error(f"Error showing congratulations: {e}")
+
+    async def request_invite_code(self, telegram_id: int, message_id: Optional[int] = None):
+        """Request invite code from user who is not an early backer"""
+        try:
+            # Escape special characters for MarkdownV2
+            def escape_md(text):
+                chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                escaped = str(text)
+                for char in chars:
+                    escaped = escaped.replace(char, f"\\{char}")
+                return escaped
+
+            # Format message requesting invite code
+            message = "✨ *Wallet Connected Successfully\\!*\n\n"
+            message += "To complete your registration, please enter an invite code\\.\n"
+            message += "You can get an invite code from an existing TETRIX member\\."
+
+            # Add button to try again if they have a code
+            keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if message_id:
+                try:
+                    await self.application.bot.edit_message_text(
+                        chat_id=telegram_id,
+                        message_id=message_id,
+                        text=message,
+                        parse_mode='MarkdownV2',
+                        reply_markup=reply_markup
+                    )
+                except Exception as e:
+                    logger.error(f"Error editing invite code request message: {e}")
+            else:
+                sent_message = await self.application.bot.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode='MarkdownV2',
+                    reply_markup=reply_markup
+                )
+                await self._store_message_id(telegram_id, sent_message.message_id)
+
+        except Exception as e:
+            logger.error(f"Error requesting invite code: {e}")

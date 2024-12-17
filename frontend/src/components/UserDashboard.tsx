@@ -44,8 +44,6 @@ export function UserDashboard() {
 
         if (isFirstBacker) {
           console.log('Attempting to register early backer...');
-          const messageId = window.Telegram.WebApp.initDataUnsafe?.start_param;
-          console.log('Message ID from start_param:', messageId);
           
           // Get TON Proof
           const { payload } = await api.getChallenge();
@@ -54,7 +52,7 @@ export function UserDashboard() {
             throw new Error('Failed to get TON Proof');
           }
           
-          const { success } = await api.registerEarlyBacker(userAddress, proof, messageId);
+          const { success } = await api.registerEarlyBacker(userAddress, proof);
           console.log('Registration result:', success);
           if (success) {
             setIsRegistered(true);

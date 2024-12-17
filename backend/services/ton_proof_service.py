@@ -14,13 +14,22 @@ TON_CONNECT_PREFIX = b'ton-connect'
 ALLOWED_DOMAINS = [
     'ton-connect.github.io',
     'localhost:5173',
-    'tetrix-hospital.pages.dev'
+    'localhost',
+    'tetrix-hospital.pages.dev',
+    '5fa5-109-245-96-58.ngrok-free.app'
 ]
 VALID_AUTH_TIME = 15 * 60  # 15 minutes
 
 def verify_proof_signature(message_bytes: bytes, signature: bytes, public_key: bytes) -> bool:
     """Verify TON Connect proof signature using NaCl."""
     try:
+        # Convert hex public key to bytes if needed
+        if len(public_key) == 64:  # If it's a hex string in bytes
+            public_key = bytes.fromhex(public_key.decode())
+        elif len(public_key) != 32:  # If it's not 32 bytes
+            logger.error(f"Invalid public key length: {len(public_key)}")
+            return False
+
         verify_key = nacl.signing.VerifyKey(public_key)
         verify_key.verify(message_bytes, signature)
         return True
@@ -105,11 +114,11 @@ class TonProofService:
             logger.info(f"Final hash: {result.hex()}")
 
             # Verify signature
-            verify_key = nacl.signing.VerifyKey(public_key)
+            verify_key = nacl.signing.VerifyKey(bytes.fromhex(payload['public_key']))
             signature = b64decode(payload['proof']['signature'])
             logger.info(f"Verifying signature: {signature.hex()}")
             
-            verify_key.verify(result, signature)
+            verify_key.verify(result, signature)  # Verify the final hash with the signature
             logger.info("Signature verified successfully")
             return True
 
