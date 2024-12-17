@@ -43,3 +43,7 @@ class UserService:
             # Update telegram_id if it's provided and different
             user.telegram_id = telegram_id
             db.session.commit()
+
+    def get_user_by_address(self, address: str) -> User:
+        """Get user by wallet address."""
+        return User.query.filter_by(wallet_address=address).first()

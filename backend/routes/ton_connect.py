@@ -51,6 +51,17 @@ def check_proof():
                 print(f"Error parsing Telegram init data: {e}")
                 # Don't fail if Telegram data is invalid, just log it
 
+        # Check if user already exists
+        existing_user = user_service.get_user_by_address(address)
+        if existing_user:
+            print(f"User {address} already registered")
+            return jsonify({
+                'token': token,
+                'status': 'registered',
+                'message': 'Already registered',
+                'replace_last': False
+            })
+
         # Generate JWT token
         token = jwt.encode(
             {
