@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
 from flask_talisman import Talisman
 from flasgger import Swagger
@@ -11,6 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import asyncio
 from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
+import telegram
 
 from models import db, User
 from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
@@ -167,6 +168,23 @@ scheduler.add_job(
     max_instances=1,
     coalesce=True
 )
+
+@app.route('/telegram-webhook', methods=['POST'])
+async def telegram_webhook():
+    if request.method == 'POST':
+        try:
+            # Get update from Telegram
+            update = telegram.Update.de_json(request.get_json(force=True), bot_manager.bot)
+            
+            # Process update
+            await bot_manager.application.process_update(update)
+            return 'ok'
+            
+        except Exception as e:
+            logger.error(f"Error processing webhook update: {e}")
+            abort(500)
+    
+    abort(403)
 
 if __name__ == '__main__':
     with app.app_context():

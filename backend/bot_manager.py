@@ -16,15 +16,19 @@ class BotManager:
         logger.info("Initializing bot manager...")
         if not token:
             raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables")
+        
+        self.webhook_url = os.getenv('WEBHOOK_URL')  # e.g. https://your-domain.com/webhook
+        if not self.webhook_url:
+            raise ValueError("WEBHOOK_URL not found in environment variables")
+            
         self.application = Application.builder().token(token).build()
-        self.bot = telegram.Bot(token=token)  # Initialize bot instance
+        self.bot = telegram.Bot(token=token)
         self.db = db
         self.User = User
         self.ton_client = ton_client
-        self.running = False
         self.flask_app = app
         self.frontend_url = os.getenv('FRONTEND_URL')
-        self.redis = app.extensions['redis']  # Get Redis from Flask app
+        self.redis = app.extensions['redis']
         
         # Initialize limiter with Redis storage
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
@@ -238,28 +242,30 @@ class BotManager:
                 await update.message.reply_text("Error processing wallet address. Please try again later.")
 
     async def start_bot(self):
-        logger.info("Starting bot...")
+        """Start bot with webhook"""
+        logger.info("Starting bot with webhook...")
         try:
             await self.application.initialize()
+            
+            # Set webhook
+            await self.application.bot.set_webhook(
+                url=f"{self.webhook_url}/telegram-webhook",
+                allowed_updates=['message', 'callback_query']
+            )
+            
+            # Start webhook
             await self.application.start()
-            self.running = True
-            logger.info("Bot started successfully")
+            logger.info(f"Bot webhook set to {self.webhook_url}/telegram-webhook")
             
-            # Start polling for updates
-            await self.application.updater.start_polling()
-            logger.info("Bot polling started")
-            
-            # Keep the bot running
-            while self.running:
-                await asyncio.sleep(1)
+            # Keep the application running
+            while True:
+                await asyncio.sleep(3600)  # Sleep for an hour
                 
         except Exception as e:
-            logger.error(f"Error starting bot: {e}")
+            logger.error(f"Error starting bot webhook: {e}")
         finally:
-            if self.running:
-                await self.application.updater.stop()
-                await self.application.stop()
-                logger.info("Bot stopped")
+            await self.application.stop()
+            logger.info("Bot stopped")
 
     def run(self):
         logger.info("Setting up event loop for bot")
