@@ -113,11 +113,6 @@ export function TonConnect() {
                     // Show success and start close timer
                     setIsConnected(true);
                     setShowSuccess(true);
-                    window.Telegram.WebApp.showPopup({
-                        title: 'Success!',
-                        message: 'Wallet connected successfully. This window will close in 7 seconds.',
-                        buttons: [{ type: 'ok' }]
-                    });
 
                 } catch (error) {
                     console.error('Wallet verification failed:', error);
