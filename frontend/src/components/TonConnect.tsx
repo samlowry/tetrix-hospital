@@ -10,16 +10,16 @@ export function TonConnect() {
     const [isConnected, setIsConnected] = useState(() => {
         return !!api.accessToken;
     });
-    const [showSuccess, setShowSuccess] = useState(false);
+    const [isValidated, setIsValidated] = useState(false);
 
     useEffect(() => {
-        if (showSuccess) {
+        if (isValidated) {
             const timer = setTimeout(() => {
                 window.Telegram.WebApp.close();
             }, 7000);
             return () => clearTimeout(timer);
         }
-    }, [showSuccess]);
+    }, [isValidated]);
 
     const generatePayload = useCallback(async () => {
         try {
@@ -112,7 +112,7 @@ export function TonConnect() {
 
                     // Show success and start close timer
                     setIsConnected(true);
-                    setShowSuccess(true);
+                    setIsValidated(true);
 
                 } catch (error) {
                     console.error('Wallet verification failed:', error);

@@ -24,11 +24,11 @@ export function UserDashboard() {
   const userAddress = useTonAddress();
 
   React.useEffect(() => {
-    async function checkAndRegister() {
+    async function handleValidation() {
       if (!userAddress) return;
 
       try {
-        console.log('Connection successful, closing WebApp in 6 seconds...');
+        console.log('Validation successful, closing WebApp...');
         setTimeout(() => {
           console.log('Closing WebApp...');
           window.Telegram.WebApp.close();
@@ -38,13 +38,13 @@ export function UserDashboard() {
       }
     }
 
-    checkAndRegister();
+    handleValidation();
   }, [userAddress]);
 
   return (
     <Card>
-      <Title>User Status</Title>
-      <Text>Wallet Connected Successfully</Text>
+      <Title>Validation Status</Title>
+      <Text>Wallet Validated Successfully</Text>
       <Text>Please wait while we redirect you back to Telegram...</Text>
     </Card>
   );
