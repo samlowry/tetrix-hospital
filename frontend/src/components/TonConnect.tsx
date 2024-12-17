@@ -97,7 +97,13 @@ export function TonConnect() {
                         public_key: w.account.publicKey
                     };
 
-                    // Register user with TON Proof
+                    // First verify the proof
+                    await api.connectWallet({
+                        address: w.account.address,
+                        proof
+                    });
+
+                    // Then register as early backer
                     await api.registerEarlyBacker(w.account.address, proof);
 
                     // Only show success and close if registration was successful
@@ -121,7 +127,6 @@ export function TonConnect() {
                     });
                     tonConnectUI.disconnect();
                     setIsConnected(false);
-                    // Don't set showSuccess here since it failed
                 }
             } else if (!isConnected) {
                 console.log('No proof in wallet connection, requesting new proof');
