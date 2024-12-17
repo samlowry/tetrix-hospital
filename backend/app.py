@@ -12,6 +12,7 @@ import asyncio
 from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
 import telegram
+from functools import partial
 
 from models import db, User
 from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
@@ -38,25 +39,21 @@ else:
 # Initialize Flask app
 app = Flask(__name__)
 
-# Add custom error handler
-@app.errorhandler(Exception)
-def handle_error(error):
-    logger.error(f"Unhandled error: {str(error)}")
-    
-    if isinstance(error, HTTPException):
-        response = {
-            'error': error.description,
-            'status_code': error.code
-        }
-        status_code = error.code
-    else:
-        response = {
-            'error': 'Internal server error',
-            'status_code': 500
-        }
-        status_code = 500
-    
-    return jsonify(response), status_code
+# Setup CORS
+cors_origins = [
+    'http://localhost:3000',
+    'https://tetrix-hospital.pages.dev',
+    'https://5fa5-109-245-96-58.ngrok-free.app'
+]
+CORS(app, resources={
+    r"/*": {
+        "origins": cors_origins,
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # Configure database
 db_url = os.getenv('DATABASE_URL').replace('postgresql://', 'postgresql+psycopg://')
@@ -85,22 +82,6 @@ cache.init_app(app)
 limiter.init_app(app)
 
 logger = setup_logging()
-
-# Setup CORS
-cors_origins = [
-    'http://localhost:3000',
-    'https://tetrix-hospital.pages.dev',
-    'https://5fa5-109-245-96-58.ngrok-free.app'
-]
-CORS(app, resources={
-    r"/*": {
-        "origins": cors_origins,
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
-        "expose_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True
-    }
-})
 
 # Configure security
 is_development = os.getenv('FLASK_ENV') == 'development'
@@ -146,62 +127,52 @@ app.bot_manager = bot_manager
 
 # Setup scheduler for metrics update
 scheduler = BackgroundScheduler()
+scheduler.start()
 
-def run_async(coro):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+# Flag to track initialization
+_is_initialized = False
 
-async def scheduled_metrics_update():
-    """Wrapper for update_metrics with app context"""
-    with app.app_context():
-        await update_metrics()
+# Create a global event loop for the application
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
-# Schedule metrics update every 5 minutes
-scheduler.add_job(
-    lambda: run_async(scheduled_metrics_update()),
-    'interval',
-    minutes=5,
-    max_instances=1,
-    coalesce=True
-)
+@app.before_request
+def init_app():
+    """Initialize app components before request"""
+    global _is_initialized
+    if not _is_initialized:
+        with app.app_context():
+            db.create_all()
+            _is_initialized = True
 
 @app.route('/telegram-webhook', methods=['POST'])
-async def telegram_webhook():
+def telegram_webhook():
     if request.method == 'POST':
         try:
-            # Get update from Telegram
-            update = telegram.Update.de_json(request.get_json(force=True), bot_manager.bot)
+            json_data = request.get_json(force=True)
+            update = telegram.Update.de_json(json_data, bot_manager.bot)
             
-            # Process update
-            await bot_manager.application.process_update(update)
+            # Process update in the existing event loop
+            loop.run_until_complete(bot_manager.application.process_update(update))
             return 'ok'
             
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
-            abort(500)
+            logger.exception(e)  # Log full traceback
+            return jsonify({"error": str(e)}), 500
     
     abort(403)
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        scheduler.start()
-        # Start bot in a separate thread
-        import threading
-        bot_thread = threading.Thread(target=bot_manager.run)
-        bot_thread.start()
-        try:
-            # Run Flask app
-            app.run(
-                host=os.getenv('FLASK_HOST', '0.0.0.0'),
-                port=int(os.getenv('FLASK_PORT', 5000))
-            )
-        finally:
-            # Clean shutdown
-            bot_manager.stop()
-            scheduler.shutdown()
-            bot_thread.join() 
+        
+        # Start bot in the same event loop
+        loop.run_until_complete(bot_manager.start_bot())
+        
+        # Run Flask app
+        app.run(
+            host=os.getenv('FLASK_HOST', '0.0.0.0'),
+            port=int(os.getenv('FLASK_PORT', 5000)),
+            debug=False
+        ) 

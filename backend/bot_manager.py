@@ -257,31 +257,18 @@ class BotManager:
             await self.application.start()
             logger.info(f"Bot webhook set to {self.webhook_url}/telegram-webhook")
             
-            # Keep the application running
-            while True:
-                await asyncio.sleep(3600)  # Sleep for an hour
-                
         except Exception as e:
             logger.error(f"Error starting bot webhook: {e}")
-        finally:
-            await self.application.stop()
-            logger.info("Bot stopped")
-
-    def run(self):
-        logger.info("Setting up event loop for bot")
-        try:
-            asyncio.run(self.start_bot())
-            logger.info("Bot event loop started")
-        except KeyboardInterrupt:
-            logger.info("Bot shutdown requested")
-            self.running = False
-        except Exception as e:
-            logger.error(f"Error in bot run: {e}")
             raise
 
-    def stop(self):
+    async def stop_bot(self):
         """Stop the bot"""
-        self.running = False
+        try:
+            await self.application.stop()
+            logger.info("Bot stopped")
+        except Exception as e:
+            logger.error(f"Error stopping bot: {e}")
+            raise
 
     def validate_wallet_address(self, wallet_address: str) -> bool:
         """Validate wallet address format"""
