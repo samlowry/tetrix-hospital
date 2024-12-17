@@ -164,7 +164,14 @@ def register_early_backer():
             message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
             message_bytes = message.encode()
             signature = b64decode(proof['signature'])
-            public_key = b64decode(proof['public_key'])
+            
+            # Handle public key
+            try:
+                public_key = b64decode(proof['public_key'])
+            except Exception as e:
+                logger.error(f"Error decoding public key: {e}")
+                # Try using the public key directly if b64decode fails
+                public_key = proof['public_key'].encode() if isinstance(proof['public_key'], str) else proof['public_key']
             
             if not verify_proof_signature(message_bytes, signature, public_key):
                 logger.error("TON Proof signature verification failed")
