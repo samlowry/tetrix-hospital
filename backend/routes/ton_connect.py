@@ -72,16 +72,22 @@ def check_proof():
             if telegram_id:
                 from flask import current_app
                 import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
                 try:
+                    # Get or create event loop
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    # Run the coroutine
                     loop.run_until_complete(current_app.bot_manager.show_congratulations(
                         telegram_id=telegram_id,
                         message_id=message_id,
                         is_early_backer=True
                     ))
-                finally:
-                    loop.close()
+                except Exception as e:
+                    print(f"Error showing congratulations: {e}")
 
             return jsonify({
                 'token': token,
@@ -96,15 +102,21 @@ def check_proof():
             if telegram_id:
                 from flask import current_app
                 import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
                 try:
+                    # Get or create event loop
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    # Run the coroutine
                     loop.run_until_complete(current_app.bot_manager.request_invite_code(
                         telegram_id=telegram_id,
                         message_id=message_id
                     ))
-                finally:
-                    loop.close()
+                except Exception as e:
+                    print(f"Error requesting invite code: {e}")
 
             return jsonify({
                 'token': token,
