@@ -100,7 +100,7 @@ export function TonConnect() {
                         public_key: w.account.publicKey
                     };
 
-                    // Single API call to verify proof and register
+                    // Single proof verification - backend handles the rest
                     const { token } = await api.connectWallet({
                         address: w.account.address,
                         proof

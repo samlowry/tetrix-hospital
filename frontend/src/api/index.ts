@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
+import { User } from '../types';
 
 export interface TonProofDomain {
     lengthBytes: number;
@@ -39,7 +40,6 @@ export class ApiService {
             baseURL: this.baseURL,
             headers: {
                 'ngrok-skip-browser-warning': 'true',
-                'X-Telegram-Init-Data': window.Telegram.WebApp.initData,
                 ...(this.accessToken ? { 'Authorization': `Bearer ${this.accessToken}` } : {})
             }
         });
@@ -81,11 +81,63 @@ export class ApiService {
         }
     }
 
+    async getUserStats(address: string): Promise<User> {
+        try {
+            const response = await this.axiosInstance.get(`/user/${address}/stats`);
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
+    }
+
+    async getMetrics() {
+        try {
+            const response = await this.axiosInstance.get('/metrics');
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
+    }
+
+    async getLeaderboard(type: 'points' | 'invites') {
+        try {
+            const response = await this.axiosInstance.get(`/user/leaderboard/${type}`);
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
+    }
+
     reset() {
         this.accessToken = null;
         localStorage.removeItem(this.localStorageKey);
         // Prepare for new connection immediately
         this.getChallenge().catch(console.error);
+    }
+
+    async checkFirstBacker(address: string) {
+        try {
+            const response = await this.axiosInstance.post('/user/check_first_backer', {
+                address
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
+    }
+
+    async registerEarlyBacker(address: string, proof: TonProofPayload): Promise<{ success: boolean }> {
+        try {
+            const tgWebAppData = window.Telegram.WebApp.initData;
+            const response = await this.axiosInstance.post('/user/register_early_backer', {
+                address,
+                tg_init_data: tgWebAppData,
+                proof
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            return this.handleError(error as AxiosError);
+        }
     }
 }
 
