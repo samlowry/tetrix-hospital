@@ -31,7 +31,9 @@ def check_proof():
             return jsonify({'error': 'Invalid proof'}), 400
 
         address = data['address']
+        print(f"Checking if {address} is early backer...")
         is_early_backer = user_service.is_early_backer(address)
+        print(f"Early backer status: {is_early_backer}")
 
         # Generate JWT token
         token = jwt.encode(
@@ -45,8 +47,10 @@ def check_proof():
         )
 
         if is_early_backer:
+            print(f"Registering early backer {address}...")
             # Register early backer and replace last message
             user_service.register_user(address, is_early_backer=True)
+            print("Early backer registered successfully")
             return jsonify({
                 'token': token,
                 'status': 'early_backer',
@@ -55,6 +59,7 @@ def check_proof():
                 'replace_last': True
             })
         else:
+            print(f"User {address} needs invite code")
             # Ask for invite code
             return jsonify({
                 'token': token,
@@ -64,4 +69,5 @@ def check_proof():
             })
 
     except Exception as e:
+        print(f"Error in check_proof: {e}")
         return jsonify({'error': str(e)}), 400

@@ -9,13 +9,18 @@ class UserService:
         cache_key = f'early_backer:{address}'
         cached = redis_client.get(cache_key)
         if cached is not None:
+            print(f"Found in cache: {address} -> {bool(int(cached))}")
             return bool(int(cached))
 
         # Check first_backers.txt
         try:
-            with open('first_backers.txt', 'r') as f:
+            print(f"Checking first_backers.txt for {address}")
+            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            backers_file = os.path.join(script_dir, 'first_backers.txt')
+            with open(backers_file, 'r') as f:
                 backers = [line.strip().lower() for line in f]
                 is_early = address.lower() in backers
+                print(f"Found in file: {address} -> {is_early}")
                 
                 # Cache result
                 redis_client.setex(cache_key, 3600, int(is_early))
