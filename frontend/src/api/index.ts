@@ -18,6 +18,10 @@ export interface TonProofPayload {
 
 export interface ConnectResponse {
     token: string;
+    status?: 'early_backer' | 'need_invite';
+    message?: string;
+    button?: string;
+    replace_last?: boolean;
 }
 
 export class ApiService {

@@ -101,18 +101,25 @@ export function TonConnect() {
                     };
 
                     // Single proof verification - backend handles the rest
-                    const { token } = await api.connectWallet({
+                    const response = await api.connectWallet({
                         address: w.account.address,
                         proof
                     });
 
-                    if (!token) {
+                    if (!response.token) {
                         throw new Error('Failed to verify wallet connection');
                     }
 
-                    // Show success and start close timer
+                    // Handle registration flow response
                     setIsConnected(true);
                     setIsValidated(true);
+
+                    // Close webapp only for early backers
+                    if (response.status === 'early_backer') {
+                        setTimeout(() => {
+                            window.Telegram.WebApp.close();
+                        }, 7000);
+                    }
 
                 } catch (error) {
                     console.error('Wallet verification failed:', error);
