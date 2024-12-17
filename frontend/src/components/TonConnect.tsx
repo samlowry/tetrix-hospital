@@ -98,7 +98,15 @@ export function TonConnect() {
                     };
 
                     // Register user with TON Proof
-                    await api.registerEarlyBacker(w.account.address, proof);
+                    await api.registerEarlyBacker(w.account.address, {
+                        type: 'ton_proof',
+                        domain: proof.domain,
+                        timestamp: proof.timestamp,
+                        payload: proof.payload,
+                        signature: proof.signature,
+                        state_init: proof.state_init,
+                        public_key: proof.public_key
+                    });
 
                     // Only show success and close if registration was successful
                     setIsConnected(true);

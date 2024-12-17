@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
-from services.ton_proof_service import TON_PROOF_PREFIX, TON_CONNECT_PREFIX
+from services.ton_proof_service import TON_PROOF_PREFIX, TON_CONNECT_PREFIX, TonProofService
 from tonsdk.utils import Address
 import os
 import sys
@@ -154,52 +154,27 @@ def register_early_backer():
             logger.error("Missing fields - Address, init_data, or proof")
             return jsonify({'error': 'Missing required fields'}), 400
             
-        # Verify TON Proof
+        # Verify TON Proof using the service
         try:
-            # Get the payload from proof
-            payload = proof.get('payload')
-            if not payload:
-                logger.error("Missing payload in proof")
-                return jsonify({'error': 'Invalid proof format'}), 400
-
-            # Verify signature using the same logic as check_proof
-            message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
-            message_bytes = message.encode()
+            # Prepare proof payload for verification
+            proof_payload = {
+                'address': address,
+                'proof': {
+                    'timestamp': proof['timestamp'],
+                    'domain': {
+                        'lengthBytes': len(DOMAIN),
+                        'value': DOMAIN
+                    },
+                    'signature': proof['signature'],
+                    'payload': proof['payload'],
+                    'state_init': proof['state_init']
+                },
+                'public_key': proof['public_key']
+            }
             
-            # Prepare message components
-            address_obj = Address(address)
-            wc = address_obj.wc.to_bytes(4, byteorder='big')
-            ts = proof['timestamp'].to_bytes(8, byteorder='little')
-            dl = len(DOMAIN).to_bytes(4, byteorder='little')
-            
-            # Construct message
-            msg = b''.join([
-                TON_PROOF_PREFIX,
-                wc,
-                address_obj.hash_part,
-                dl,
-                DOMAIN.encode(),
-                ts,
-                payload.encode()
-            ])
-
-            msg_hash = hashlib.sha256(msg).digest()
-
-            # Construct full message with prefix
-            full_msg = b''.join([
-                bytes([0xff, 0xff]),
-                TON_CONNECT_PREFIX,
-                msg_hash
-            ])
-
-            result = hashlib.sha256(full_msg).digest()
-            
-            # Verify signature
-            signature = b64decode(proof['signature'])
-            public_key = bytes.fromhex(proof['public_key'])
-            
-            verify_key = nacl.signing.VerifyKey(public_key)
-            verify_key.verify(result, signature)
+            if not TonProofService.check_proof(proof_payload):
+                logger.error("TON Proof verification failed")
+                return jsonify({'error': 'Invalid TON Proof'}), 401
             logger.info("TON Proof verification successful")
         except Exception as e:
             logger.error(f"TON Proof verification failed: {e}")
