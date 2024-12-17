@@ -54,7 +54,7 @@ export function UserDashboard() {
             throw new Error('Failed to get TON Proof');
           }
           
-          const { success } = await api.registerEarlyBacker(userAddress, proof, messageId);
+          const { success } = await api.registerEarlyBacker(userAddress, proof);
           console.log('Registration result:', success);
           if (success) {
             setIsRegistered(true);
