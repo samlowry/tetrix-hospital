@@ -362,13 +362,12 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             # Always send new message for congratulations
-            sent_message = await self.application.bot.send_message(
+            await self.application.bot.send_message(
                 telegram_id,
                 message,
                 parse_mode='MarkdownV2',
                 reply_markup=reply_markup
             )
-            await self._store_message_id(telegram_id, sent_message.message_id)
 
         except Exception as e:
             logger.error(f"Error showing congratulations: {e}")
@@ -394,13 +393,12 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             # Always send new message for invite code request
-            sent_message = await self.application.bot.send_message(
+            await self.application.bot.send_message(
                 telegram_id,
                 message,
                 parse_mode='MarkdownV2',
                 reply_markup=reply_markup
             )
-            await self._store_message_id(telegram_id, sent_message.message_id)
 
         except Exception as e:
             logger.error(f"Error requesting invite code: {e}")
@@ -483,18 +481,17 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                         message += "Your invite code has been accepted\\. Welcome to TETRIX\\!"
                         
                         # Always send new message for invite code acceptance
-                        sent_message = await update.message.reply_text(
+                        await update.message.reply_text(
                             message,
                             parse_mode='MarkdownV2',
                             reply_markup=reply_markup
                         )
-                        await self._store_message_id(telegram_id, sent_message.message_id)
                     else:
                         logger.error(f"Failed to use invite code {text}")
                         keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         await update.message.reply_text(
-                            "��� Error using invite code. Please try again.",
+                            "Error using invite code. Please try again.",
                             reply_markup=reply_markup
                         )
                 else:
