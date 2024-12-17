@@ -1,17 +1,37 @@
 version: "3.8"
 
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - backend
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     environment:
       - DATABASE_URL=postgresql://tetrix:tetrixpass@db:5432/tetrix
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - FLASK_ENV=production
     depends_on:
       - db
+      - redis
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
     volumes:
       - ./logs:/app/logs
 
@@ -23,14 +43,19 @@ services:
       POSTGRES_DB: tetrix
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    deploy:
+      restart_policy:
+        condition: on-failure
 
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
 
 volumes:
   postgres_data:
-  redis_data: 
+  redis_data:
