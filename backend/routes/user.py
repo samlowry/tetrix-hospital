@@ -2,8 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
-from services.ton_proof_service import TON_PROOF_PREFIX, TON_CONNECT_PREFIX, TonProofService
-from tonsdk.utils import Address
+from services.ton_proof_service import verify_proof_signature
 import os
 import sys
 import asyncio
@@ -13,10 +12,9 @@ import hmac
 import json
 from urllib.parse import parse_qs
 from base64 import b64decode
-import nacl.signing
 
 logger = logging.getLogger('tetrix')
-DOMAIN = os.getenv('DOMAIN', '5fa5-109-245-96-58.ngrok-free.app')  # Use ngrok URL as default
+DOMAIN = os.getenv('DOMAIN', 'localhost')  # Default to localhost if not set
 
 def parse_init_data(init_data: str) -> dict:
     """Parse and validate Telegram WebApp init data"""
@@ -154,31 +152,40 @@ def register_early_backer():
             logger.error("Missing fields - Address, init_data, or proof")
             return jsonify({'error': 'Missing required fields'}), 400
             
-        # Verify TON Proof using the service
+        # Verify TON Proof
         try:
-            # Prepare proof payload for verification
-            proof_payload = {
-                'address': address,
-                'proof': {
-                    'timestamp': proof['timestamp'],
-                    'domain': {
-                        'lengthBytes': len(DOMAIN),
-                        'value': DOMAIN
-                    },
-                    'signature': proof['signature'],
-                    'payload': proof['payload'],
-                    'state_init': proof['state_init']
-                },
-                'public_key': proof['public_key']
-            }
+            # Get the payload from proof
+            payload = proof.get('payload')
+            if not payload:
+                logger.error("Missing payload in proof")
+                return jsonify({'error': 'Invalid proof format'}), 400
+
+            # Verify signature
+            message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
+            message_bytes = message.encode()
+            signature = b64decode(proof['signature'])
+            public_key = b64decode(proof['public_key'])
             
-            if not TonProofService.check_proof(proof_payload):
-                logger.error("TON Proof verification failed")
-                return jsonify({'error': 'Invalid TON Proof'}), 401
+            if not verify_proof_signature(message_bytes, signature, public_key):
+                logger.error("TON Proof signature verification failed")
+                return jsonify({'error': 'Invalid TON Proof signature'}), 401
             logger.info("TON Proof verification successful")
         except Exception as e:
             logger.error(f"TON Proof verification failed: {e}")
             return jsonify({'error': 'Invalid TON Proof'}), 401
+            
+        # Verify if it's really an early backer
+        normalized_address = normalize_address(address)
+        try:
+            with open('first_backers.txt', 'r') as f:
+                first_backers = set(normalize_address(line.strip()) for line in f)
+                
+            if normalized_address not in first_backers:
+                logger.error(f"Address {normalized_address} is not in first_backers.txt")
+                return jsonify({'error': 'Not an early backer'}), 403
+        except FileNotFoundError:
+            logger.error("first_backers.txt not found")
+            return jsonify({'error': 'Could not verify early backer status'}), 500
             
         # Verify Telegram WebApp data
         try:
@@ -189,16 +196,6 @@ def register_early_backer():
         except Exception as e:
             logger.error(f"Invalid Telegram init data: {e}")
             return jsonify({'error': 'Invalid Telegram data'}), 400
-            
-        # Check if early backer
-        normalized_address = normalize_address(address)
-        try:
-            with open('first_backers.txt', 'r') as f:
-                first_backers = set(normalize_address(line.strip()) for line in f)
-                is_early_backer = normalized_address in first_backers
-        except FileNotFoundError:
-            logger.warning("first_backers.txt not found, assuming not an early backer")
-            is_early_backer = False
             
         # Register user
         user = User.query.filter_by(wallet_address=address).first()
@@ -213,29 +210,17 @@ def register_early_backer():
         db.session.commit()
         logger.info(f"User saved to database successfully")
         
-        # Show appropriate message based on early backer status
-        logger.info(f"Showing message for telegram_id {telegram_id}")
+        # Schedule dashboard display in background
+        logger.info(f"Scheduling dashboard display for telegram_id {telegram_id}")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            if is_early_backer:
-                # Show congratulations for early backer
-                loop.run_until_complete(current_app.bot_manager.show_congratulations(
-                    telegram_id=telegram_id,
-                    message_id=message_id,
-                    is_early_backer=True
-                ))
-            else:
-                # Show invite code request for regular user
-                loop.run_until_complete(current_app.bot_manager.request_invite_code(
-                    telegram_id=telegram_id,
-                    message_id=message_id
-                ))
+            loop.run_until_complete(current_app.bot_manager.display_user_dashboard(telegram_id, message_id))
         finally:
             loop.close()
         
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f"Error registering user: {e}")
+        logger.error(f"Error registering early backer: {e}")
         return jsonify({'error': str(e)}), 500

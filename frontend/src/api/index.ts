@@ -126,12 +126,13 @@ export class ApiService {
         }
     }
 
-    async registerEarlyBacker(address: string, proof: TonProofPayload): Promise<{ success: boolean }> {
+    async registerEarlyBacker(address: string, proof: TonProofPayload, messageId?: string): Promise<{ success: boolean }> {
         try {
             const tgWebAppData = window.Telegram.WebApp.initData;
             const response = await this.axiosInstance.post('/user/register_early_backer', {
                 address,
                 tg_init_data: tgWebAppData,
+                message_id: messageId,
                 proof
             });
             return this.handleResponse(response);
