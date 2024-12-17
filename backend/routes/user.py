@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
+from services.ton_proof_service import VerifyKey
 import os
 import sys
 import asyncio
@@ -10,8 +11,10 @@ import hashlib
 import hmac
 import json
 from urllib.parse import parse_qs
+from base64 import b64decode
 
 logger = logging.getLogger('tetrix')
+DOMAIN = os.getenv('DOMAIN', 'localhost')  # Default to localhost if not set
 
 def parse_init_data(init_data: str) -> dict:
     """Parse and validate Telegram WebApp init data"""
@@ -140,13 +143,35 @@ def register_early_backer():
         data = request.get_json()
         address = data.get('address')
         tg_init_data = data.get('tg_init_data')
+        proof = data.get('proof')  # Get TON Proof
         
         logger.info(f"Received registration request for address: {address}")
         logger.info(f"Telegram init data received: {tg_init_data[:100]}...")  # Log first 100 chars
         
-        if not all([address, tg_init_data]):
-            logger.error("Missing fields - Address or init_data")
+        if not all([address, tg_init_data, proof]):
+            logger.error("Missing fields - Address, init_data, or proof")
             return jsonify({'error': 'Missing required fields'}), 400
+            
+        # Verify TON Proof
+        try:
+            # Get the payload from proof
+            payload = proof.get('payload')
+            if not payload:
+                logger.error("Missing payload in proof")
+                return jsonify({'error': 'Invalid proof format'}), 400
+
+            # Verify signature
+            message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
+            message_bytes = message.encode()
+            signature = b64decode(proof['signature'])
+            public_key = b64decode(proof['public_key'])
+            
+            verify_key = VerifyKey(public_key)
+            verify_key.verify(message_bytes, signature)
+            logger.info("TON Proof verification successful")
+        except Exception as e:
+            logger.error(f"TON Proof verification failed: {e}")
+            return jsonify({'error': 'Invalid TON Proof'}), 401
             
         # Verify if it's really an early backer
         normalized_address = normalize_address(address)

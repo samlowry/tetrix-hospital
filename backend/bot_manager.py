@@ -4,6 +4,7 @@ from typing import Optional
 import logging
 import asyncio
 import os
+import telegram
 
 logger = logging.getLogger('tetrix')
 
@@ -80,81 +81,95 @@ class BotManager:
         query = update.callback_query
         await query.answer()
         
-        if query.data == 'reconnect_wallet':
-            keyboard = [[InlineKeyboardButton("Reconnect Wallet", web_app={"url": self.frontend_url})]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                "Please verify your wallet using our secure web interface:",
-                reply_markup=reply_markup
-            )
-            
-        elif query.data == 'create_wallet':
-            keyboard = [
-                [InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})],
-                [InlineKeyboardButton("Return", callback_data='return_to_start')]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                "To create a TON wallet:\n\n"
-                "1. Open @wallet in Telegram\n"
-                "2. Click 'Create Wallet'\n"
-                "3. Follow the setup instructions\n"
-                "4. Return here and connect your wallet\n\n"
-                "Click the button below when you're ready to connect:",
-                reply_markup=reply_markup
-            )
-            
-        elif query.data == 'return_to_start':
-            keyboard = [
-                [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
-                [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                "Welcome to TETRIX! Let's get started:",
-                reply_markup=reply_markup
-            )
-            
-        elif query.data == 'check_stats':
-            # Use the same dashboard display function
-            await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
-            
-        elif query.data == 'show_invites':
-            with self.flask_app.app_context():
-                user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
-                if not user:
-                    await query.edit_message_text("Please connect your wallet first.")
-                    return
+        try:
+            if query.data == 'reconnect_wallet':
+                keyboard = [[InlineKeyboardButton("Reconnect Wallet", web_app={"url": self.frontend_url})]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                codes = user.get_invite_codes()
+                await query.edit_message_text(
+                    "Please verify your wallet using our secure web interface:",
+                    reply_markup=reply_markup
+                )
                 
-                # Format invite codes
-                code_lines = []
-                for code_info in codes:
-                    if code_info['status'] == 'used_today':
-                        code_lines.append(f"~~```\n{code_info['code']}\n```~~ (Used)")
-                    else:
-                        code_lines.append(f"```\n{code_info['code']}\n```")
-                
-                while len(code_lines) < 5:
-                    code_lines.append("*empty*")
-                
+            elif query.data == 'create_wallet':
                 keyboard = [
-                    [InlineKeyboardButton("Refresh Codes", callback_data='show_invites')],
-                    [InlineKeyboardButton("Back to Stats", callback_data='back_to_menu')]                    
+                    [InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})],
+                    [InlineKeyboardButton("Return", callback_data='return_to_start')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                # Join codes with double newlines for separate copy blocks
-                message = "Your Invite Codes:\n\n" + "\n\n".join(code_lines) + "\n\n"
-                await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-            
-        elif query.data == 'back_to_menu':
-            # Show dashboard for registered users
-            await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
+                await query.edit_message_text(
+                    "To create a TON wallet:\n\n"
+                    "1. Open @wallet in Telegram\n"
+                    "2. Click 'Create Wallet'\n"
+                    "3. Follow the setup instructions\n"
+                    "4. Return here and connect your wallet\n\n"
+                    "Click the button below when you're ready to connect:",
+                    reply_markup=reply_markup
+                )
+                
+            elif query.data == 'return_to_start':
+                keyboard = [
+                    [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
+                    [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    "Welcome to TETRIX! Let's get started:",
+                    reply_markup=reply_markup
+                )
+                
+            elif query.data == 'check_stats':
+                # Use the same dashboard display function
+                await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
+                
+            elif query.data == 'show_invites':
+                with self.flask_app.app_context():
+                    user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
+                    if not user:
+                        await query.edit_message_text("Please connect your wallet first.")
+                        return
+                    
+                    codes = user.get_invite_codes()
+                    
+                    # Format invite codes
+                    code_lines = []
+                    for code_info in codes:
+                        if code_info['status'] == 'used_today':
+                            code_lines.append(f"~~```\n{code_info['code']}\n```~~ (Used)")
+                        else:
+                            code_lines.append(f"```\n{code_info['code']}\n```")
+                    
+                    while len(code_lines) < 5:
+                        code_lines.append("*empty*")
+                    
+                    keyboard = [
+                        [InlineKeyboardButton("Refresh Codes", callback_data='show_invites')],
+                        [InlineKeyboardButton("Back to Stats", callback_data='back_to_menu')]                    
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    # Join codes with double newlines for separate copy blocks
+                    message = "Your Invite Codes:\n\n" + "\n\n".join(code_lines) + "\n\n"
+                    try:
+                        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+                    except telegram.error.BadRequest as e:
+                        if "Message is not modified" in str(e):
+                            # Just acknowledge the refresh with a notification
+                            await query.answer("Codes are up to date!")
+                        else:
+                            raise
+                
+            elif query.data == 'back_to_menu':
+                # Show dashboard for registered users
+                await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
+        except telegram.error.BadRequest as e:
+            if "Message is not modified" in str(e):
+                # Just acknowledge the refresh with a notification
+                await query.answer("Stats are up to date!")
+            else:
+                raise
 
     async def handle_wallet_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle wallet address messages"""
