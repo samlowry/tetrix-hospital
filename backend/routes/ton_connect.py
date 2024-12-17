@@ -9,7 +9,6 @@ import os
 bp = Blueprint('ton_connect', __name__, url_prefix='/api')
 ton_proof_service = TonProofService()
 user_service = UserService()
-telegram_service = TelegramService()
 
 @bp.route('/generate_payload', methods=['POST'])
 @limiter.limit("100 per minute")
@@ -31,6 +30,7 @@ def check_proof():
             return jsonify({'error': 'Invalid proof'}), 400
 
         address = data['address']
+        print(f"Received address: {address}")
         print(f"Checking if {address} is early backer...")
         is_early_backer = user_service.is_early_backer(address)
         print(f"Early backer status: {is_early_backer}")

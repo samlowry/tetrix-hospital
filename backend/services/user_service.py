@@ -6,7 +6,7 @@ class UserService:
     def is_early_backer(self, address: str) -> bool:
         """Check if address is in early backers list."""
         # Check Redis cache first
-        cache_key = f'early_backer:{address}'
+        cache_key = f'early_backer:{address.upper()}'
         cached = redis_client.get(cache_key)
         if cached is not None:
             print(f"Found in cache: {address} -> {bool(int(cached))}")
@@ -18,8 +18,8 @@ class UserService:
             script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             backers_file = os.path.join(script_dir, 'first_backers.txt')
             with open(backers_file, 'r') as f:
-                backers = [line.strip().lower() for line in f]
-                is_early = address.lower() in backers
+                backers = [line.strip().upper() for line in f]
+                is_early = address.upper() in backers
                 print(f"Found in file: {address} -> {is_early}")
                 
                 # Cache result
@@ -37,5 +37,5 @@ class UserService:
             db.session.add(user)
             db.session.commit()
             
-            # Cache early backer status
-            redis_client.setex(f'early_backer:{address}', 3600, int(is_early_backer))
+            # Cache early backer status with uppercase address
+            redis_client.setex(f'early_backer:{address.upper()}', 3600, int(is_early_backer))

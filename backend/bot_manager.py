@@ -12,7 +12,10 @@ class BotManager:
     def __init__(self, token: str, db, User, ton_client, app):
         """Initialize bot with dependencies"""
         logger.info("Initializing bot manager...")
+        if not token:
+            raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables")
         self.application = Application.builder().token(token).build()
+        self.bot = telegram.Bot(token=token)  # Initialize bot instance
         self.db = db
         self.User = User
         self.ton_client = ton_client

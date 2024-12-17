@@ -18,10 +18,21 @@ from routes.metrics import update_metrics
 from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
+from services.telegram_service import TelegramService
 
 # Load environment variables
 env_path = Path(__file__).resolve().parent.parent / '.env'
-load_dotenv(env_path)
+print(f"Looking for .env at: {env_path.absolute()}")
+if not env_path.exists():
+    # Try current directory
+    env_path = Path('.env')
+    print(f"Not found, trying current directory: {env_path.absolute()}")
+if env_path.exists():
+    print(f"Found .env file at: {env_path.absolute()}")
+    load_dotenv(env_path)
+    print(f"Loaded TELEGRAM_BOT_TOKEN: {os.getenv('TELEGRAM_BOT_TOKEN')}")
+else:
+    print("No .env file found!")
 
 # Initialize Flask app
 app = Flask(__name__)
