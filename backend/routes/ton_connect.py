@@ -109,7 +109,7 @@ def check_proof():
             })
         else:
             print(f"User {address} needs invite code")
-            # Register user without early backer status
+            # Register user without early backer status (not fully registered yet)
             user_service.register_user(address, is_early_backer=False, telegram_id=telegram_id)
             print(f"Registered user {address} without early backer status")
             

@@ -31,18 +31,37 @@ class UserService:
 
     def register_user(self, address: str, is_early_backer: bool = False, telegram_id: int = None) -> None:
         """Register new user."""
+        print(f"Registering user - Address: {address}, Early Backer: {is_early_backer}, Telegram ID: {telegram_id}")
+        
         user = User.query.filter_by(wallet_address=address).first()
         if not user:
-            user = User(wallet_address=address, telegram_id=telegram_id)
+            # Create new user with proper flags
+            user = User(
+                wallet_address=address,
+                telegram_id=telegram_id,
+                is_early_backer=is_early_backer,
+                is_fully_registered=is_early_backer  # Early backers are automatically fully registered
+            )
             db.session.add(user)
             db.session.commit()
+            print(f"Created new user - Early Backer: {user.is_early_backer}, Fully Registered: {user.is_fully_registered}")
             
             # Cache early backer status with uppercase address
             redis_client.setex(f'early_backer:{address.upper()}', 3600, int(is_early_backer))
         elif telegram_id and user.telegram_id != telegram_id:
             # Update telegram_id if it's provided and different
             user.telegram_id = telegram_id
+            # Make sure early backer flags are set correctly
+            if is_early_backer:
+                user.is_early_backer = True
+                user.is_fully_registered = True
+                print(f"Updated user flags - Early Backer: {user.is_early_backer}, Fully Registered: {user.is_fully_registered}")
             db.session.commit()
+        
+        # Log final state
+        user = User.query.filter_by(wallet_address=address).first()
+        print(f"Final user state - Early Backer: {user.is_early_backer}, Fully Registered: {user.is_fully_registered}")
+        return user
 
     def get_user_by_address(self, address: str) -> User:
         """Get user by wallet address."""

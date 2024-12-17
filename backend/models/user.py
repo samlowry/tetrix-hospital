@@ -23,11 +23,16 @@ class User(db.Model):
     telegram_id = db.Column(db.BigInteger, unique=True, nullable=True)
     max_invite_slots = db.Column(db.Integer, default=5)  # Custom slot number
     ignore_slot_reset = db.Column(db.Boolean, default=False)  # Option to ignore daily reset
+    is_early_backer = db.Column(db.Boolean, default=False)  # Early backer status
+    is_fully_registered = db.Column(db.Boolean, default=False)  # Registration status
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Set last_slot_reset to 25 hours ago to ensure first invites are available
         self.last_slot_reset = datetime.utcnow() - timedelta(hours=25)
+        # Early backers are automatically fully registered
+        if kwargs.get('is_early_backer'):
+            self.is_fully_registered = True
         
     # Relationships
     created_codes = db.relationship('InviteCode', 
@@ -40,6 +45,10 @@ class User(db.Model):
 
     def get_invite_codes(self):
         """Get current invite codes with their status"""
+        # Only generate codes for fully registered users
+        if not self.is_fully_registered:
+            return []
+            
         today = datetime.utcnow().date()
         today_start = datetime.combine(today, time.min)
         today_end = datetime.combine(today, time.max)
@@ -130,7 +139,15 @@ class User(db.Model):
             logger.info(f"Found valid invite code {code}, marking as used")
             invite.used_by_id = user_id
             invite.used_at = datetime.utcnow()
-            db.session.commit()
+            
+            # Mark user as fully registered
+            user = cls.query.get(user_id)
+            if user:
+                logger.info(f"User {user_id} before update - Early Backer: {user.is_early_backer}, Fully Registered: {user.is_fully_registered}")
+                user.is_fully_registered = True
+                db.session.commit()
+                logger.info(f"User {user_id} after update - Early Backer: {user.is_early_backer}, Fully Registered: {user.is_fully_registered}")
+                
             logger.info(f"Successfully used invite code {code}")
             return True
         logger.warning(f"Invite code {code} not found or already used")
@@ -150,7 +167,7 @@ class User(db.Model):
         # Calculate points
         holding_points = 420  # Dummy value for now
         invite_points = total_invites * 420
-        early_backer_bonus = 4200  # Will be checked against first_backers.txt
+        early_backer_bonus = 4200 if self.is_early_backer else 0  # Use field instead of file check
         
         total_points = holding_points + invite_points + early_backer_bonus
         

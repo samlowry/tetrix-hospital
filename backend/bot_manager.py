@@ -5,6 +5,8 @@ import logging
 import asyncio
 import os
 import telegram
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 logger = logging.getLogger('tetrix')
 
@@ -23,6 +25,15 @@ class BotManager:
         self.flask_app = app
         self.frontend_url = os.getenv('FRONTEND_URL')
         self.redis = app.extensions['redis']  # Get Redis from Flask app
+        
+        # Initialize limiter with Redis storage
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+        self.limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            storage_uri=redis_url
+        )
+        
         self.setup_handlers()
         logger.info("Bot manager initialized successfully")
 
@@ -35,24 +46,6 @@ class BotManager:
         from telegram.ext import MessageHandler, filters
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         logger.info("Bot handlers set up successfully")
-
-    def _get_message_key(self, user_id: int) -> str:
-        """Get Redis key for storing message ID"""
-        return f"bot:message:{user_id}"
-
-    async def _store_message_id(self, user_id: int, message_id: int):
-        """Store message ID in Redis"""
-        key = self._get_message_key(user_id)
-        self.redis.set(key, str(message_id), ex=3600)  # Expire after 1 hour
-        logger.info(f"Stored message ID {message_id} for user {user_id} in Redis")
-
-    async def _get_message_id(self, user_id: int) -> Optional[int]:
-        """Get message ID from Redis"""
-        key = self._get_message_key(user_id)
-        message_id = self.redis.get(key)
-        if message_id:
-            return int(message_id)
-        return None
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
@@ -74,13 +67,7 @@ class BotManager:
                 message = "Welcome to TETRIX! Let's get started:"
                 
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                try:
-                    sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-                    # Store the message ID in Redis
-                    await self._store_message_id(update.effective_user.id, sent_message.message_id)
-                except Exception as e:
-                    logger.error(f"Error sending welcome message: {e}")
+                await update.message.reply_text(message, reply_markup=reply_markup)
 
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle button callbacks"""
@@ -135,8 +122,8 @@ class BotManager:
                 )
                 
             elif query.data == 'check_stats':
-                # Use the same dashboard display function
-                await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
+                # Send new dashboard message
+                await self.display_user_dashboard(telegram_id=update.effective_user.id)
                 
             elif query.data == 'show_invites':
                 with self.flask_app.app_context():
@@ -164,20 +151,19 @@ class BotManager:
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
-                    # Join codes with double newlines for separate copy blocks
+                    # Send new message with codes
                     message = "Your Invite Codes:\n\n" + "\n\n".join(code_lines) + "\n\n"
-                    try:
-                        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-                    except telegram.error.BadRequest as e:
-                        if "Message is not modified" in str(e):
-                            # Just acknowledge the refresh with a notification
-                            await query.answer("Codes are up to date!")
-                        else:
-                            raise
+                    await self.application.bot.send_message(
+                        update.effective_user.id,
+                        message,
+                        parse_mode='Markdown',
+                        reply_markup=reply_markup
+                    )
                 
             elif query.data == 'back_to_menu':
                 # Show dashboard for registered users
-                await self.display_user_dashboard(update.effective_user.id, query.message.message_id)
+                await self.display_user_dashboard(telegram_id=update.effective_user.id)
+                
         except telegram.error.BadRequest as e:
             if "Message is not modified" in str(e):
                 # Just acknowledge the refresh with a notification
@@ -272,22 +258,21 @@ class BotManager:
         """Check if we should edit the message or send a new one.
         Returns True if we should edit, False if we should send new message."""
         if not message_id:
+            logger.info("No message_id provided, will send new message")
             return False
             
         try:
-            # First check if it's a callback query (button press)
-            if not (update and update.callback_query):
+            # Check if this is a callback query (button press)
+            if not update or not update.callback_query:
                 logger.info("Not a button press, will send new message")
                 return False
                 
-            # Then check if there are newer messages
-            chat = await self.application.bot.get_chat(telegram_id)
-            latest_messages = await chat.get_history(limit=1)
-            if latest_messages and latest_messages[0].message_id > message_id:
-                logger.info(f"Found newer messages after {message_id}, will send new message")
+            # Check if we're trying to edit the same message that has the button
+            if update.callback_query.message.message_id != message_id:
+                logger.info(f"Button press was on different message (button: {update.callback_query.message.message_id}, target: {message_id}), will send new message")
                 return False
                 
-            # If it's a button press and no newer messages, edit the message
+            logger.info(f"Will edit message {message_id} in response to button press")
             return True
             
         except Exception as e:
@@ -298,8 +283,11 @@ class BotManager:
         """Display user dashboard with points and stats"""
         with self.flask_app.app_context():
             try:
+                logger.info(f"Displaying dashboard for user {telegram_id}")
+                
                 user = self.User.query.filter_by(telegram_id=telegram_id).first()
                 if not user:
+                    logger.warning(f"User {telegram_id} not found in database")
                     return
                 
                 stats = user.get_stats()
@@ -337,41 +325,14 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
-                # Try to get message ID from Redis if not provided
-                if not message_id:
-                    message_id = await self._get_message_id(telegram_id)
-
-                should_edit = await self._should_edit_message(telegram_id, message_id, update)
-                
-                if should_edit:
-                    try:
-                        await self.application.bot.edit_message_text(
-                            chat_id=telegram_id,
-                            message_id=message_id,
-                            text=message,
-                            parse_mode='MarkdownV2',
-                            reply_markup=reply_markup
-                        )
-                        logger.info(f"Successfully edited message {message_id} for user {telegram_id}")
-                    except Exception as e:
-                        logger.error(f"Error editing message: {e}")
-                        # If editing fails, send a new message
-                        sent_message = await self.application.bot.send_message(
-                            telegram_id,
-                            message,
-                            parse_mode='MarkdownV2',
-                            reply_markup=reply_markup
-                        )
-                        await self._store_message_id(telegram_id, sent_message.message_id)
-                else:
-                    # Send new message
-                    sent_message = await self.application.bot.send_message(
-                        telegram_id,
-                        message,
-                        parse_mode='MarkdownV2',
-                        reply_markup=reply_markup
-                    )
-                    await self._store_message_id(telegram_id, sent_message.message_id)
+                # Always send new message
+                logger.info("Sending new dashboard message")
+                await self.application.bot.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode='MarkdownV2',
+                    reply_markup=reply_markup
+                )
                 
             except Exception as e:
                 logger.error(f"Error displaying dashboard: {e}")
@@ -444,20 +405,64 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
         except Exception as e:
             logger.error(f"Error requesting invite code: {e}")
 
+    async def _check_rate_limit(self, telegram_id: int) -> bool:
+        """Check if user has exceeded rate limit (5 attempts per hour)"""
+        key = f"invite_code_limit:{telegram_id}"
+        try:
+            # Get current count
+            count = self.redis.get(key)
+            if count is None:
+                # First attempt
+                self.redis.setex(key, 3600, 1)  # Expire in 1 hour
+                return True
+            
+            count = int(count)
+            if count >= 5:
+                return False
+            
+            # Increment count
+            self.redis.incr(key)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking rate limit: {e}")
+            return True  # Allow on error
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages (invite codes)"""
         with self.flask_app.app_context():
-            text = update.message.text.strip()  # Trim whitespace and newlines
             telegram_id = update.effective_user.id
+            
+            # Ignore commands
+            if update.message.text.startswith('/'):
+                return
+                
+            text = update.message.text.strip()  # Trim whitespace and newlines
             logger.info(f"Received message from {telegram_id}: {text}")
             
-            # Check if user exists but not fully registered (needs invite code)
+            # Check if user exists
             user = self.User.query.filter_by(telegram_id=telegram_id).first()
             if not user:
                 logger.info(f"User {telegram_id} not found in database, ignoring message")
                 return
+                
+            # If user is fully registered or is early backer, ignore non-command messages
+            if user.is_fully_registered or user.is_early_backer:
+                logger.info(f"User {telegram_id} is fully registered or early backer, ignoring message")
+                return
             
-            logger.info(f"Found user {telegram_id} in database, checking invite code")
+            # Check rate limit for unregistered users
+            if not await self._check_rate_limit(telegram_id):
+                logger.info(f"Rate limit exceeded for user {telegram_id}")
+                await update.message.reply_text(
+                    "❌ Rate limit exceeded. Please try again later.",
+                    reply_markup=None
+                )
+                return
+            
+            # At this point, user exists but is not fully registered
+            # Treat any message as a potential invite code
+            logger.info(f"Treating message as invite code from unregistered user {telegram_id}")
             
             # Verify invite code
             try:
@@ -489,7 +494,7 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                         keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         await update.message.reply_text(
-                            "❌ Error using invite code. Please try again.",
+                            "��� Error using invite code. Please try again.",
                             reply_markup=reply_markup
                         )
                 else:
