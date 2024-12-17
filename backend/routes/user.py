@@ -174,19 +174,6 @@ def register_early_backer():
             logger.error(f"TON Proof verification failed: {e}")
             return jsonify({'error': 'Invalid TON Proof'}), 401
             
-        # Verify if it's really an early backer
-        normalized_address = normalize_address(address)
-        try:
-            with open('first_backers.txt', 'r') as f:
-                first_backers = set(normalize_address(line.strip()) for line in f)
-                
-            if normalized_address not in first_backers:
-                logger.error(f"Address {normalized_address} is not in first_backers.txt")
-                return jsonify({'error': 'Not an early backer'}), 403
-        except FileNotFoundError:
-            logger.error("first_backers.txt not found")
-            return jsonify({'error': 'Could not verify early backer status'}), 500
-            
         # Verify Telegram WebApp data
         try:
             init_data = parse_init_data(tg_init_data)
@@ -196,6 +183,16 @@ def register_early_backer():
         except Exception as e:
             logger.error(f"Invalid Telegram init data: {e}")
             return jsonify({'error': 'Invalid Telegram data'}), 400
+            
+        # Check if early backer
+        normalized_address = normalize_address(address)
+        try:
+            with open('first_backers.txt', 'r') as f:
+                first_backers = set(normalize_address(line.strip()) for line in f)
+                is_early_backer = normalized_address in first_backers
+        except FileNotFoundError:
+            logger.warning("first_backers.txt not found, assuming not an early backer")
+            is_early_backer = False
             
         # Register user
         user = User.query.filter_by(wallet_address=address).first()
@@ -210,21 +207,29 @@ def register_early_backer():
         db.session.commit()
         logger.info(f"User saved to database successfully")
         
-        # Show congratulations message
-        logger.info(f"Showing congratulations for telegram_id {telegram_id}")
+        # Show appropriate message based on early backer status
+        logger.info(f"Showing message for telegram_id {telegram_id}")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(current_app.bot_manager.show_congratulations(
-                telegram_id=telegram_id,
-                message_id=message_id,
-                is_early_backer=True  # Since this endpoint is only for early backers
-            ))
+            if is_early_backer:
+                # Show congratulations for early backer
+                loop.run_until_complete(current_app.bot_manager.show_congratulations(
+                    telegram_id=telegram_id,
+                    message_id=message_id,
+                    is_early_backer=True
+                ))
+            else:
+                # Show invite code request for regular user
+                loop.run_until_complete(current_app.bot_manager.request_invite_code(
+                    telegram_id=telegram_id,
+                    message_id=message_id
+                ))
         finally:
             loop.close()
         
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f"Error registering early backer: {e}")
+        logger.error(f"Error registering user: {e}")
         return jsonify({'error': str(e)}), 500

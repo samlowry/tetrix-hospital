@@ -14,7 +14,6 @@ export function TonConnect() {
 
     useEffect(() => {
         if (showSuccess) {
-            // Close the WebApp after 7 seconds
             const timer = setTimeout(() => {
                 window.Telegram.WebApp.close();
             }, 7000);
@@ -98,20 +97,10 @@ export function TonConnect() {
                         public_key: w.account.publicKey
                     };
 
-                    // First verify the wallet
-                    await api.connectWallet({
-                        address: w.account.address,
-                        proof
-                    });
+                    // Register user with TON Proof
+                    await api.registerEarlyBacker(w.account.address, proof);
 
-                    // Check if user is a first backer
-                    const { isFirstBacker } = await api.checkFirstBacker(w.account.address);
-                    
-                    if (isFirstBacker) {
-                        // Register as early backer if eligible
-                        await api.registerEarlyBacker(w.account.address, proof);
-                    }
-
+                    // Only show success and close if registration was successful
                     setIsConnected(true);
                     setShowSuccess(true);
                     window.Telegram.WebApp.showPopup({
@@ -125,10 +114,14 @@ export function TonConnect() {
                     window.Telegram.WebApp.showPopup({
                         title: 'Error',
                         message: error instanceof Error ? error.message : 'Connection failed',
-                        buttons: [{ type: 'ok' }]
+                        buttons: [{ 
+                            type: 'close',
+                            text: 'Close'
+                        }]
                     });
                     tonConnectUI.disconnect();
                     setIsConnected(false);
+                    // Don't set showSuccess here since it failed
                 }
             } else if (!isConnected) {
                 console.log('No proof in wallet connection, requesting new proof');

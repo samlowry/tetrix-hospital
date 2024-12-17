@@ -82,7 +82,15 @@ class BotManager:
         await query.answer()
         
         try:
-            if query.data == 'reconnect_wallet':
+            if query.data == 'enter_invite_code':
+                # Show message asking to enter invite code
+                message = "Please enter your invite code:"
+                await query.edit_message_text(
+                    text=message,
+                    reply_markup=None  # Remove buttons while waiting for code
+                )
+                
+            elif query.data == 'reconnect_wallet':
                 keyboard = [[InlineKeyboardButton("Reconnect Wallet", web_app={"url": self.frontend_url})]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -382,3 +390,46 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
 
         except Exception as e:
             logger.error(f"Error showing congratulations: {e}")
+
+    async def request_invite_code(self, telegram_id: int, message_id: Optional[int] = None):
+        """Request invite code from user who is not an early backer"""
+        try:
+            # Escape special characters for MarkdownV2
+            def escape_md(text):
+                chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+                escaped = str(text)
+                for char in chars:
+                    escaped = escaped.replace(char, f"\\{char}")
+                return escaped
+
+            # Format message requesting invite code
+            message = "✨ *Wallet Connected Successfully\\!*\n\n"
+            message += "To complete your registration, please enter an invite code\\.\n"
+            message += "You can get an invite code from an existing TETRIX member\\."
+
+            # Add button to try again if they have a code
+            keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if message_id:
+                try:
+                    await self.application.bot.edit_message_text(
+                        chat_id=telegram_id,
+                        message_id=message_id,
+                        text=message,
+                        parse_mode='MarkdownV2',
+                        reply_markup=reply_markup
+                    )
+                except Exception as e:
+                    logger.error(f"Error editing invite code request message: {e}")
+            else:
+                sent_message = await self.application.bot.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode='MarkdownV2',
+                    reply_markup=reply_markup
+                )
+                await self._store_message_id(telegram_id, sent_message.message_id)
+
+        except Exception as e:
+            logger.error(f"Error requesting invite code: {e}")
