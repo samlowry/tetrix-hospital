@@ -1,5 +1,6 @@
 from models import db, User
 from utils.redis_service import redis_client
+import os
 
 class UserService:
     def is_early_backer(self, address: str) -> bool:
@@ -10,21 +11,26 @@ class UserService:
         if cached is not None:
             return bool(int(cached))
 
-        # Check database
-        user = User.query.filter_by(address=address).first()
-        is_early = bool(user and user.is_early_backer)
-        
-        # Cache result
-        redis_client.setex(cache_key, 3600, int(is_early))
-        return is_early
+        # Check first_backers.txt
+        try:
+            with open('first_backers.txt', 'r') as f:
+                backers = [line.strip().lower() for line in f]
+                is_early = address.lower() in backers
+                
+                # Cache result
+                redis_client.setex(cache_key, 3600, int(is_early))
+                return is_early
+        except FileNotFoundError:
+            print("Warning: first_backers.txt not found")
+            return False
 
     def register_user(self, address: str, is_early_backer: bool = False) -> None:
         """Register new user."""
-        user = User.query.filter_by(address=address).first()
+        user = User.query.filter_by(wallet_address=address).first()
         if not user:
-            user = User(address=address, is_early_backer=is_early_backer)
+            user = User(wallet_address=address)
             db.session.add(user)
             db.session.commit()
             
-            # Update cache
-            redis_client.setex(f'early_backer:{address}', 3600, int(is_early_backer)) 
+            # Cache early backer status
+            redis_client.setex(f'early_backer:{address}', 3600, int(is_early_backer))
