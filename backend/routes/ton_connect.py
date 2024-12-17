@@ -39,11 +39,13 @@ def check_proof():
 
         # Parse Telegram init data if provided
         telegram_id = None
+        message_id = None
         if tg_init_data:
             try:
                 from routes.user import parse_init_data
                 init_data = parse_init_data(tg_init_data)
                 telegram_id = init_data['user']['id']
+                message_id = init_data.get('start_param')  # Get message_id from start_param
                 print(f"Got Telegram ID: {telegram_id}")
             except Exception as e:
                 print(f"Error parsing Telegram init data: {e}")
@@ -65,6 +67,22 @@ def check_proof():
             # Register early backer and replace last message
             user_service.register_user(address, is_early_backer=True, telegram_id=telegram_id)
             print("Early backer registered successfully")
+
+            # Show congratulations message if we have telegram_id
+            if telegram_id:
+                from flask import current_app
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(current_app.bot_manager.show_congratulations(
+                        telegram_id=telegram_id,
+                        message_id=message_id,
+                        is_early_backer=True
+                    ))
+                finally:
+                    loop.close()
+
             return jsonify({
                 'token': token,
                 'status': 'early_backer',
@@ -74,7 +92,20 @@ def check_proof():
             })
         else:
             print(f"User {address} needs invite code")
-            # Ask for invite code
+            # Ask for invite code and show appropriate message
+            if telegram_id:
+                from flask import current_app
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(current_app.bot_manager.request_invite_code(
+                        telegram_id=telegram_id,
+                        message_id=message_id
+                    ))
+                finally:
+                    loop.close()
+
             return jsonify({
                 'token': token,
                 'status': 'need_invite',
