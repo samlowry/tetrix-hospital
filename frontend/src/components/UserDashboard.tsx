@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useTonAddress } from '@tonconnect/ui-react';
+import { api } from '../api';
 
 const Card = styled.div`
   padding: 20px;
@@ -25,11 +26,40 @@ export function UserDashboard() {
   const [isRegistered, setIsRegistered] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    // Registration is now handled by the backend during proof verification
-    // Just show the success message and let the app close automatically
-    if (userAddress) {
-      setIsRegistered(true);
+    async function verifyWallet() {
+      if (!userAddress) return;
+
+      try {
+        console.log('Verifying wallet connection for:', userAddress);
+        
+        // Get TON Proof
+        const { payload } = await api.getChallenge();
+        const proof = await window.ton?.sendTonProof({ payload });
+        if (!proof) {
+          throw new Error('Failed to get TON Proof');
+        }
+        
+        // Verify proof and register
+        const { token } = await api.connectWallet({
+          address: userAddress,
+          proof
+        });
+
+        if (token) {
+          console.log('Wallet verified successfully');
+          setIsRegistered(true);
+          // Close WebApp after 6 seconds
+          setTimeout(() => {
+            console.log('Closing WebApp...');
+            window.Telegram.WebApp.close();
+          }, 6000);
+        }
+      } catch (error) {
+        console.error('Error in verification process:', error);
+      }
     }
+
+    verifyWallet();
   }, [userAddress]);
 
   return (
