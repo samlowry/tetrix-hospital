@@ -17,4 +17,27 @@ def generate_payload():
 @bp.route('/check_proof', methods=['POST'])
 def check_proof():
     """Verify TON Connect proof and issue JWT token."""
-    return jsonify({'error': 'Rate limit exceeded'}), 429
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        is_valid = ton_proof_service.check_proof(data)
+        if not is_valid:
+            return jsonify({'error': 'Invalid proof'}), 400
+
+        # Generate JWT token
+        token = jwt.encode(
+            {
+                'address': data['address'],
+                'network': data.get('network'),
+                'public_key': data['public_key']
+            },
+            os.environ.get('JWT_SECRET_KEY', 'dev-secret-key'),
+            algorithm='HS256'
+        )
+
+        return jsonify({'token': token})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
