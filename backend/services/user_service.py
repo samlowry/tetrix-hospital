@@ -29,13 +29,17 @@ class UserService:
             print("Warning: first_backers.txt not found")
             return False
 
-    def register_user(self, address: str, is_early_backer: bool = False) -> None:
+    def register_user(self, address: str, is_early_backer: bool = False, telegram_id: int = None) -> None:
         """Register new user."""
         user = User.query.filter_by(wallet_address=address).first()
         if not user:
-            user = User(wallet_address=address)
+            user = User(wallet_address=address, telegram_id=telegram_id)
             db.session.add(user)
             db.session.commit()
             
             # Cache early backer status with uppercase address
             redis_client.setex(f'early_backer:{address.upper()}', 3600, int(is_early_backer))
+        elif telegram_id and user.telegram_id != telegram_id:
+            # Update telegram_id if it's provided and different
+            user.telegram_id = telegram_id
+            db.session.commit()

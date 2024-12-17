@@ -30,10 +30,24 @@ def check_proof():
             return jsonify({'error': 'Invalid proof'}), 400
 
         address = data['address']
+        tg_init_data = data.get('tg_init_data')
+        
         print(f"Received address: {address}")
         print(f"Checking if {address} is early backer...")
         is_early_backer = user_service.is_early_backer(address)
         print(f"Early backer status: {is_early_backer}")
+
+        # Parse Telegram init data if provided
+        telegram_id = None
+        if tg_init_data:
+            try:
+                from routes.user import parse_init_data
+                init_data = parse_init_data(tg_init_data)
+                telegram_id = init_data['user']['id']
+                print(f"Got Telegram ID: {telegram_id}")
+            except Exception as e:
+                print(f"Error parsing Telegram init data: {e}")
+                # Don't fail if Telegram data is invalid, just log it
 
         # Generate JWT token
         token = jwt.encode(
@@ -49,7 +63,7 @@ def check_proof():
         if is_early_backer:
             print(f"Registering early backer {address}...")
             # Register early backer and replace last message
-            user_service.register_user(address, is_early_backer=True)
+            user_service.register_user(address, is_early_backer=True, telegram_id=telegram_id)
             print("Early backer registered successfully")
             return jsonify({
                 'token': token,

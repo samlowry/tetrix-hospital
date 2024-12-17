@@ -69,10 +69,12 @@ export class ApiService {
 
     async connectWallet(data: { address: string; proof: TonProofPayload }): Promise<ConnectResponse> {
         try {
+            const tgWebAppData = window.Telegram.WebApp.initData;
             const response = await this.axiosInstance.post('/api/check_proof', {
                 address: data.address,
                 proof: data.proof,
-                public_key: data.proof.public_key
+                public_key: data.proof.public_key,
+                tg_init_data: tgWebAppData
             });
             const result = this.handleResponse<ConnectResponse>(response);
             if (result.token) {
