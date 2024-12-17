@@ -89,7 +89,10 @@ export function TonConnect() {
                 try {
                     const proof: TonProofPayload = {
                         type: 'ton_proof' as const,
-                        domain: w.connectItems.tonProof.proof.domain,
+                        domain: {
+                            lengthBytes: 25,
+                            value: 'tetrix-hospital.pages.dev'
+                        },
                         timestamp: w.connectItems.tonProof.proof.timestamp,
                         payload: w.connectItems.tonProof.proof.payload,
                         signature: w.connectItems.tonProof.proof.signature,
@@ -97,16 +100,17 @@ export function TonConnect() {
                         public_key: w.account.publicKey
                     };
 
-                    // First verify the proof
-                    await api.connectWallet({
+                    // Single proof verification - backend handles the rest
+                    const { token } = await api.connectWallet({
                         address: w.account.address,
                         proof
                     });
 
-                    // Then register as early backer
-                    await api.registerEarlyBacker(w.account.address, proof);
+                    if (!token) {
+                        throw new Error('Failed to verify wallet connection');
+                    }
 
-                    // Only show success and close if registration was successful
+                    // Show success and start close timer
                     setIsConnected(true);
                     setShowSuccess(true);
                     window.Telegram.WebApp.showPopup({
