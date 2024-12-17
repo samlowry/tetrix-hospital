@@ -14,7 +14,9 @@ TON_CONNECT_PREFIX = b'ton-connect'
 ALLOWED_DOMAINS = [
     'ton-connect.github.io',
     'localhost:5173',
-    'tetrix-hospital.pages.dev'
+    'localhost',
+    'tetrix-hospital.pages.dev',
+    '5fa5-109-245-96-58.ngrok-free.app'
 ]
 VALID_AUTH_TIME = 15 * 60  # 15 minutes
 
