@@ -2,7 +2,8 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_caching import Cache
 from models import User, db
 from utils.decorators import limiter, log_api_call
-from services.ton_proof_service import verify_proof_signature
+from services.ton_proof_service import TON_PROOF_PREFIX, TON_CONNECT_PREFIX
+from tonsdk.utils import Address
 import os
 import sys
 import asyncio
@@ -12,6 +13,7 @@ import hmac
 import json
 from urllib.parse import parse_qs
 from base64 import b64decode
+import nacl.signing
 
 logger = logging.getLogger('tetrix')
 DOMAIN = os.getenv('DOMAIN', 'localhost')  # Default to localhost if not set
@@ -160,22 +162,44 @@ def register_early_backer():
                 logger.error("Missing payload in proof")
                 return jsonify({'error': 'Invalid proof format'}), 400
 
-            # Verify signature
+            # Verify signature using the same logic as check_proof
             message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
             message_bytes = message.encode()
+            
+            # Prepare message components
+            address_obj = Address(address)
+            wc = address_obj.wc.to_bytes(4, byteorder='big')
+            ts = proof['timestamp'].to_bytes(8, byteorder='little')
+            dl = len(DOMAIN).to_bytes(4, byteorder='little')
+            
+            # Construct message
+            msg = b''.join([
+                TON_PROOF_PREFIX,
+                wc,
+                address_obj.hash_part,
+                dl,
+                DOMAIN.encode(),
+                ts,
+                payload.encode()
+            ])
+
+            msg_hash = hashlib.sha256(msg).digest()
+
+            # Construct full message with prefix
+            full_msg = b''.join([
+                bytes([0xff, 0xff]),
+                TON_CONNECT_PREFIX,
+                msg_hash
+            ])
+
+            result = hashlib.sha256(full_msg).digest()
+            
+            # Verify signature
             signature = b64decode(proof['signature'])
+            public_key = bytes.fromhex(proof['public_key'])
             
-            # Handle public key
-            try:
-                public_key = b64decode(proof['public_key'])
-            except Exception as e:
-                logger.error(f"Error decoding public key: {e}")
-                # Try using the public key directly if b64decode fails
-                public_key = proof['public_key'].encode() if isinstance(proof['public_key'], str) else proof['public_key']
-            
-            if not verify_proof_signature(message_bytes, signature, public_key):
-                logger.error("TON Proof signature verification failed")
-                return jsonify({'error': 'Invalid TON Proof signature'}), 401
+            verify_key = nacl.signing.VerifyKey(public_key)
+            verify_key.verify(result, signature)
             logger.info("TON Proof verification successful")
         except Exception as e:
             logger.error(f"TON Proof verification failed: {e}")
