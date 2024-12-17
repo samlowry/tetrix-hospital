@@ -2,8 +2,10 @@ from datetime import datetime, time, timedelta
 import secrets
 from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
+import logging
 
 db = SQLAlchemy()
+logger = logging.getLogger(__name__)
 
 class InviteCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -107,24 +109,31 @@ class User(db.Model):
     @classmethod
     def verify_invite_code(cls, code):
         """Verify if invite code is valid and unused"""
-        return InviteCode.query.filter_by(
+        logger.info(f"Verifying invite code: {code}")
+        invite = InviteCode.query.filter_by(
             code=code,
             used_by_id=None
         ).first()
+        logger.info(f"Found invite code: {invite is not None}")
+        return invite
 
     @classmethod
     def use_invite_code(cls, code, user_id):
         """Mark invite code as used by user"""
+        logger.info(f"Using invite code {code} for user {user_id}")
         invite = InviteCode.query.filter_by(
             code=code,
             used_by_id=None
         ).first()
         
         if invite:
+            logger.info(f"Found valid invite code {code}, marking as used")
             invite.used_by_id = user_id
             invite.used_at = datetime.utcnow()
             db.session.commit()
+            logger.info(f"Successfully used invite code {code}")
             return True
+        logger.warning(f"Invite code {code} not found or already used")
         return False
 
     def get_stats(self):

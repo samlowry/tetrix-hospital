@@ -445,27 +445,50 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
         with self.flask_app.app_context():
             text = update.message.text.strip()  # Trim whitespace and newlines
             telegram_id = update.effective_user.id
+            logger.info(f"Received message from {telegram_id}: {text}")
             
             # Check if user exists but not fully registered (needs invite code)
             user = self.User.query.filter_by(telegram_id=telegram_id).first()
             if not user:
-                # Ignore messages from unregistered users
+                logger.info(f"User {telegram_id} not found in database, ignoring message")
                 return
-                
+            
+            logger.info(f"Found user {telegram_id} in database, checking invite code")
+            
             # Verify invite code
             try:
-                if self.User.verify_invite_code(text):
+                logger.info(f"Verifying invite code: {text}")
+                invite = self.User.verify_invite_code(text)  # Returns invite object or None
+                logger.info(f"Invite code verification result: {invite is not None}")
+                
+                if invite:
                     # Use the invite code
-                    self.User.use_invite_code(text, user.id)
-                    
-                    # Show success message and dashboard
-                    await update.message.reply_text(
-                        "✨ Invite code accepted! Welcome to TETRIX!",
-                        reply_markup=None
-                    )
-                    await self.display_user_dashboard(telegram_id)
+                    logger.info(f"Using invite code {text} for user {user.id}")
+                    if self.User.use_invite_code(text, user.id):
+                        # Show congratulations message with dashboard button
+                        logger.info("Sending success message")
+                        keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        
+                        message = "🎉 *Congratulations\\!*\n\n"
+                        message += "Your invite code has been accepted\\. Welcome to TETRIX\\!"
+                        
+                        await update.message.reply_text(
+                            message,
+                            parse_mode='MarkdownV2',
+                            reply_markup=reply_markup
+                        )
+                    else:
+                        logger.error(f"Failed to use invite code {text}")
+                        keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        await update.message.reply_text(
+                            "❌ Error using invite code. Please try again.",
+                            reply_markup=reply_markup
+                        )
                 else:
                     # Invalid code, let them try again
+                    logger.info("Invalid code, showing retry button")
                     keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await update.message.reply_text(
@@ -474,6 +497,9 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     )
             except Exception as e:
                 logger.error(f"Error processing invite code: {e}")
+                keyboard = [[InlineKeyboardButton("Try Again", callback_data='enter_invite_code')]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(
-                    "Error processing invite code. Please try again later."
+                    "Error processing invite code. Please try again later.",
+                    reply_markup=reply_markup
                 )
