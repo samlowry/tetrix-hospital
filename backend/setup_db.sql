@@ -1,20 +1,17 @@
--- Drop existing database and user if they exist
-DROP DATABASE IF EXISTS tetrix;
-DROP USER IF EXISTS tetrix;
+-- We don't need to create database/user as they're created by Docker
+-- based on POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB environment variables
 
--- Create user
-CREATE USER tetrix WITH PASSWORD 'tetrixpass';
+-- Create extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create database
-CREATE DATABASE tetrix WITH OWNER tetrix;
-
--- Connect to the new database
-\c tetrix
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE tetrix TO tetrix;
+-- Grant privileges (already owner, but let's ensure full access)
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO tetrix;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO tetrix;
 
--- Create extensions if needed
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Create necessary schemas and tables here
+-- Example:
+-- CREATE TABLE IF NOT EXISTS users (
+--     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- );

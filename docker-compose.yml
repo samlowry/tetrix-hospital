@@ -54,6 +54,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup
+      - ./backend/setup_db.sql:/docker-entrypoint-initdb.d/setup_db.sql:ro
     environment:
       - POSTGRES_USER=tetrix
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
