@@ -38,7 +38,7 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-const manifestUrl = 'https://tetrix-hospital.pages.dev/tonconnect-manifest.json';
+const manifestUrl = `${import.meta.env.VITE_FRONTEND_URL}/tonconnect-manifest.json`;
 
 // Debug info
 console.log('Environment:', {

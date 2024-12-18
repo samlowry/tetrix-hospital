@@ -91,7 +91,7 @@ export function TonConnect() {
                         type: 'ton_proof' as const,
                         domain: {
                             lengthBytes: 25,
-                            value: 'tetrix-hospital.pages.dev'
+                            value: new URL(import.meta.env.VITE_FRONTEND_URL).host
                         },
                         timestamp: w.connectItems.tonProof.proof.timestamp,
                         payload: w.connectItems.tonProof.proof.payload,

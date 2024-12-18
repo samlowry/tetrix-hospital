@@ -26,7 +26,7 @@ export interface ConnectResponse {
 
 export class ApiService {
     private localStorageKey = 'tetrix-auth-token';
-    private baseURL = 'https://5fa5-109-245-96-58.ngrok-free.app';
+    private baseURL = import.meta.env.VITE_BACKEND_URL;
     public accessToken: string | null = null;
     public readonly refreshIntervalMs = 9 * 60 * 1000;
 

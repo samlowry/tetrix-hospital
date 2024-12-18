@@ -149,19 +149,14 @@ jobs:
         CF_API_TOKEN: ${{ secrets.DEPLOY_CF_API_TOKEN }}
         CF_ACCOUNT_ID: ${{ vars.DEPLOY_CF_ACCOUNT_ID }}
         CF_PROJECT_NAME: ${{ vars.DEPLOY_CF_PROJECT_NAME }}
-        BACKEND_URL: ${{ vars.BACKEND_URL }}
-        VITE_TON_COLLECTION_ADDRESS: ${{ vars.VITE_TON_COLLECTION_ADDRESS }}
       run: |
-        # Remove trailing slash if present
-        BACKEND_URL_CLEAN=${BACKEND_URL%/}
-        
         curl -X PUT \
           -H "Authorization: Bearer $CF_API_TOKEN" \
           -H "Content-Type: application/json" \
           -d '{
             "env_vars": {
-              "VITE_API_URL": { "value": "'"${BACKEND_URL_CLEAN}"'" },
-              "VITE_TON_COLLECTION_ADDRESS": { "value": "'"${VITE_TON_COLLECTION_ADDRESS}"'" }
+              "VITE_BACKEND_URL": { "value": "${{ vars.BACKEND_URL }}" },
+              "VITE_FRONTEND_URL": { "value": "${{ vars.FRONTEND_URL }}" }
             }
           }' \
           "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${CF_PROJECT_NAME}"
