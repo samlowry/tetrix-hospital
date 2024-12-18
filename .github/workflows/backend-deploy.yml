@@ -142,3 +142,49 @@ jobs:
           done
           echo "Services failed to become healthy"
           exit 1
+
+    - name: Setup Cloudflare Pages env vars
+      if: steps.changed-files.outputs.frontend == 'true'
+      env:
+        CF_API_TOKEN: ${{ secrets.DEPLOY_CF_API_TOKEN }}
+        CF_ACCOUNT_ID: ${{ vars.DEPLOY_CF_ACCOUNT_ID }}
+        CF_PROJECT_NAME: ${{ vars.DEPLOY_CF_PROJECT_NAME }}
+        BACKEND_URL: ${{ vars.BACKEND_URL }}
+        VITE_TON_COLLECTION_ADDRESS: ${{ vars.VITE_TON_COLLECTION_ADDRESS }}
+      run: |
+        # Remove trailing slash if present
+        BACKEND_URL_CLEAN=${BACKEND_URL%/}
+        
+        curl -X PUT \
+          -H "Authorization: Bearer $CF_API_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "env_vars": {
+              "VITE_API_URL": { "value": "'"${BACKEND_URL_CLEAN}"'" },
+              "VITE_TON_COLLECTION_ADDRESS": { "value": "'"${VITE_TON_COLLECTION_ADDRESS}"'" }
+            }
+          }' \
+          "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${CF_PROJECT_NAME}"
+
+    # Required GitHub configuration:
+    #
+    # Action Secrets (sensitive data):
+    # - PROD_SSH_KEY: SSH private key for production server
+    # - DEPLOY_CF_API_TOKEN: Cloudflare API token with Pages:Deploy permission
+    # - JWT_SECRET_KEY: JWT secret key for backend auth
+    # Note: POSTGRES_PASSWORD is generated during initialization
+    #
+    # Action Variables (non-sensitive, can be monitored):
+    # Infrastructure:
+    # - PROD_HOST: Production server IP address
+    # - DEPLOY_PATH: Deployment path (default: /opt/tetrix-hospital)
+    # URLs (no trailing slashes):
+    # - FRONTEND_URL: Frontend URL (e.g., https://tetrix-hospital.pages.dev)
+    # - BACKEND_URL: Backend URL (e.g., https://api.your-domain.com)
+    #   Note: WEBHOOK_URL is auto-generated as ${BACKEND_URL}/telegram-webhook
+    #   Note: VITE_API_URL is auto-generated from BACKEND_URL for Cloudflare Pages
+    # Cloudflare:
+    # - DEPLOY_CF_ACCOUNT_ID: Cloudflare account ID
+    # - DEPLOY_CF_PROJECT_NAME: Cloudflare Pages project name
+    # Business Logic:
+    # - VITE_TON_COLLECTION_ADDRESS: TON NFT collection address
