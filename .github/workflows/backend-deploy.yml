@@ -120,31 +120,17 @@ jobs:
     # - POSTGRES_PASSWORD: PostgreSQL database password
     # - GRAFANA_PASSWORD: Grafana admin password
     # - DEPLOY_CF_API_TOKEN: Cloudflare API token with Pages:Deploy permission
-    # - TELEGRAM_BOT_TOKEN: Telegram bot API token
     #
     # Action Variables (non-sensitive, can be monitored):
     # Infrastructure:
     # - PROD_HOST: Production server IP/domain
     # - PROD_USERNAME: SSH username for production server
-    # - APP_HOST: Backend host (default: 0.0.0.0)
     # - APP_PORT: Backend application port (default: 5000)
     # - NGINX_PORT: Nginx listening port (default: 443)
     # - DEPLOY_PATH: Deployment path (default: /opt/tetrix-hospital)
-    # - FLASK_ENV: Environment mode (default: production)
     # Database:
     # - POSTGRES_USER: PostgreSQL username (default: tetrix)
     # - POSTGRES_DB: PostgreSQL database name (default: tetrix)
-    # - POSTGRES_HOST: PostgreSQL host (default: postgres)
-    # - POSTGRES_PORT: PostgreSQL port (default: 5432)
-    # Redis:
-    # - REDIS_HOST: Redis host (default: redis)
-    # - REDIS_PORT: Redis port (default: 6379)
-    # - REDIS_DB: Redis database number (default: 0)
-    # - CACHE_TIMEOUT: Redis cache timeout (default: 300)
-    # API:
-    # - API_VERSION: API version (default: 1.0.0)
-    # - CORS_ORIGINS: Comma-separated list of allowed origins
-    # - WEBHOOK_URL: Telegram webhook URL
     # Monitoring:
     # - PROMETHEUS_PORT: Prometheus port (default: 127.0.0.1:9090)
     # - GRAFANA_PORT: Grafana port (default: 127.0.0.1:3000)

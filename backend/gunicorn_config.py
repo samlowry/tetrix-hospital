@@ -1,27 +1,26 @@
 import multiprocessing
-import os
 
 # Number of worker processes
-workers = int(os.getenv('GUNICORN_WORKERS', multiprocessing.cpu_count() * 2 + 1))
+workers = multiprocessing.cpu_count() * 2 + 1
 
 # Use gevent worker class for async support
-worker_class = os.getenv('GUNICORN_WORKER_CLASS', 'gevent')
+worker_class = 'gevent'
 
 # Maximum requests before worker restart
-max_requests = int(os.getenv('GUNICORN_MAX_REQUESTS', 1000))
-max_requests_jitter = int(os.getenv('GUNICORN_MAX_REQUESTS_JITTER', 50))
+max_requests = 1000
+max_requests_jitter = 50
 
 # Timeouts
-timeout = int(os.getenv('GUNICORN_TIMEOUT', 120))
-keepalive = int(os.getenv('GUNICORN_KEEPALIVE', 5))
+timeout = 120
+keepalive = 5
 
 # Logging
-accesslog = os.getenv('GUNICORN_ACCESS_LOG', 'access.log')
-errorlog = os.getenv('GUNICORN_ERROR_LOG', 'error.log')
-loglevel = os.getenv('GUNICORN_LOG_LEVEL', 'info')
+accesslog = 'access.log'
+errorlog = 'error.log'
+loglevel = 'info'
 
 # Bind address
-bind = f"{os.getenv('APP_HOST', '0.0.0.0')}:{os.getenv('APP_PORT', '5000')}"
+bind = '0.0.0.0:5000'
 
 # Preload app for faster worker startup
-preload_app = os.getenv('GUNICORN_PRELOAD', 'true').lower() == 'true' 
+preload_app = True 

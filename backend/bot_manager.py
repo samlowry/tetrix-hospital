@@ -27,15 +27,11 @@ class BotManager:
         self.User = User
         self.ton_client = ton_client
         self.flask_app = app
-        self.frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')  # Backend-specific frontend URL
+        self.frontend_url = os.getenv('FRONTEND_URL')
         self.redis = app.extensions['redis']
         
         # Initialize limiter with Redis storage
-        redis_host = os.getenv('REDIS_HOST', 'redis')
-        redis_port = int(os.getenv('REDIS_PORT', 6379))
-        redis_db = int(os.getenv('REDIS_DB', 0))
-        redis_url = f"redis://{redis_host}:{redis_port}/{redis_db}"
-        
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
         self.limiter = Limiter(
             app=app,
             key_func=get_remote_address,

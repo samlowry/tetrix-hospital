@@ -5,7 +5,7 @@ from loguru import logger
 
 class TonClient:
     def __init__(self):
-        self.tetrix_contract = os.getenv('TON_CONTRACT_ADDRESS')
+        self.tetrix_contract = os.getenv('TETRIX_CONTRACT_ADDRESS')
 
     async def get_balance(self, wallet_address: str) -> float:
         try:
