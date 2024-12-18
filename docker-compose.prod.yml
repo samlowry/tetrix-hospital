@@ -5,11 +5,12 @@ services:
     image: nginx:1.24.0-alpine
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./frontend/dist:/usr/share/nginx/html:ro
       - ./nginx/logs:/var/log/nginx
     ports:
-      - "443:443"
+      - "80:80"
+    networks:
+      - frontend
+      - backend
     depends_on:
       - app
     healthcheck:
@@ -26,6 +27,10 @@ services:
       - FLASK_ENV=production
       - REDIS_HOST=redis
       - POSTGRES_HOST=postgres
+      - DATABASE_URL=postgresql://tetrix:${POSTGRES_PASSWORD_HASH}@postgres:5432/tetrix
+      - TRUSTED_PROXIES=172.16.0.0/12  # Docker network
+    networks:
+      - backend
     deploy:
       replicas: 2
       update_config:
@@ -46,9 +51,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup
     environment:
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      - POSTGRES_USER=tetrix
+      - POSTGRES_PASSWORD_HASH=${POSTGRES_PASSWORD_HASH:-$(openssl rand -base64 32)}
+      - POSTGRES_DB=tetrix
+    networks:
+      - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U tetrix"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,8 +66,11 @@ services:
     image: redis:7.4.1-alpine
     volumes:
       - redis_data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./logs/redis:/var/log/nginx
     command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -75,19 +87,26 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - backend
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"  # Only localhost access
 
   grafana:
     image: grafana/grafana:10.4.0
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_password
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    networks:
+      - backend
     ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
+      - "127.0.0.1:3000:3000"  # Only localhost access
+
+networks:
+  frontend:
+  backend:
+    internal: true  # No external access
 
 volumes:
   postgres_data:

@@ -44,9 +44,11 @@ services:
 
   redis:
     image: redis:7.4.1-alpine
-    command: redis-server --appendonly yes
+    command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - redis_dev_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./logs/redis:/var/log/redis
     ports:
       - "6379:6379"
 

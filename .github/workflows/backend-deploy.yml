@@ -1,4 +1,4 @@
-name: Deploy Backend
+name: Deploy Backend and Frontend
 
 # Trigger on specific changes
 on:
@@ -15,12 +15,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
-    # Required secrets:
-    # - DOCKER_HUB_USERNAME: Your Docker Hub username
+    # Required GitHub configuration:
+    #
+    # Action Secrets (sensitive data):
     # - DOCKER_HUB_TOKEN: Docker Hub access token
+    # - PROD_SSH_KEY: SSH private key for production server
+    # - POSTGRES_PASSWORD: PostgreSQL database password
+    # - DEPLOY_CF_API_TOKEN: Cloudflare API token with Pages:Deploy permission
+    #
+    # Action Variables (non-sensitive, can be monitored):
+    # Infrastructure:
+    # - DOCKER_HUB_USERNAME: Your Docker Hub username
     # - PROD_HOST: Production server IP/domain
-    # - PROD_USERNAME: SSH username
-    # - PROD_SSH_KEY: SSH private key
+    # - PROD_USERNAME: SSH username for production server
+    # Cloudflare:
+    # - DEPLOY_CF_ACCOUNT_ID: Cloudflare account ID
+    # - DEPLOY_CF_PROJECT_NAME: Cloudflare Pages project name
+    # Frontend:
+    # - VITE_API_URL: Backend API URL
+    # - VITE_TELEGRAM_BOT_USERNAME: Telegram bot username
+    # - VITE_TON_COLLECTION_ADDRESS: TON NFT collection address
     
     steps:
     - uses: actions/checkout@v3
@@ -38,6 +52,56 @@ jobs:
         if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^nginx/"; then
           echo "nginx=true" >> $GITHUB_OUTPUT
         fi
+
+    # Frontend deployment to Cloudflare Pages
+    - name: Setup Node.js
+      if: steps.changed-files.outputs.frontend == 'true'
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      if: steps.changed-files.outputs.frontend == 'true'
+      working-directory: frontend
+      run: npm ci
+
+    - name: Build frontend
+      if: steps.changed-files.outputs.frontend == 'true'
+      working-directory: frontend
+      run: npm run build
+
+    - name: Setup Cloudflare Pages env vars
+      if: steps.changed-files.outputs.frontend == 'true'
+      env:
+        CF_API_TOKEN: ${{ secrets.DEPLOY_CF_API_TOKEN }}
+        CF_ACCOUNT_ID: ${{ vars.DEPLOY_CF_ACCOUNT_ID }}
+        CF_PROJECT_NAME: ${{ vars.DEPLOY_CF_PROJECT_NAME }}
+        VITE_API_URL: ${{ vars.VITE_API_URL }}
+        VITE_TELEGRAM_BOT_USERNAME: ${{ vars.VITE_TELEGRAM_BOT_USERNAME }}
+        VITE_TON_COLLECTION_ADDRESS: ${{ vars.VITE_TON_COLLECTION_ADDRESS }}
+      run: |
+        curl -X PUT \
+          -H "Authorization: Bearer $CF_API_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "env_vars": {
+              "VITE_API_URL": { "value": "'"${VITE_API_URL}"'" },
+              "VITE_TELEGRAM_BOT_USERNAME": { "value": "'"${VITE_TELEGRAM_BOT_USERNAME}"'" },
+              "VITE_TON_COLLECTION_ADDRESS": { "value": "'"${VITE_TON_COLLECTION_ADDRESS}"'" }
+            }
+          }' \
+          "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${CF_PROJECT_NAME}"
+
+    - name: Deploy to Cloudflare Pages
+      if: steps.changed-files.outputs.frontend == 'true'
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.DEPLOY_CF_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ vars.DEPLOY_CF_ACCOUNT_ID }}
+      run: |
+        cd frontend/dist
+        npx wrangler pages deploy . --project-name=${{ vars.DEPLOY_CF_PROJECT_NAME }} --commit-hash=${{ github.sha }}
 
     - name: Set up Python
       if: steps.changed-files.outputs.backend == 'true'
@@ -73,7 +137,7 @@ jobs:
     - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        username: ${{ vars.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     # Build and push backend if changed
@@ -83,25 +147,41 @@ jobs:
       with:
         context: ./backend
         push: true
-        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:latest
-        cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:buildcache
-        cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:buildcache,mode=max
+        tags: ${{ vars.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:latest
+        cache-from: type=registry,ref=${{ vars.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:buildcache
+        cache-to: type=registry,ref=${{ vars.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:buildcache,mode=max
 
-    # Build and push frontend if changed
-    - name: Build and push frontend
-      if: steps.changed-files.outputs.frontend == 'true'
-      uses: docker/build-push-action@v4
+    # Initial backup and cron setup
+    - name: Setup Backup System
+      uses: appleboy/ssh-action@master
       with:
-        context: ./frontend
-        push: true
-        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-frontend:latest
+        host: ${{ vars.PROD_HOST }}
+        username: ${{ vars.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd /opt/tetrix-hospital
+          
+          # Make backup script executable
+          chmod +x scripts/backup.sh
+          
+          # Run initial backup if services are running
+          if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+            echo "Running initial backup..."
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} ./scripts/backup.sh
+          else
+            echo "Skipping backup - services not running yet"
+          fi
+          
+          # Set up cron job for daily backups at 2 AM
+          CRON_CMD="0 2 * * * cd /opt/tetrix-hospital && POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} ./scripts/backup.sh >> /var/log/tetrix-backup.log 2>&1"
+          (crontab -l 2>/dev/null | grep -v "tetrix-hospital.*backup.sh" ; echo "$CRON_CMD") | crontab -
 
     # Deploy to production server
     - name: Deploy to production
       uses: appleboy/ssh-action@master
       with:
-        host: ${{ secrets.PROD_HOST }}
-        username: ${{ secrets.PROD_USERNAME }}
+        host: ${{ vars.PROD_HOST }}
+        username: ${{ vars.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
@@ -111,12 +191,6 @@ jobs:
             echo "Updating backend service..."
             docker-compose -f docker-compose.prod.yml pull app
             docker-compose -f docker-compose.prod.yml up -d --no-deps --build app
-          fi
-          
-          if [[ "${{ steps.changed-files.outputs.frontend }}" == "true" ]]; then
-            echo "Updating frontend service..."
-            docker-compose -f docker-compose.prod.yml pull frontend
-            docker-compose -f docker-compose.prod.yml up -d --no-deps --build frontend
           fi
           
           if [[ "${{ steps.changed-files.outputs.nginx }}" == "true" ]]; then
@@ -131,8 +205,8 @@ jobs:
     - name: Check deployment
       uses: appleboy/ssh-action@master
       with:
-        host: ${{ secrets.PROD_HOST }}
-        username: ${{ secrets.PROD_USERNAME }}
+        host: ${{ vars.PROD_HOST }}
+        username: ${{ vars.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           # Wait for services to be healthy
