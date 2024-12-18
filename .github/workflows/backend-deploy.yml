@@ -12,8 +12,97 @@ on:
       - '.github/workflows/backend-deploy.yml'
 
 jobs:
-  deploy:
+  initialize:
     runs-on: ubuntu-latest
+    environment:
+      name: production-init
+      url: ${{ vars.PROD_HOST }}
+    # This environment can be manually triggered again if needed
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    # Generate self-signed SSL certificate for initial setup
+    # (You can replace it later with a proper one)
+    - name: Generate SSL Certificate
+      run: |
+        mkdir -p nginx/ssl
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+          -keyout nginx/ssl/private.key \
+          -out nginx/ssl/certificate.crt \
+          -subj "/C=US/ST=CA/L=SF/O=TetrixHospital/CN=${PROD_HOST}"
+
+    - name: Initial Server Setup
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ vars.PROD_HOST }}
+        username: ${{ vars.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          # Create required directories
+          sudo mkdir -p /opt/tetrix-hospital
+          sudo chown ${USER}:${USER} /opt/tetrix-hospital
+          mkdir -p /opt/tetrix-hospital/backups/{postgres,redis}
+          
+          # Setup logging
+          sudo mkdir -p /var/log/nginx
+          sudo touch /var/log/tetrix-backup.log
+          sudo chown ${USER}:${USER} /var/log/tetrix-backup.log
+          sudo chmod 644 /var/log/tetrix-backup.log
+          
+          # Setup git
+          cd /opt/tetrix-hospital
+          git init
+          git config --global --add safe.directory /opt/tetrix-hospital
+          git remote add origin https://github.com/${GITHUB_REPOSITORY}.git
+          
+          # Copy SSL certificates
+          mkdir -p /opt/tetrix-hospital/nginx/ssl
+          
+          # Setup monitoring directories
+          mkdir -p /opt/tetrix-hospital/prometheus
+          mkdir -p /opt/tetrix-hospital/grafana/dashboards
+          
+          # Make scripts executable
+          chmod +x scripts/*.sh
+
+    - name: Copy SSL Certificates
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ vars.PROD_HOST }}
+        username: ${{ vars.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        source: "nginx/ssl/*"
+        target: "/opt/tetrix-hospital/nginx/ssl"
+        strip_components: 2
+
+    - name: Setup Monitoring
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ vars.PROD_HOST }}
+        username: ${{ vars.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd /opt/tetrix-hospital
+          
+          # Initialize Prometheus
+          docker-compose -f docker-compose.prod.yml up -d prometheus
+          
+          # Initialize Grafana
+          docker-compose -f docker-compose.prod.yml up -d grafana
+          
+          # Setup exporters
+          docker-compose -f docker-compose.prod.yml up -d \
+            redis-exporter \
+            postgres-exporter \
+            node-exporter
+
+  deploy:
+    needs: initialize
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ vars.PROD_HOST }}
     
     # Required GitHub configuration:
     #
