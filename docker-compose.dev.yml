@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   nginx:
-    image: nginx:alpine
+    image: nginx:1.24.0-alpine
     ports:
       - "80:80"
     volumes:
@@ -32,7 +32,7 @@ services:
       - redis
 
   db:
-    image: postgres:15-alpine
+    image: postgres:15.6-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tetrix_dev}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_pass}
@@ -43,7 +43,7 @@ services:
       - "5432:5432"
 
   redis:
-    image: redis:alpine
+    image: redis:7.4.1-alpine
     command: redis-server --appendonly yes
     volumes:
       - redis_dev_data:/data
