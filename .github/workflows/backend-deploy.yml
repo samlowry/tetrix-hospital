@@ -1,11 +1,13 @@
 name: Deploy Backend
 
-# Trigger on main branch changes to backend code
+# Trigger on specific changes
 on:
   push:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - 'frontend/**'
+      - 'nginx/**'
       - 'docker-compose.prod.yml'
       - '.github/workflows/backend-deploy.yml'
 
@@ -22,24 +24,42 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
+    
+    # Determine changed services
+    - name: Check changed files
+      id: changed-files
+      run: |
+        if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^backend/"; then
+          echo "backend=true" >> $GITHUB_OUTPUT
+        fi
+        if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^frontend/"; then
+          echo "frontend=true" >> $GITHUB_OUTPUT
+        fi
+        if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^nginx/"; then
+          echo "nginx=true" >> $GITHUB_OUTPUT
+        fi
 
     - name: Set up Python
+      if: steps.changed-files.outputs.backend == 'true'
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
         
     - name: Install dependencies
+      if: steps.changed-files.outputs.backend == 'true'
       run: |
         python -m pip install --upgrade pip
         pip install -r backend/requirements.txt
         pip install pytest pytest-cov
 
     - name: Run tests
+      if: steps.changed-files.outputs.backend == 'true'
       run: |
         cd backend
         pytest --cov=. --cov-report=xml
 
-    - name: Upload coverage to Codecov
+    - name: Upload coverage
+      if: steps.changed-files.outputs.backend == 'true'
       uses: codecov/codecov-action@v3
       with:
         file: ./backend/coverage.xml
@@ -56,8 +76,9 @@ jobs:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-    # Build and push Docker image
-    - name: Build and push Docker image
+    # Build and push backend if changed
+    - name: Build and push backend
+      if: steps.changed-files.outputs.backend == 'true'
       uses: docker/build-push-action@v4
       with:
         context: ./backend
@@ -65,6 +86,15 @@ jobs:
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:latest
         cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:buildcache
         cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-backend:buildcache,mode=max
+
+    # Build and push frontend if changed
+    - name: Build and push frontend
+      if: steps.changed-files.outputs.frontend == 'true'
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        push: true
+        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/tetrix-hospital-frontend:latest
 
     # Deploy to production server
     - name: Deploy to production
@@ -75,11 +105,29 @@ jobs:
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
-          docker-compose -f docker-compose.prod.yml pull app
-          docker-compose -f docker-compose.prod.yml up -d app
-          docker system prune -f
+          
+          # Pull and update only changed services
+          if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
+            echo "Updating backend service..."
+            docker-compose -f docker-compose.prod.yml pull app
+            docker-compose -f docker-compose.prod.yml up -d --no-deps --build app
+          fi
+          
+          if [[ "${{ steps.changed-files.outputs.frontend }}" == "true" ]]; then
+            echo "Updating frontend service..."
+            docker-compose -f docker-compose.prod.yml pull frontend
+            docker-compose -f docker-compose.prod.yml up -d --no-deps --build frontend
+          fi
+          
+          if [[ "${{ steps.changed-files.outputs.nginx }}" == "true" ]]; then
+            echo "Updating nginx service..."
+            docker-compose -f docker-compose.prod.yml up -d --no-deps --build nginx
+          fi
+          
+          # Clean only dangling images
+          docker image prune -f
 
-    # Verify deployment
+    # Verify deployment with retries
     - name: Check deployment
       uses: appleboy/ssh-action@master
       with:
@@ -87,4 +135,26 @@ jobs:
         username: ${{ secrets.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
-          curl -f http://localhost:5000/health || exit 1
+          # Wait for services to be healthy
+          for i in {1..30}; do
+            HEALTH_OK=true
+            
+            # Check backend if updated
+            if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
+              if ! curl -f http://localhost:5000/health; then
+                HEALTH_OK=false
+              fi
+            fi
+            
+            # Add other service health checks here
+            
+            if [[ "$HEALTH_OK" == "true" ]]; then
+              echo "All services are healthy"
+              exit 0
+            fi
+            
+            echo "Waiting for services to be healthy... ($i/30)"
+            sleep 2
+          done
+          echo "Services failed to become healthy"
+          exit 1

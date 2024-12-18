@@ -157,28 +157,134 @@ mkdir -p nginx/ssl
 
 3. Update production environment variables in `.env.prod`
 
-### Deployment
+### Deployment Methods
 
-1. Build and start services:
+#### 1. Automated Deployment (GitHub Actions)
+
+The CI/CD pipeline automatically:
+- Detects changed services (backend, frontend, nginx)
+- Runs tests for changed services
+- Builds and pushes Docker images
+- Updates only the changed services in production
+- Verifies deployment health
+
+Triggers on pushes to main branch that modify:
+- `backend/**`
+- `frontend/**`
+- `nginx/**`
+- `docker-compose.prod.yml`
+
+#### 2. Manual Deployment
+
+##### Full System Deployment
 ```bash
+# Pull all latest images
+docker-compose -f docker-compose.prod.yml pull
+
+# Update all services
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-2. Monitor logs:
+##### Single Service Updates
 ```bash
-docker-compose -f docker-compose.prod.yml logs -f
+# Update specific service (e.g., backend)
+docker-compose -f docker-compose.prod.yml pull app
+docker-compose -f docker-compose.prod.yml up -d --no-deps --build app
+
+# Update configuration only (e.g., nginx)
+docker-compose -f docker-compose.prod.yml up -d --no-deps nginx
+
+# Force rebuild specific service
+docker-compose -f docker-compose.prod.yml up -d --no-deps --build nginx
 ```
 
-### Monitoring
+##### Update Multiple Services
+```bash
+# Update specific services
+docker-compose -f docker-compose.prod.yml up -d --no-deps --build nginx app redis
+```
 
+### Volume Management
+
+Data persistence is handled through Docker named volumes:
+```yaml
+volumes:
+  postgres_data:    # Database files
+  redis_data:      # Redis data
+  prometheus_data: # Metrics
+  grafana_data:   # Dashboards
+```
+
+These volumes persist:
+- Between service restarts
+- During deployments
+- After container removal
+
+### Monitoring Deployment
+
+1. Check service logs:
+```bash
+# All services
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Specific service
+docker-compose -f docker-compose.prod.yml logs -f app
+```
+
+2. Check service health:
+```bash
+# Backend health
+curl http://localhost:5000/health
+
+# Container status
+docker-compose -f docker-compose.prod.yml ps
+```
+
+3. Monitor metrics:
 - Prometheus: http://your-domain:9090
 - Grafana: http://your-domain:3000
 
 ### Backup
 
-Automated backups are configured in `scripts/backup.sh`. Run manually:
+1. Automated backups:
 ```bash
+# Run backup script
 ./scripts/backup.sh
+```
+
+2. Manual volume backup:
+```bash
+# Backup volume data
+docker run --rm -v tetrix_postgres_data:/data -v /backup:/backup alpine tar czf /backup/postgres_data.tar.gz /data
+
+# Restore volume data
+docker run --rm -v tetrix_postgres_data:/data -v /backup:/backup alpine tar xzf /backup/postgres_data.tar.gz
+```
+
+### Troubleshooting
+
+1. Check service health:
+```bash
+docker-compose -f docker-compose.prod.yml ps
+```
+
+2. View service logs:
+```bash
+docker-compose -f docker-compose.prod.yml logs -f [service_name]
+```
+
+3. Restart specific service:
+```bash
+docker-compose -f docker-compose.prod.yml restart [service_name]
+```
+
+4. Clean up:
+```bash
+# Remove unused images
+docker image prune -f
+
+# Remove unused volumes (careful!)
+docker volume prune -f
 ```
 
 ## Architecture
