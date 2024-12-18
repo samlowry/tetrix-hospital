@@ -39,10 +39,17 @@ jobs:
         username: ${{ vars.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
+          # Update system and install dependencies
+          sudo apt update && sudo apt upgrade -y
+          sudo apt install -y docker.io docker-compose git
+
+          # Add user to docker group
+          sudo usermod -aG docker $USER
+          
           # Create required directories
-          sudo mkdir -p /opt/tetrix-hospital
-          sudo chown ${USER}:${USER} /opt/tetrix-hospital
-          mkdir -p /opt/tetrix-hospital/backups/{postgres,redis}
+          sudo mkdir -p ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
+          sudo chown ${USER}:${USER} ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
+          mkdir -p ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}/backups/{postgres,redis}
           
           # Setup logging
           sudo mkdir -p /var/log/nginx
@@ -51,20 +58,22 @@ jobs:
           sudo chmod 644 /var/log/tetrix-backup.log
           
           # Setup git
-          cd /opt/tetrix-hospital
+          cd ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
           git init
-          git config --global --add safe.directory /opt/tetrix-hospital
+          git config --global --add safe.directory ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
           git remote add origin https://github.com/${GITHUB_REPOSITORY}.git
           
-          # Copy SSL certificates
-          mkdir -p /opt/tetrix-hospital/nginx/ssl
-          
-          # Setup monitoring directories
-          mkdir -p /opt/tetrix-hospital/prometheus
-          mkdir -p /opt/tetrix-hospital/grafana/dashboards
+          # Setup directories
+          mkdir -p nginx/ssl
+          mkdir -p prometheus
+          mkdir -p grafana/dashboards
+          mkdir -p logs/redis
           
           # Make scripts executable
           chmod +x scripts/*.sh
+          
+          # Reload shell to apply docker group
+          newgrp docker
 
     - name: Copy SSL Certificates
       uses: appleboy/scp-action@master
@@ -109,12 +118,23 @@ jobs:
     # Action Secrets (sensitive data):
     # - PROD_SSH_KEY: SSH private key for production server
     # - POSTGRES_PASSWORD: PostgreSQL database password
+    # - GRAFANA_PASSWORD: Grafana admin password
     # - DEPLOY_CF_API_TOKEN: Cloudflare API token with Pages:Deploy permission
     #
     # Action Variables (non-sensitive, can be monitored):
     # Infrastructure:
     # - PROD_HOST: Production server IP/domain
     # - PROD_USERNAME: SSH username for production server
+    # - APP_PORT: Backend application port (default: 5000)
+    # - NGINX_PORT: Nginx listening port (default: 443)
+    # - DEPLOY_PATH: Deployment path (default: /opt/tetrix-hospital)
+    # Database:
+    # - POSTGRES_USER: PostgreSQL username (default: tetrix)
+    # - POSTGRES_DB: PostgreSQL database name (default: tetrix)
+    # Monitoring:
+    # - PROMETHEUS_PORT: Prometheus port (default: 127.0.0.1:9090)
+    # - GRAFANA_PORT: Grafana port (default: 127.0.0.1:3000)
+    # - GRAFANA_URL: Grafana root URL
     # Cloudflare:
     # - DEPLOY_CF_ACCOUNT_ID: Cloudflare account ID
     # - DEPLOY_CF_PROJECT_NAME: Cloudflare Pages project name
@@ -277,6 +297,8 @@ jobs:
         host: ${{ vars.PROD_HOST }}
         username: ${{ vars.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
+        env:
+          APP_PORT: ${{ vars.APP_PORT || '5000' }}
         script: |
           # Wait for services to be healthy
           for i in {1..30}; do
@@ -284,12 +306,10 @@ jobs:
             
             # Check backend if updated
             if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
-              if ! curl -f http://localhost:5000/health; then
+              if ! curl -f "http://localhost:${APP_PORT}/health"; then
                 HEALTH_OK=false
               fi
             fi
-            
-            # Add other service health checks here
             
             if [[ "$HEALTH_OK" == "true" ]]; then
               echo "All services are healthy"
