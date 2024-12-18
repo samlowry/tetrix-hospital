@@ -8,11 +8,14 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.redis import RedisJobStore
 import asyncio
 from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
 import telegram
 from functools import partial
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import Counter, Histogram, Gauge
 
 from models import db, User
 from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
@@ -125,25 +128,89 @@ bot_manager = BotManager(
 # Add bot manager to app context
 app.bot_manager = bot_manager
 
-# Setup scheduler for metrics update
-scheduler = BackgroundScheduler()
+# Redis-based job store config
+jobstores = {
+    'default': RedisJobStore(
+        jobs_key='scheduler.jobs',
+        run_times_key='scheduler.runs',
+        host=os.getenv('REDIS_HOST', 'localhost'),
+        port=int(os.getenv('REDIS_PORT', 6379)),
+        db=int(os.getenv('REDIS_DB', 0))
+    )
+}
+
+# Setup scheduler with Redis store
+scheduler = BackgroundScheduler(jobstores=jobstores)
 scheduler.start()
 
-# Flag to track initialization
-_is_initialized = False
+# Replace global flags with Redis
+def is_initialized():
+    return redis_client.get('app:initialized') == 'true'
+
+def set_initialized():
+    redis_client.set('app:initialized', 'true')
 
 # Create a global event loop for the application
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
+# Initialize Prometheus metrics
+metrics = PrometheusMetrics(app)
+requests_total = Counter('requests_total', 'Total requests')
+request_latency = Histogram('request_latency_seconds', 'Request latency')
+active_users = Gauge('active_users', 'Number of active users')
+
+def check_db_connection():
+    try:
+        db.session.execute('SELECT 1')
+        return True
+    except Exception:
+        return False
+
+def check_redis_connection():
+    try:
+        redis_client.ping()
+        return True
+    except Exception:
+        return False
+
+def check_scheduler_status():
+    return scheduler.running
+
+@app.route('/health')
+def health():
+    checks = {
+        'db': check_db_connection(),
+        'redis': check_redis_connection(),
+        'scheduler': check_scheduler_status()
+    }
+    status = all(checks.values())
+    return jsonify({
+        'status': 'healthy' if status else 'unhealthy',
+        'checks': checks
+    }), 200 if status else 503
+
+def setup_telegram_webhook():
+    """Setup Telegram webhook for receiving updates"""
+    webhook_url = os.getenv('WEBHOOK_URL')
+    if not webhook_url:
+        logger.error("WEBHOOK_URL not set in environment")
+        return False
+    
+    try:
+        bot_manager.bot.delete_webhook()
+        bot_manager.bot.set_webhook(url=f"{webhook_url}/telegram-webhook")
+        logger.info(f"Webhook set to {webhook_url}/telegram-webhook")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {e}")
+        return False
+
 @app.before_request
 def init_app():
-    """Initialize app components before request"""
-    global _is_initialized
-    if not _is_initialized:
-        with app.app_context():
-            db.create_all()
-            _is_initialized = True
+    if not is_initialized():
+        setup_telegram_webhook()
+        set_initialized()
 
 @app.route('/telegram-webhook', methods=['POST'])
 def telegram_webhook():

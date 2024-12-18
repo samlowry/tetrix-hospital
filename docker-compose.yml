@@ -1,61 +1,35 @@
-version: "3.8"
+version: '3.8'
+
+# Default configuration points to production
+# For development: docker-compose -f docker-compose.dev.yml up
+# For production: docker-compose -f docker-compose.prod.yml up
 
 services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
-      - ./nginx/logs:/var/log/nginx
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    expose:
-      - "5000"
+  app:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.prod
     environment:
-      - DATABASE_URL=postgresql://tetrix:tetrixpass@db:5432/tetrix
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - FLASK_ENV=production
-    depends_on:
-      - db
-      - redis
-    deploy:
-      replicas: 2
-      restart_policy:
-        condition: on-failure
-    volumes:
-      - ./logs:/app/logs
+    ports:
+      - "5000:5000"
 
-  db:
-    image: postgres:13
+  postgres:
+    image: postgres:15-alpine
     environment:
-      POSTGRES_USER: tetrix
-      POSTGRES_PASSWORD: tetrixpass
-      POSTGRES_DB: tetrix
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    deploy:
-      restart_policy:
-        condition: on-failure
 
   redis:
     image: redis:alpine
-    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    deploy:
-      restart_policy:
-        condition: on-failure
 
 volumes:
   postgres_data:
   redis_data:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt 
