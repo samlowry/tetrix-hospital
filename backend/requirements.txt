@@ -16,3 +16,5 @@ python-telegram-bot==21.9
 redis==5.2.1
 requests==2.32.3
 tonsdk==1.0.15
+prometheus-flask-exporter==0.23.0
+prometheus-client==0.19.0
