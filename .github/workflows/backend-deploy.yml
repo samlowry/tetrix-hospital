@@ -36,7 +36,6 @@ jobs:
       uses: appleboy/ssh-action@master
       with:
         host: ${{ vars.PROD_HOST }}
-        username: ${{ vars.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           # Update system and install dependencies
@@ -45,6 +44,13 @@ jobs:
 
           # Add user to docker group
           sudo usermod -aG docker $USER
+          
+          # Generate PostgreSQL password if not exists
+          if [ ! -f /opt/tetrix-hospital/secrets/postgres_password.txt ]; then
+            mkdir -p /opt/tetrix-hospital/secrets
+            openssl rand -base64 32 > /opt/tetrix-hospital/secrets/postgres_password.txt
+            chmod 600 /opt/tetrix-hospital/secrets/postgres_password.txt
+          fi
           
           # Create required directories
           sudo mkdir -p ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
@@ -117,30 +123,20 @@ jobs:
     #
     # Action Secrets (sensitive data):
     # - PROD_SSH_KEY: SSH private key for production server
-    # - POSTGRES_PASSWORD: PostgreSQL database password
     # - GRAFANA_PASSWORD: Grafana admin password
     # - DEPLOY_CF_API_TOKEN: Cloudflare API token with Pages:Deploy permission
+    # - JWT_SECRET_KEY: JWT secret key for backend auth
+    # Note: POSTGRES_PASSWORD is generated during initialization
     #
     # Action Variables (non-sensitive, can be monitored):
     # Infrastructure:
-    # - PROD_HOST: Production server IP/domain
-    # - PROD_USERNAME: SSH username for production server
-    # - APP_PORT: Backend application port (default: 5000)
-    # - NGINX_PORT: Nginx listening port (default: 443)
+    # - PROD_HOST: Production server IP address
     # - DEPLOY_PATH: Deployment path (default: /opt/tetrix-hospital)
-    # Database:
-    # - POSTGRES_USER: PostgreSQL username (default: tetrix)
-    # - POSTGRES_DB: PostgreSQL database name (default: tetrix)
-    # Monitoring:
-    # - PROMETHEUS_PORT: Prometheus port (default: 127.0.0.1:9090)
-    # - GRAFANA_PORT: Grafana port (default: 127.0.0.1:3000)
-    # - GRAFANA_URL: Grafana root URL
-    # Cloudflare:
+    # Frontend/URLs:
+    # - FRONTEND_URL: Frontend URL (e.g., https://tetrix-hospital.pages.dev)
     # - DEPLOY_CF_ACCOUNT_ID: Cloudflare account ID
     # - DEPLOY_CF_PROJECT_NAME: Cloudflare Pages project name
-    # Frontend:
-    # - VITE_API_URL: Backend API URL
-    # - VITE_TELEGRAM_BOT_USERNAME: Telegram bot username
+    # Business Logic:
     # - VITE_TON_COLLECTION_ADDRESS: TON NFT collection address
     
     steps:
@@ -186,7 +182,6 @@ jobs:
         CF_ACCOUNT_ID: ${{ vars.DEPLOY_CF_ACCOUNT_ID }}
         CF_PROJECT_NAME: ${{ vars.DEPLOY_CF_PROJECT_NAME }}
         VITE_API_URL: ${{ vars.VITE_API_URL }}
-        VITE_TELEGRAM_BOT_USERNAME: ${{ vars.VITE_TELEGRAM_BOT_USERNAME }}
         VITE_TON_COLLECTION_ADDRESS: ${{ vars.VITE_TON_COLLECTION_ADDRESS }}
       run: |
         curl -X PUT \
@@ -195,7 +190,6 @@ jobs:
           -d '{
             "env_vars": {
               "VITE_API_URL": { "value": "'"${VITE_API_URL}"'" },
-              "VITE_TELEGRAM_BOT_USERNAME": { "value": "'"${VITE_TELEGRAM_BOT_USERNAME}"'" },
               "VITE_TON_COLLECTION_ADDRESS": { "value": "'"${VITE_TON_COLLECTION_ADDRESS}"'" }
             }
           }' \
