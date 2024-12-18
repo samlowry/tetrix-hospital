@@ -16,7 +16,7 @@ ALLOWED_DOMAINS = [
     'localhost:5173',
     'localhost',
     'tetrix-hospital.pages.dev',
-    '5fa5-109-245-96-58.ngrok-free.app'
+    '3bb1-109-245-96-58.ngrok-free.app'
 ]
 VALID_AUTH_TIME = 15 * 60  # 15 minutes
 

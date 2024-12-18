@@ -46,7 +46,7 @@ app = Flask(__name__)
 cors_origins = [
     'http://localhost:3000',
     'https://tetrix-hospital.pages.dev',
-    'https://5fa5-109-245-96-58.ngrok-free.app'
+    'https://3bb1-109-245-96-58.ngrok-free.app'
 ]
 CORS(app, resources={
     r"/*": {
@@ -190,7 +190,7 @@ def health():
         'checks': checks
     }), 200 if status else 503
 
-def setup_telegram_webhook():
+async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
     webhook_url = os.getenv('WEBHOOK_URL')
     if not webhook_url:
@@ -198,8 +198,9 @@ def setup_telegram_webhook():
         return False
     
     try:
-        bot_manager.bot.delete_webhook()
-        bot_manager.bot.set_webhook(url=f"{webhook_url}/telegram-webhook")
+        await bot_manager.bot.initialize()
+        await bot_manager.bot.delete_webhook()
+        await bot_manager.bot.set_webhook(url=f"{webhook_url}/telegram-webhook")
         logger.info(f"Webhook set to {webhook_url}/telegram-webhook")
         return True
     except Exception as e:
@@ -209,7 +210,7 @@ def setup_telegram_webhook():
 @app.before_request
 def init_app():
     if not is_initialized():
-        setup_telegram_webhook()
+        loop.run_until_complete(setup_telegram_webhook())
         set_initialized()
 
 @app.route('/telegram-webhook', methods=['POST'])
