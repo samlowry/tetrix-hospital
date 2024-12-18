@@ -16,11 +16,15 @@ def get_device_identifier():
     # Hash the string to keep the key length manageable
     return hashlib.md5(device_string.encode()).hexdigest()
 
+redis_host = os.getenv('REDIS_HOST', 'redis')
+redis_port = int(os.getenv('REDIS_PORT', 6379))
+redis_db = int(os.getenv('REDIS_DB', 0))
+redis_url = f"redis://{redis_host}:{redis_port}/{redis_db}"
+
 limiter = Limiter(
-    key_func=get_device_identifier,
-    default_limits=["1000 per hour", "10000 per day"],
-    storage_uri=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
-    strategy="fixed-window"
+    key_func=get_remote_address,
+    storage_uri=redis_url,
+    default_limits=["200 per day", "50 per hour"]
 )
 
 def log_api_call(f):

@@ -35,7 +35,6 @@ if not env_path.exists():
 if env_path.exists():
     print(f"Found .env file at: {env_path.absolute()}")
     load_dotenv(env_path)
-    print(f"Loaded TELEGRAM_BOT_TOKEN: {os.getenv('TELEGRAM_BOT_TOKEN')}")
 else:
     print("No .env file found!")
 
@@ -43,11 +42,7 @@ else:
 app = Flask(__name__)
 
 # Setup CORS
-cors_origins = [
-    'http://localhost:3000',
-    'https://tetrix-hospital.pages.dev',
-    'https://5fa5-109-245-96-58.ngrok-free.app'
-]
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,https://tetrix-hospital.pages.dev').split(',')
 CORS(app, resources={
     r"/*": {
         "origins": cors_origins,
@@ -59,7 +54,7 @@ CORS(app, resources={
 })
 
 # Configure database
-db_url = os.getenv('DATABASE_URL').replace('postgresql://', 'postgresql+psycopg://')
+db_url = f"postgresql+psycopg://{os.getenv('POSTGRES_USER', 'tetrix')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST', 'postgres')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'tetrix')}"
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -67,9 +62,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 # Initialize Redis and Cache
+redis_host = os.getenv('REDIS_HOST', 'redis')
+redis_port = int(os.getenv('REDIS_PORT', 6379))
+redis_db = int(os.getenv('REDIS_DB', 0))
+
 redis_client = redis.Redis(
-    host=os.getenv('REDIS_HOST', 'localhost'),
-    port=int(os.getenv('REDIS_PORT', 6379))
+    host=redis_host,
+    port=redis_port,
+    db=redis_db
 )
 
 # Add Redis to Flask extensions
@@ -78,8 +78,8 @@ app.extensions['redis'] = redis_client
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_URL': os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
-    'CACHE_DEFAULT_TIMEOUT': 300
+    'CACHE_REDIS_URL': f'redis://{redis_host}:{redis_port}/{redis_db}',
+    'CACHE_DEFAULT_TIMEOUT': int(os.getenv('CACHE_TIMEOUT', 300))
 })
 cache.init_app(app)
 limiter.init_app(app)
@@ -87,7 +87,7 @@ limiter.init_app(app)
 logger = setup_logging()
 
 # Configure security
-is_development = os.getenv('FLASK_ENV') == 'development'
+is_development = os.getenv('FLASK_ENV', 'production') == 'development'
 Talisman(app,
     force_https=not is_development,
     content_security_policy={
@@ -103,7 +103,7 @@ swagger = Swagger(app, template={
     "info": {
         "title": "TETRIX Bot API",
         "description": "API for TETRIX Token Bot System",
-        "version": "1.0.0"
+        "version": os.getenv('API_VERSION', '1.0.0')
     }
 })
 
@@ -133,9 +133,9 @@ jobstores = {
     'default': RedisJobStore(
         jobs_key='scheduler.jobs',
         run_times_key='scheduler.runs',
-        host=os.getenv('REDIS_HOST', 'localhost'),
-        port=int(os.getenv('REDIS_PORT', 6379)),
-        db=int(os.getenv('REDIS_DB', 0))
+        host=redis_host,
+        port=redis_port,
+        db=redis_db
     )
 }
 
@@ -239,7 +239,7 @@ if __name__ == '__main__':
         
         # Run Flask app
         app.run(
-            host=os.getenv('FLASK_HOST', '0.0.0.0'),
-            port=int(os.getenv('FLASK_PORT', 5000)),
-            debug=False
+            host=os.getenv('APP_HOST', '0.0.0.0'),
+            port=int(os.getenv('APP_PORT', 5000)),
+            debug=is_development
         ) 

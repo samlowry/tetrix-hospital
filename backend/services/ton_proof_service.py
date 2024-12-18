@@ -2,6 +2,7 @@ import hashlib
 from base64 import b64decode
 from typing import Optional
 import logging
+import os
 
 import nacl.signing
 from tonsdk.utils import Address
@@ -11,14 +12,8 @@ logger = logging.getLogger('tetrix')
 
 TON_PROOF_PREFIX = b'ton-proof-item-v2/'
 TON_CONNECT_PREFIX = b'ton-connect'
-ALLOWED_DOMAINS = [
-    'ton-connect.github.io',
-    'localhost:5173',
-    'localhost',
-    'tetrix-hospital.pages.dev',
-    '5fa5-109-245-96-58.ngrok-free.app'
-]
-VALID_AUTH_TIME = 15 * 60  # 15 minutes
+ALLOWED_DOMAINS = os.getenv('CORS_ORIGINS', 'localhost:5173,localhost,tetrix-hospital.pages.dev').split(',')
+VALID_AUTH_TIME = int(os.getenv('TON_AUTH_TIMEOUT', 15 * 60))  # 15 minutes by default
 
 def verify_proof_signature(message_bytes: bytes, signature: bytes, public_key: bytes) -> bool:
     """Verify TON Connect proof signature using NaCl."""

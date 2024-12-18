@@ -16,7 +16,8 @@ from base64 import b64decode
 import nacl.signing
 
 logger = logging.getLogger('tetrix')
-DOMAIN = os.getenv('DOMAIN', '5fa5-109-245-96-58.ngrok-free.app')  # Use ngrok URL as default
+DOMAIN = os.getenv('WEBHOOK_URL').replace('https://', '')  # Extract domain from webhook URL
+bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
 
 def parse_init_data(init_data: str) -> dict:
     """Parse and validate Telegram WebApp init data"""
