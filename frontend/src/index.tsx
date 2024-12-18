@@ -44,7 +44,6 @@ const manifestUrl = `${import.meta.env.VITE_FRONTEND_URL}/tonconnect-manifest.js
 console.log('Environment:', {
   mode: import.meta.env.MODE,
   manifestUrl,
-  appUrl: import.meta.env.VITE_APP_URL,
   tgWebAppData: window.Telegram.WebApp.initData,
   tgWebAppVersion: window.Telegram.WebApp.version,
   tgPlatform: window.Telegram.WebApp.platform,

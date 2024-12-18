@@ -318,3 +318,12 @@ Swagger UI available at: `http://localhost:5000/apidocs`
 3. Commit changes
 4. Push to branch
 5. Create Pull Request 
+
+## Frontend Environment Variables
+
+Required environment variables for the frontend application:
+
+- `VITE_BACKEND_URL`: URL of the backend API (e.g., https://api.your-domain.com)
+- `VITE_FRONTEND_URL`: URL of the frontend application (e.g., https://tetrix-hospital.pages.dev)
+
+These variables need to be set in Cloudflare Pages environment settings for production deployment.
