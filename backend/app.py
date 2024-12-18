@@ -145,14 +145,16 @@ scheduler.start()
 
 # Replace global flags with Redis
 def is_initialized():
-    return redis_client.get('app:initialized') == 'true'
+    return redis_client.get('app:initialized') == b'true'
 
 def set_initialized():
     redis_client.set('app:initialized', 'true')
 
-# Create a global event loop for the application
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+# Initialize bot at startup instead of per-request
+def initialize_bot():
+    if not is_initialized():
+        asyncio.run(setup_telegram_webhook())
+        set_initialized()
 
 # Initialize Prometheus metrics
 metrics = PrometheusMetrics(app)
@@ -207,11 +209,9 @@ async def setup_telegram_webhook():
         logger.error(f"Failed to set webhook: {e}")
         return False
 
-@app.before_request
-def init_app():
-    if not is_initialized():
-        loop.run_until_complete(setup_telegram_webhook())
-        set_initialized()
+@app.before_first_request
+def before_first_request():
+    initialize_bot()
 
 @app.route('/telegram-webhook', methods=['POST'])
 def telegram_webhook():
@@ -220,8 +220,8 @@ def telegram_webhook():
             json_data = request.get_json(force=True)
             update = telegram.Update.de_json(json_data, bot_manager.bot)
             
-            # Process update in the existing event loop
-            loop.run_until_complete(bot_manager.application.process_update(update))
+            # Use asyncio.run instead of loop
+            asyncio.run(bot_manager.application.process_update(update))
             return 'ok'
             
         except Exception as e:
@@ -234,9 +234,7 @@ def telegram_webhook():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        
-        # Start bot in the same event loop
-        loop.run_until_complete(bot_manager.start_bot())
+        initialize_bot()
         
         # Run Flask app
         app.run(
