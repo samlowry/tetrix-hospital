@@ -8,7 +8,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'nginx/**'
-      - 'docker-compose.prod.yml'
+      - 'docker-compose.yml'
       - '.github/workflows/backend-deploy.yml'
 
 jobs:
@@ -71,8 +71,6 @@ jobs:
           
           # Setup directories
           mkdir -p nginx/ssl
-          mkdir -p prometheus
-          mkdir -p grafana/dashboards
           mkdir -p logs/redis
           
           # Make scripts executable
@@ -105,12 +103,12 @@ jobs:
           # Build and update services
           if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
             echo "Building and updating backend service..."
-            docker-compose -f docker-compose.prod.yml up -d --build app
+            docker-compose up -d --build app
           fi
           
           if [[ "${{ steps.changed-files.outputs.nginx }}" == "true" ]]; then
             echo "Building and updating nginx service..."
-            docker-compose -f docker-compose.prod.yml up -d --build nginx
+            docker-compose up -d --build nginx
           fi
           
           # Clean only dangling images
@@ -121,10 +119,7 @@ jobs:
       uses: appleboy/ssh-action@master
       with:
         host: ${{ vars.PROD_HOST }}
-        username: ${{ vars.PROD_USERNAME }}
         key: ${{ secrets.PROD_SSH_KEY }}
-        env:
-          APP_PORT: ${{ vars.APP_PORT || '5000' }}
         script: |
           # Wait for services to be healthy
           for i in {1..30}; do
@@ -132,7 +127,7 @@ jobs:
             
             # Check backend if updated
             if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
-              if ! curl -f "http://localhost:${APP_PORT}/health"; then
+              if ! curl -f "http://localhost:5000/health"; then
                 HEALTH_OK=false
               fi
             fi
