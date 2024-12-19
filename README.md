@@ -327,3 +327,12 @@ Required environment variables for the frontend application:
 - `VITE_FRONTEND_URL`: URL of the frontend application (e.g., https://tetrix-hospital.pages.dev)
 
 These variables need to be set in Cloudflare Pages environment settings for production deployment.
+
+## Cloudflare Pages Setup
+
+Set these environment variables in Cloudflare Pages settings:
+
+```
+VITE_BACKEND_URL=https://api.your-domain.com
+VITE_FRONTEND_URL=https://your-cf-pages-domain.pages.dev
+```
