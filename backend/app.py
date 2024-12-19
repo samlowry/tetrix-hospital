@@ -26,6 +26,7 @@ from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
 from services.telegram_service import TelegramService
+from config import WEBHOOK_PATH, WEBHOOK_URL, TON_API_ENDPOINT
 
 # Load environment variables
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -258,9 +259,7 @@ def webhook_lock(timeout=10):
 
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
-    WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
-    webhook_url = f"{os.getenv('BACKEND_URL')}{WEBHOOK_PATH}"
-    if not webhook_url:
+    if not WEBHOOK_URL:  # Используем константу
         logger.error("WEBHOOK_URL not set in environment")
         return False
     
@@ -277,20 +276,20 @@ async def setup_telegram_webhook():
         
         try:
             await bot_manager.bot.set_webhook(
-                url=f"{webhook_url}/telegram-webhook",
+                url=WEBHOOK_URL,  # Используем константу
                 drop_pending_updates=True
             )
         except telegram.error.RetryAfter as e:
             logger.warning(f"Flood control, waiting {e.retry_after} seconds")
             await asyncio.sleep(e.retry_after)
             await bot_manager.bot.set_webhook(
-                url=f"{webhook_url}/telegram-webhook",
+                url=WEBHOOK_URL,  # Используем константу
                 drop_pending_updates=True
             )
         
-        redis_client.set(REDIS_KEYS['webhook_url'], webhook_url)
+        redis_client.set(REDIS_KEYS['webhook_url'], WEBHOOK_URL)
         set_bot_initialized()
-        logger.info(f"Webhook set to {webhook_url}/telegram-webhook")
+        logger.info(f"Webhook set to {WEBHOOK_URL}/telegram-webhook")
         return True
     except Exception as e:
         logger.error(f"Failed to set webhook: {e}")

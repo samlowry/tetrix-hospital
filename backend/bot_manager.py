@@ -7,6 +7,7 @@ import os
 import telegram
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from config import WEBHOOK_URL
 
 logger = logging.getLogger('tetrix')
 
@@ -14,20 +15,26 @@ class BotManager:
     def __init__(self, token: str, db, User, ton_client, app):
         """Initialize bot with dependencies"""
         logger.info("Initializing bot manager...")
-        if not token:
-            raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables")
         
-        self.webhook_url = os.getenv('WEBHOOK_URL')  # e.g. https://your-domain.com/webhook
-        if not self.webhook_url:
-            raise ValueError("WEBHOOK_URL not found in environment variables")
-            
-        self.application = Application.builder().token(token).build()
-        self.bot = telegram.Bot(token=token)
+        if not token:
+            raise ValueError("Bot token not found in environment variables")
+        
+        if not os.getenv('BACKEND_URL'):
+            raise ValueError("BACKEND_URL not found in environment variables")
+        
+        self.token = token
         self.db = db
         self.User = User
         self.ton_client = ton_client
-        self.flask_app = app
-        self.frontend_url = os.getenv('FRONTEND_URL')
+        self.app = app
+        
+        # Initialize bot with token
+        self.bot = telegram.Bot(token=token)
+        
+        # Setup webhook URL
+        self.webhook_url = WEBHOOK_URL  # Используем импортированную константу
+        
+        self.application = Application.builder().token(token).build()
         self.redis = app.extensions['redis']
         
         # Initialize limiter with Redis storage
@@ -56,7 +63,7 @@ class BotManager:
         logger.info(f"Received /start command from user {update.effective_user.id}")
         
         # Use Flask app context
-        with self.flask_app.app_context():
+        with self.app.app_context():
             # Check if user is registered
             user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
             
@@ -99,7 +106,7 @@ class BotManager:
         try:
             # For stats and invite-related callbacks, check registration status first
             if query.data in ['check_stats', 'show_invites', 'back_to_menu']:
-                with self.flask_app.app_context():
+                with self.app.app_context():
                     user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
                     if not user or not (user.is_fully_registered or user.is_early_backer):
                         logger.info(f"Ignoring {query.data} callback for non-fully registered user")
@@ -156,7 +163,7 @@ class BotManager:
                 await self.display_user_dashboard(telegram_id=update.effective_user.id)
                 
             elif query.data == 'show_invites':
-                with self.flask_app.app_context():
+                with self.app.app_context():
                     user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
                     if not user:
                         await query.edit_message_text("Please connect your wallet first.")
@@ -205,7 +212,7 @@ class BotManager:
 
     async def handle_wallet_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle wallet address messages"""
-        with self.flask_app.app_context():
+        with self.app.app_context():
             wallet_address = update.message.text
             telegram_id = update.effective_user.id
             
@@ -302,7 +309,7 @@ class BotManager:
 
     async def display_user_dashboard(self, telegram_id: int, message_id: Optional[int] = None, update: Update = None):
         """Display user dashboard with points and stats"""
-        with self.flask_app.app_context():
+        with self.app.app_context():
             try:
                 logger.info(f"Displaying dashboard for user {telegram_id}")
                 
@@ -449,7 +456,7 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages (invite codes)"""
-        with self.flask_app.app_context():
+        with self.app.app_context():
             telegram_id = update.effective_user.id
             
             # Ignore commands
