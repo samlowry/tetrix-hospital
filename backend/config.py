@@ -1,4 +1,20 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables first
+env_path = Path(__file__).resolve().parent.parent / '.env'
+print(f"Looking for .env at: {env_path.absolute()}")
+if not env_path.exists():
+    # Try current directory
+    env_path = Path('.env')
+    print(f"Not found, trying current directory: {env_path.absolute()}")
+if env_path.exists():
+    print(f"Found .env file at: {env_path.absolute()}")
+    load_dotenv(env_path)
+    print(f"Loaded TELEGRAM_BOT_TOKEN: {os.getenv('TELEGRAM_BOT_TOKEN')}")
+else:
+    print("No .env file found!")
 
 # Constants
 # Hardcoded for security - obscure webhook path with random suffix
@@ -11,12 +27,9 @@ REDIS_PORT = 6379
 REDIS_HOST_PROD = 'redis'
 REDIS_HOST_DEV = 'localhost'
 
-# URL will be constructed after env is loaded
-WEBHOOK_URL = None
-
-def init_webhook_url():
-    global WEBHOOK_URL
-    backend_url = os.getenv('BACKEND_URL')
-    print(f"Backend URL from env: {backend_url}")
-    WEBHOOK_URL = f"{backend_url}{WEBHOOK_PATH}"
-    print(f"Constructed webhook URL: {WEBHOOK_URL}")
+# Construct webhook URL
+backend_url = os.getenv('BACKEND_URL')
+if not backend_url:
+    raise ValueError("BACKEND_URL environment variable is required")
+WEBHOOK_URL = f"{backend_url}{WEBHOOK_PATH}"
+print(f"Constructed webhook URL: {WEBHOOK_URL}")

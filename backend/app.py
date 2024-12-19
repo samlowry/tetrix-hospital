@@ -1,3 +1,5 @@
+from config import WEBHOOK_PATH, WEBHOOK_URL, REDIS_HOST_DEV, REDIS_HOST_PROD, REDIS_PORT
+
 from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
 from flask_talisman import Talisman
@@ -26,25 +28,6 @@ from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
 from services.telegram_service import TelegramService
-from config import WEBHOOK_PATH, WEBHOOK_URL, REDIS_HOST_DEV, REDIS_HOST_PROD, REDIS_PORT
-
-# Load environment variables
-env_path = Path(__file__).resolve().parent.parent / '.env'
-print(f"Looking for .env at: {env_path.absolute()}")
-if not env_path.exists():
-    # Try current directory
-    env_path = Path('.env')
-    print(f"Not found, trying current directory: {env_path.absolute()}")
-if env_path.exists():
-    print(f"Found .env file at: {env_path.absolute()}")
-    load_dotenv(env_path)
-    print(f"Loaded TELEGRAM_BOT_TOKEN: {os.getenv('TELEGRAM_BOT_TOKEN')}")
-else:
-    print("No .env file found!")
-
-# Initialize webhook URL after env is loaded
-from config import init_webhook_url
-init_webhook_url()
 
 # Initialize Flask app
 app = Flask(__name__)
