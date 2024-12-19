@@ -16,6 +16,8 @@ import telegram
 from functools import partial
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram, Gauge
+import json
+import time
 
 from models import db, User
 from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
@@ -74,6 +76,44 @@ redis_client = redis.Redis(
 
 # Add Redis to Flask extensions
 app.extensions['redis'] = redis_client
+
+# Redis keys for bot state
+REDIS_KEYS = {
+    'initialized': 'bot:initialized',
+    'webhook_url': 'bot:webhook_url',
+    'bot_state': 'bot:state',
+    'user_sessions': 'bot:user_sessions:{}'  # Format with user_id
+}
+
+def get_bot_state():
+    """Get bot state from Redis"""
+    state = redis_client.get(REDIS_KEYS['bot_state'])
+    return state.decode('utf-8') if state else None
+
+def set_bot_state(state):
+    """Set bot state in Redis"""
+    redis_client.set(REDIS_KEYS['bot_state'], state)
+
+def is_bot_initialized():
+    """Check if bot is initialized"""
+    return redis_client.get(REDIS_KEYS['initialized']) == b'true'
+
+def set_bot_initialized():
+    """Mark bot as initialized"""
+    redis_client.set(REDIS_KEYS['initialized'], 'true')
+
+def get_user_session(user_id):
+    """Get user session from Redis"""
+    session = redis_client.get(REDIS_KEYS['user_sessions'].format(user_id))
+    return session.decode('utf-8') if session else None
+
+def set_user_session(user_id, session_data):
+    """Set user session in Redis"""
+    redis_client.set(
+        REDIS_KEYS['user_sessions'].format(user_id), 
+        session_data,
+        ex=3600  # 1 hour expiration
+    )
 
 # Configure cache
 cache = Cache(config={
@@ -143,19 +183,6 @@ jobstores = {
 scheduler = BackgroundScheduler(jobstores=jobstores)
 scheduler.start()
 
-# Replace global flags with Redis
-def is_initialized():
-    return redis_client.get('app:initialized') == b'true'
-
-def set_initialized():
-    redis_client.set('app:initialized', 'true')
-
-# Initialize bot at startup instead of per-request
-async def initialize_bot():
-    if not is_initialized():
-        await setup_telegram_webhook()
-        set_initialized()
-
 # Initialize Prometheus metrics
 metrics = PrometheusMetrics(app)
 requests_total = Counter('requests_total', 'Total requests')
@@ -192,6 +219,40 @@ def health():
         'checks': checks
     }), 200 if status else 503
 
+def generate_webhook_secret():
+    """Generate new webhook secret"""
+    import secrets
+    return secrets.token_urlsafe(32)
+
+def get_webhook_secret():
+    """Get webhook secret from Redis"""
+    secret = redis_client.get(REDIS_KEYS['webhook_secret'])
+    if not secret:
+        secret = generate_webhook_secret().encode('utf-8')
+        redis_client.set(REDIS_KEYS['webhook_secret'], secret)
+    return secret.decode('utf-8')
+
+@contextmanager
+def webhook_lock(timeout=10):
+    """Lock for webhook initialization"""
+    lock_id = generate_webhook_secret()  # Используем как уникальный ID
+    lock_timeout = timeout + 1
+    
+    # Try to acquire lock
+    acquired = redis_client.set(
+        REDIS_KEYS['webhook_lock'],
+        lock_id,
+        ex=lock_timeout,
+        nx=True
+    )
+    
+    try:
+        yield acquired
+    finally:
+        # Release lock only if we acquired it and it's still ours
+        if acquired and redis_client.get(REDIS_KEYS['webhook_lock']) == lock_id.encode('utf-8'):
+            redis_client.delete(REDIS_KEYS['webhook_lock'])
+
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
     webhook_url = os.getenv('WEBHOOK_URL')
@@ -200,33 +261,101 @@ async def setup_telegram_webhook():
         return False
     
     try:
+        # Check current webhook status
+        webhook_info = await bot_manager.bot.get_webhook_info()
+        current_url = webhook_info.url
+        logger.info(f"Current webhook URL: {current_url}")
+        
+        # Always delete and recreate webhook to ensure clean state
+        logger.info("Setting up webhook...")
         await bot_manager.bot.initialize()
-        await bot_manager.bot.delete_webhook()
-        await bot_manager.bot.set_webhook(url=f"{webhook_url}/telegram-webhook")
+        await bot_manager.bot.delete_webhook(drop_pending_updates=True)
+        
+        try:
+            await bot_manager.bot.set_webhook(
+                url=f"{webhook_url}/telegram-webhook",
+                drop_pending_updates=True
+            )
+        except telegram.error.RetryAfter as e:
+            logger.warning(f"Flood control, waiting {e.retry_after} seconds")
+            await asyncio.sleep(e.retry_after)
+            await bot_manager.bot.set_webhook(
+                url=f"{webhook_url}/telegram-webhook",
+                drop_pending_updates=True
+            )
+        
+        redis_client.set(REDIS_KEYS['webhook_url'], webhook_url)
+        set_bot_initialized()
         logger.info(f"Webhook set to {webhook_url}/telegram-webhook")
         return True
     except Exception as e:
         logger.error(f"Failed to set webhook: {e}")
         return False
 
+@contextmanager
+def get_event_loop():
+    """Context manager for handling event loops safely across requests"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop
+    finally:
+        try:
+            # Cancel all running tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            # Wait for tasks cancellation
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+def run_async(coro):
+    """Helper to run coroutines safely"""
+    with get_event_loop() as loop:
+        return loop.run_until_complete(coro)
+
+# Initialize event loop for the application
+app_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(app_loop)
+
 @app.route('/telegram-webhook', methods=['POST'])
 def telegram_webhook():
     if request.method == 'POST':
         try:
             json_data = request.get_json(force=True)
+            # Get user_id from message or callback_query
+            user_id = (
+                json_data.get('message', {}).get('from', {}).get('id') or 
+                json_data.get('callback_query', {}).get('from', {}).get('id')
+            )
+            logger.info(f"Processing update from user: {user_id}")
             
             async def process_update():
-                await bot_manager.bot.initialize()
                 update = telegram.Update.de_json(json_data, bot_manager.bot)
+                
+                # Store user session if needed
+                if user_id:
+                    session_data = json.dumps({
+                        'last_activity': int(time.time()),
+                        'update_type': (
+                            update.effective_message.text if update.effective_message 
+                            else update.callback_query.data if update.callback_query 
+                            else None
+                        )
+                    })
+                    set_user_session(user_id, session_data)
+                
                 await bot_manager.application.process_update(update)
             
-            # Process update
-            asyncio.run(process_update())
+            app_loop.run_until_complete(process_update())
             return 'ok'
             
         except Exception as e:
-            logger.error(f"Error processing webhook update: {e}")
-            logger.exception(e)  # Log full traceback
+            logger.error(f"Error processing webhook: {e}")
+            logger.exception(e)
             return jsonify({"error": str(e)}), 500
     
     abort(403)
@@ -236,8 +365,13 @@ if __name__ == '__main__':
         db.create_all()
         
         # Initialize bot and start it
-        asyncio.run(initialize_bot())
-        asyncio.run(bot_manager.start_bot())
+        app_loop.run_until_complete(setup_telegram_webhook())
+        app_loop.run_until_complete(bot_manager.application.initialize())
+        app_loop.run_until_complete(bot_manager.application.start())
+        
+        # Log final webhook status
+        webhook_info = app_loop.run_until_complete(bot_manager.bot.get_webhook_info())
+        logger.info(f"Final webhook status - URL: {webhook_info.url}, Pending updates: {webhook_info.pending_update_count}")
         
         # Run Flask app
         app.run(
