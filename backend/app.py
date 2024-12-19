@@ -26,7 +26,7 @@ from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
 from services.telegram_service import TelegramService
-from config import WEBHOOK_PATH, WEBHOOK_URL, TON_API_ENDPOINT
+from config import WEBHOOK_PATH, WEBHOOK_URL, REDIS_HOST_DEV, REDIS_HOST_PROD, REDIS_PORT
 
 # Load environment variables
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -63,9 +63,11 @@ CORS(app, resources={
 
 # Configure database
 if os.getenv('FLASK_ENV') != 'development':  # Default to production
-    db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'  # Docker internal
+    # Docker internal hostname and credentials - managed by docker-compose in prod
+    db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'
 else:
-    db_url = 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix'  # Dev local
+    # Local dev setup with standard credentials
+    db_url = 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -74,8 +76,10 @@ db.init_app(app)
 
 # Initialize Redis and Cache
 redis_client = redis.Redis(
-    host='redis' if os.getenv('FLASK_ENV') != 'development' else 'localhost',  # Docker internal or local
-    port=6379  # Default Redis port
+    # Docker internal hostname in prod, localhost in dev - managed by docker-compose
+    host='redis' if os.getenv('FLASK_ENV') != 'development' else 'localhost',
+    port=6379,  # Standard Redis port
+    db=0  # Default Redis database number
 )
 
 # Add Redis to Flask extensions
@@ -122,7 +126,7 @@ def set_user_session(user_id, session_data):
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_URL': os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
+    'CACHE_REDIS_URL': f"redis://{REDIS_HOST_PROD if os.getenv('FLASK_ENV') != 'development' else REDIS_HOST_DEV}:{REDIS_PORT}/0",
     'CACHE_DEFAULT_TIMEOUT': 300
 })
 cache.init_app(app)

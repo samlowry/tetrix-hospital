@@ -5,6 +5,7 @@ from services.user_service import UserService
 from services.telegram_service import TelegramService
 import jwt
 import os
+from config import WEBHOOK_URL
 
 bp = Blueprint('ton_connect', __name__, url_prefix='/api')
 ton_proof_service = TonProofService()

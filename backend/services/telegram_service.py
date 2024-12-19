@@ -1,4 +1,3 @@
-from utils.redis_service import redis_client
 from flask import current_app
 
 class TelegramService:

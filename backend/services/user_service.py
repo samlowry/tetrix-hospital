@@ -1,5 +1,5 @@
 from models import db, User
-from utils.redis_service import redis_client
+from flask import current_app
 import os
 
 class UserService:
@@ -7,7 +7,7 @@ class UserService:
         """Check if address is in early backers list."""
         # Check Redis cache first
         cache_key = f'early_backer:{address.upper()}'
-        cached = redis_client.get(cache_key)
+        cached = current_app.extensions['redis'].get(cache_key)
         if cached is not None:
             print(f"Found in cache: {address} -> {bool(int(cached))}")
             return bool(int(cached))
@@ -23,7 +23,7 @@ class UserService:
                 print(f"Found in file: {address} -> {is_early}")
                 
                 # Cache result
-                redis_client.setex(cache_key, 3600, int(is_early))
+                current_app.extensions['redis'].setex(cache_key, 3600, int(is_early))
                 return is_early
         except FileNotFoundError:
             print("Warning: first_backers.txt not found")
@@ -47,7 +47,7 @@ class UserService:
             print(f"Created new user - Early Backer: {user.is_early_backer}, Fully Registered: {user.is_fully_registered}")
             
             # Cache early backer status with uppercase address
-            redis_client.setex(f'early_backer:{address.upper()}', 3600, int(is_early_backer))
+            current_app.extensions['redis'].setex(f'early_backer:{address.upper()}', 3600, int(is_early_backer))
         elif telegram_id and user.telegram_id != telegram_id:
             # Update telegram_id if it's provided and different
             user.telegram_id = telegram_id
