@@ -11,7 +11,7 @@ on:
       - '.github/workflows/deploy.yml'
 
 jobs:
-  initialize:
+  deploy:
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -19,15 +19,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
-
-    - name: Get changed files
-      id: changed-files
-      uses: tj-actions/changed-files@v39
-      with:
-        files: |
-          backend/**
-          nginx/**
-          docker-compose.yml
 
     # Generate self-signed SSL certificate for initial setup
     - name: Generate SSL Certificate
@@ -37,6 +28,7 @@ jobs:
           -keyout nginx/ssl/private.key \
           -out nginx/ssl/certificate.crt \
           -subj "/C=US/ST=CA/L=SF/O=TetrixHospital/CN=${PROD_HOST}"
+        chmod 644 nginx/ssl/private.key nginx/ssl/certificate.crt
 
     - name: Initial Server Setup
       uses: appleboy/ssh-action@master
@@ -45,40 +37,20 @@ jobs:
         username: root
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
-          # Update system and install dependencies
-          sudo apt update && sudo apt upgrade -y
-          sudo apt install -y docker.io docker-compose git
-
-          # Add user to docker group
-          sudo usermod -aG docker $USER
-          
-          # Generate PostgreSQL password if not exists
-          if [ ! -f /opt/tetrix-hospital/secrets/postgres_password.txt ]; then
-            mkdir -p /opt/tetrix-hospital/secrets
-            openssl rand -base64 32 > /opt/tetrix-hospital/secrets/postgres_password.txt
-            chmod 600 /opt/tetrix-hospital/secrets/postgres_password.txt
+          # Install Docker if not exists
+          if ! command -v docker &> /dev/null; then
+            apt update && apt install -y docker.io docker-compose
           fi
           
           # Create required directories
-          sudo mkdir -p ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
-          sudo chown ${USER}:${USER} ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
-          mkdir -p ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}/backups/{postgres,redis}
+          mkdir -p /opt/tetrix-hospital/nginx/ssl
+          mkdir -p /opt/tetrix-hospital/logs/redis
           
-          # Setup logging
-          sudo mkdir -p /var/log/nginx
-          sudo touch /var/log/tetrix-backup.log
-          sudo chown ${USER}:${USER} /var/log/tetrix-backup.log
-          sudo chmod 644 /var/log/tetrix-backup.log
-          
-          # Setup git
-          cd ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
+          # Setup git and pull code
+          cd /opt/tetrix-hospital
           git init
-          git config --global --add safe.directory ${{ vars.DEPLOY_PATH || '/opt/tetrix-hospital' }}
-          git remote add origin https://github.com/${GITHUB_REPOSITORY}.git
-          
-          # Setup directories
-          mkdir -p nginx/ssl
-          mkdir -p logs/redis
+          git config --global --add safe.directory /opt/tetrix-hospital
+          git remote add origin https://github.com/${GITHUB_REPOSITORY}.git || git remote set-url origin https://github.com/${GITHUB_REPOSITORY}.git
           
           # Save environment variables
           cat > .env << EOL
@@ -87,12 +59,6 @@ jobs:
           BACKEND_URL=${{ vars.BACKEND_URL }}
           FRONTEND_URL=${{ vars.FRONTEND_URL }}
           EOL
-          
-          # Make scripts executable
-          chmod +x scripts/*.sh
-          
-          # Reload shell to apply docker group
-          newgrp docker
 
     - name: Copy SSL Certificates
       uses: appleboy/scp-action@master
@@ -112,8 +78,6 @@ jobs:
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
-          
-          # Sync repository to ensure latest code
           git fetch origin production
           git reset --hard origin/production
           
@@ -140,7 +104,6 @@ jobs:
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
-          # Wait for services to be healthy
           for i in {1..30}; do
             if curl -f "http://localhost:5000/health"; then
               echo "All services are healthy"
