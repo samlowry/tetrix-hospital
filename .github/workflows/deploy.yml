@@ -24,11 +24,10 @@ jobs:
     - name: Generate SSL Certificate
       run: |
         mkdir -p nginx/ssl
-        DOMAIN=${BACKEND_URL/https:\/\//}
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
           -keyout nginx/ssl/private.key \
           -out nginx/ssl/certificate.crt \
-          -subj "/C=US/ST=CA/L=SF/O=TetrixHospital/CN=${DOMAIN}"
+          -subj "/C=US/ST=CA/L=SF/O=TetrixHospital/CN=tetrix.com"
         chmod 644 nginx/ssl/private.key nginx/ssl/certificate.crt
 
     - name: Initial Server Setup
