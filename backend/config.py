@@ -27,6 +27,10 @@ REDIS_PORT = 6379
 REDIS_HOST_PROD = 'redis'
 REDIS_HOST_DEV = 'localhost'
 
+# Redis connection settings
+REDIS_HOST = REDIS_HOST_DEV if os.getenv('FLASK_ENV') == 'development' else REDIS_HOST_PROD
+REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+
 # Construct webhook URL
 backend_url = os.getenv('BACKEND_URL')
 if not backend_url:

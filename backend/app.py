@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 
 import monkey  # This must be the first import
 
-from config import WEBHOOK_PATH, WEBHOOK_URL, REDIS_HOST_DEV, REDIS_HOST_PROD, REDIS_PORT
+from config import (
+    WEBHOOK_PATH, WEBHOOK_URL,
+    REDIS_HOST, REDIS_PORT, REDIS_URL  # Import centralized Redis settings
+)
 
 from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
@@ -82,8 +85,8 @@ db.init_app(app)
 
 # Redis configuration
 REDIS_CONFIG = {
-    'host': 'localhost' if os.getenv('FLASK_ENV') == 'development' else 'redis',
-    'port': 6379,
+    'host': REDIS_HOST,
+    'port': REDIS_PORT,
     'db': 0,
     'socket_timeout': 30,
     'retry_on_timeout': True,
