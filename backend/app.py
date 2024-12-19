@@ -172,12 +172,24 @@ jobstores = {
         run_times_key='scheduler.runs',
         host=os.getenv('REDIS_HOST', 'localhost'),
         port=int(os.getenv('REDIS_PORT', 6379)),
-        db=int(os.getenv('REDIS_DB', 0))
+        db=int(os.getenv('REDIS_DB', 0)),
+        socket_timeout=5,
+        retry_on_timeout=True,
+        socket_connect_timeout=5
     )
 }
 
 # Setup scheduler with Redis store
-scheduler = BackgroundScheduler(jobstores=jobstores)
+scheduler = BackgroundScheduler(
+    jobstores=jobstores,
+    job_defaults={
+        'coalesce': True,  # Combine multiple waiting instances of the same job
+        'max_instances': 1  # Only allow one instance of each job to run at a time
+    },
+    executors={
+        'default': {'type': 'threadpool', 'max_workers': 20}  # Use threads instead of processes
+    }
+)
 scheduler.start()
 
 # Initialize Prometheus metrics
