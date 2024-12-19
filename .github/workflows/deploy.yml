@@ -148,13 +148,9 @@ jobs:
     # Action Secrets (sensitive data):
     # - PROD_SSH_KEY: SSH private key for production server
     # - JWT_SECRET_KEY: JWT secret key for backend auth
-    # Note: POSTGRES_PASSWORD is generated during initialization
+    # - TELEGRAM_BOT_TOKEN: Telegram bot token from @BotFather
     #
-    # Action Variables (non-sensitive, can be monitored):
-    # Infrastructure:
-    # - PROD_HOST: Production server IP address
-    # - DEPLOY_PATH: Deployment path (default: /opt/tetrix-hospital)
-    # URLs (no trailing slashes):
-    # - FRONTEND_URL: Frontend URL (e.g., https://tetrix-hospital.pages.dev)
-    # - BACKEND_URL: Backend URL (e.g., https://api.your-domain.com)
-    #   Note: WEBHOOK_URL is auto-generated as ${BACKEND_URL}/telegram-webhook
+    # Action Variables (non-sensitive):
+    # - PROD_HOST: Production server IP
+    # - BACKEND_URL: Backend URL (e.g., https://api.tetrix.lol)
+    # - FRONTEND_URL: Frontend URL (e.g., https://webapp.tetrix.lol)
