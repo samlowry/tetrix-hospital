@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: ${{ vars.PROD_HOST }}
+      url: ${{ vars.BACKEND_URL }}
     
     steps:
     - uses: actions/checkout@v3
@@ -37,11 +37,6 @@ jobs:
         username: root
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
-          # Install Docker if not exists
-          if ! command -v docker &> /dev/null; then
-            apt update && apt install -y docker.io docker-compose
-          fi
-          
           # Create required directories
           mkdir -p /opt/tetrix-hospital/nginx/ssl
           mkdir -p /opt/tetrix-hospital/logs/redis
@@ -52,13 +47,16 @@ jobs:
           git config --global --add safe.directory /opt/tetrix-hospital
           git remote add origin https://github.com/samlowry/tetrix-hospital.git || git remote set-url origin https://github.com/samlowry/tetrix-hospital.git
           
-          # Save environment variables
+          # Save environment variables with proper formatting
           cat > .env << EOL
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           BACKEND_URL=${{ vars.BACKEND_URL }}
           FRONTEND_URL=${{ vars.FRONTEND_URL }}
           EOL
+          
+          # Ensure proper permissions
+          chmod 600 .env
 
     - name: Copy SSL Certificates
       uses: appleboy/scp-action@master
@@ -108,15 +106,15 @@ jobs:
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
-          for i in {1..5}; do
+          for i in {1..10}; do
             if curl -f "http://localhost:5000/health"; then
               echo "All services are healthy"
               exit 0
             fi
-            echo "Waiting for services to be healthy... ($i/5)"
+            echo "Waiting for services to be healthy... ($i/10)"
             docker-compose ps
             docker-compose logs --tail=50 app
-            sleep 2
+            sleep 10
           done
           echo "Services failed to become healthy"
           exit 1
