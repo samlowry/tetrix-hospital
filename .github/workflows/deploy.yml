@@ -106,6 +106,7 @@ jobs:
       uses: appleboy/ssh-action@master
       with:
         host: ${{ vars.PROD_HOST }}
+        username: root
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
