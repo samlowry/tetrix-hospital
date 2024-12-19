@@ -6,6 +6,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/logs:/var/log/nginx
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     ports:
       - "443:443"
     environment:
@@ -23,25 +24,22 @@ services:
 
   app:
     build: 
-      context: ./backend
-      dockerfile: Dockerfile.prod
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       - FLASK_ENV=production
       - REDIS_HOST=redis
       - POSTGRES_HOST=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
       - BACKEND_URL=${BACKEND_URL}
       - WEBHOOK_URL=${BACKEND_URL}/telegram-webhook
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     networks:
       - backend
-    deploy:
-      replicas: 2
-      update_config:
-        parallelism: 1
-        delay: 10s
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
