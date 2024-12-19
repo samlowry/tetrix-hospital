@@ -80,13 +80,21 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize extensions
 db.init_app(app)
 
-# Initialize Redis and Cache
-redis_client = redis.Redis(
-    # Docker internal hostname in prod, localhost in dev - managed by docker-compose
-    host='redis' if os.getenv('FLASK_ENV') != 'development' else 'localhost',
-    port=6379,  # Standard Redis port
-    db=0  # Default Redis database number
-)
+# Redis configuration
+REDIS_CONFIG = {
+    'host': 'localhost' if os.getenv('FLASK_ENV') == 'development' else 'redis',
+    'port': 6379,
+    'db': 0,
+    'socket_timeout': 30,
+    'retry_on_timeout': True,
+    'socket_connect_timeout': 30,
+    'socket_keepalive': True,
+    'health_check_interval': 30,
+    'max_connections': 3
+}
+
+# Initialize Redis client
+redis_client = redis.Redis(**REDIS_CONFIG)
 
 # Add Redis to Flask extensions
 app.extensions['redis'] = redis_client
@@ -96,7 +104,9 @@ REDIS_KEYS = {
     'initialized': 'bot:initialized',
     'webhook_url': 'bot:webhook_url',
     'bot_state': 'bot:state',
-    'user_sessions': 'bot:user_sessions:{}'  # Format with user_id
+    'user_sessions': 'bot:user_sessions:{}',  # Format with user_id
+    'webhook_secret': 'webhook_secret',
+    'webhook_lock': 'webhook_lock'
 }
 
 def get_bot_state():
@@ -132,7 +142,7 @@ def set_user_session(user_id, session_data):
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_URL': f"redis://{REDIS_HOST_PROD if os.getenv('FLASK_ENV') != 'development' else REDIS_HOST_DEV}:{REDIS_PORT}/0",
+    'CACHE_REDIS_URL': f"redis://{REDIS_CONFIG['host']}:{REDIS_CONFIG['port']}/{REDIS_CONFIG['db']}",
     'CACHE_DEFAULT_TIMEOUT': 300
 })
 cache.init_app(app)
@@ -187,15 +197,7 @@ jobstores = {
     'default': RedisJobStore(
         jobs_key='scheduler.jobs',
         run_times_key='scheduler.runs',
-        host=os.getenv('REDIS_HOST', 'redis'),  # Use service name as default
-        port=int(os.getenv('REDIS_PORT', 6379)),
-        db=int(os.getenv('REDIS_DB', 0)),
-        socket_timeout=30,  # Increased timeout
-        retry_on_timeout=True,
-        socket_connect_timeout=30,  # Increased connect timeout
-        socket_keepalive=True,  # Enable keepalive
-        health_check_interval=30,  # Add health check
-        max_connections=3  # Limit connections
+        **REDIS_CONFIG
     )
 }
 
@@ -210,8 +212,7 @@ scheduler = BackgroundScheduler(
     executors={
         'default': {
             'type': 'threadpool',
-            'max_workers': 10,  # Reduced from 20 to prevent overwhelming
-            'thread_name_prefix': 'JobExecutor'
+            'max_workers': 10  # Reduced from 20 to prevent overwhelming
         }
     }
 )

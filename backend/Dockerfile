@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY backend/requirements.txt .
-RUN pip install -r requirements.txt gunicorn gevent
+RUN pip install -r requirements.txt gunicorn
 
 # Copy application code
 COPY backend/ .
