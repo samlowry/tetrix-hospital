@@ -1,4 +1,4 @@
-name: Deploy Backend and Frontend
+name: Deploy Backend
 
 # Trigger on specific changes
 on:
@@ -6,10 +6,9 @@ on:
     branches: [ production ]
     paths:
       - 'backend/**'
-      - 'frontend/**'
       - 'nginx/**'
       - 'docker-compose.yml'
-      - '.github/workflows/backend-deploy.yml'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   initialize:
@@ -17,13 +16,20 @@ jobs:
     environment:
       name: production
       url: ${{ vars.PROD_HOST }}
-    # This environment can be manually triggered again if needed
     
     steps:
     - uses: actions/checkout@v3
 
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v39
+      with:
+        files: |
+          backend/**
+          nginx/**
+          docker-compose.yml
+
     # Generate self-signed SSL certificate for initial setup
-    # (You can replace it later with a proper one)
     - name: Generate SSL Certificate
       run: |
         mkdir -p nginx/ssl
@@ -73,6 +79,14 @@ jobs:
           mkdir -p nginx/ssl
           mkdir -p logs/redis
           
+          # Save environment variables
+          cat > .env << EOL
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+          BACKEND_URL=${{ vars.BACKEND_URL }}
+          FRONTEND_URL=${{ vars.FRONTEND_URL }}
+          EOL
+          
           # Make scripts executable
           chmod +x scripts/*.sh
           
@@ -101,12 +115,12 @@ jobs:
           git reset --hard origin/production
           
           # Build and update services
-          if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
+          if [[ $(git diff --name-only HEAD HEAD~1 | grep -c "^backend/") -gt 0 ]]; then
             echo "Building and updating backend service..."
             docker-compose up -d --build app
           fi
           
-          if [[ "${{ steps.changed-files.outputs.nginx }}" == "true" ]]; then
+          if [[ $(git diff --name-only HEAD HEAD~1 | grep -c "^nginx/") -gt 0 ]]; then
             echo "Building and updating nginx service..."
             docker-compose up -d --build nginx
           fi
@@ -121,22 +135,13 @@ jobs:
         host: ${{ vars.PROD_HOST }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
+          cd /opt/tetrix-hospital
           # Wait for services to be healthy
           for i in {1..30}; do
-            HEALTH_OK=true
-            
-            # Check backend if updated
-            if [[ "${{ steps.changed-files.outputs.backend }}" == "true" ]]; then
-              if ! curl -f "http://localhost:5000/health"; then
-                HEALTH_OK=false
-              fi
-            fi
-            
-            if [[ "$HEALTH_OK" == "true" ]]; then
+            if curl -f "http://localhost:5000/health"; then
               echo "All services are healthy"
               exit 0
             fi
-            
             echo "Waiting for services to be healthy... ($i/30)"
             sleep 2
           done
