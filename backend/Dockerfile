@@ -25,4 +25,4 @@ ENV FLASK_ENV=production
 EXPOSE 5000
 
 # Run with Gunicorn
-CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"] 
+CMD ["gunicorn", "--config", "gunicorn_config.py", "--preload", "--pythonpath", "/app", "app:app"] 

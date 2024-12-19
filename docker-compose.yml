@@ -48,8 +48,10 @@ services:
       timeout: 10s
       retries: 3
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -82,7 +84,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-h", "localhost", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -92,9 +94,9 @@ services:
 networks:
   frontend:
   backend:
-    internal: true
     name: tetrix_backend
     driver: bridge
+    internal: true
 
 volumes:
   postgres_data:

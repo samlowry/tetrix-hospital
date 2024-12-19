@@ -1,3 +1,5 @@
+import monkey  # This must be the first import
+
 from config import WEBHOOK_PATH, WEBHOOK_URL, REDIS_HOST_DEV, REDIS_HOST_PROD, REDIS_PORT
 
 from flask import Flask, jsonify, request, abort
