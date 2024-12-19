@@ -16,7 +16,7 @@ export function TonConnect() {
         if (isValidated) {
             const timer = setTimeout(() => {
                 window.Telegram.WebApp.close();
-            }, 7000);
+            }, 4000);
             return () => clearTimeout(timer);
         }
     }, [isValidated]);
@@ -118,7 +118,7 @@ export function TonConnect() {
                     if (response.status === 'early_backer') {
                         setTimeout(() => {
                             window.Telegram.WebApp.close();
-                        }, 7000);
+                        }, 4000);
                     }
 
                 } catch (error) {
