@@ -61,7 +61,10 @@ CORS(app, resources={
 })
 
 # Configure database
-db_url = os.getenv('DATABASE_URL').replace('postgresql://', 'postgresql+psycopg://')
+if os.getenv('FLASK_ENV') != 'development':  # Default to production
+    db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'  # Docker internal
+else:
+    db_url = 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix'  # Dev local
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -70,8 +73,8 @@ db.init_app(app)
 
 # Initialize Redis and Cache
 redis_client = redis.Redis(
-    host=os.getenv('REDIS_HOST', 'localhost'),
-    port=int(os.getenv('REDIS_PORT', 6379))
+    host='redis' if os.getenv('FLASK_ENV') != 'development' else 'localhost',  # Docker internal or local
+    port=6379  # Default Redis port
 )
 
 # Add Redis to Flask extensions
@@ -255,7 +258,8 @@ def webhook_lock(timeout=10):
 
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
-    webhook_url = os.getenv('WEBHOOK_URL')
+    WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
+    webhook_url = f"{os.getenv('BACKEND_URL')}{WEBHOOK_PATH}"
     if not webhook_url:
         logger.error("WEBHOOK_URL not set in environment")
         return False
