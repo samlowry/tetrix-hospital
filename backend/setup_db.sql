@@ -1,5 +1,5 @@
 -- We don't need to create database/user as they're created by Docker
--- based on POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB environment variables
+-- based on POSTGRES_USER and POSTGRES_DB environment variables
 
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

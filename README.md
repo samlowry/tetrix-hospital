@@ -34,30 +34,18 @@ brew services start redis
 
 4. Create `.env` file in project root:
 ```env
-# Database
-DATABASE_URL=postgresql://localhost:5432/tetrix
-POSTGRES_USER=your_user
-POSTGRES_PASSWORD=your_password
-POSTGRES_DB=tetrix
+# Required environment variables
+BACKEND_URL=http://localhost:5000  # or your domain in production
+FRONTEND_URL=http://localhost:3000 # or your frontend URL in production
+TELEGRAM_BOT_TOKEN=your_bot_token  # from @BotFather
+JWT_SECRET_KEY=your_secret_key     # for JWT token generation
 
-# Redis
-REDIS_URL=redis://localhost:6379/0
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# Telegram
-TELEGRAM_BOT_TOKEN=your_bot_token
-WEBHOOK_URL=https://your-domain.com  # or ngrok URL for local testing
-
-# Security
-JWT_SECRET_KEY=your_secret_key
-FLASK_SECRET_KEY=another_secret_key
-
-# Environment
-FLASK_ENV=development
-FLASK_DEBUG=1
-FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
+# Optional development variables (defaults shown)
+FLASK_ENV=development              # development/production
+POSTGRES_USER=tetrix              # default user
+POSTGRES_DB=tetrix               # default database
+REDIS_HOST=redis                # redis in docker, localhost for dev
+REDIS_PORT=6379                # default Redis port
 ```
 
 ### Database Setup
@@ -90,16 +78,10 @@ npm install
 npm start
 ```
 
-#### Development with Docker
-
-```bash
-docker-compose -f docker-compose.dev.yml up
-```
-
 #### Production with Docker
 
 ```bash
-docker-compose -f docker-compose.prod.yml up
+docker-compose up -d
 ```
 
 ## Production Deployment
@@ -107,31 +89,24 @@ docker-compose -f docker-compose.prod.yml up
 ### Prerequisites
 - Domain with SSL certificate
 - Docker and Docker Compose
-- PostgreSQL database (can be containerized or external)
-- Redis instance (can be containerized or external)
-- Docker Hub account (for CI/CD)
+- GitHub account (for CI/CD)
 
 ### GitHub Actions Setup
 
 1. Go to your repository's Settings → Secrets and variables → Actions
 2. Add the following secrets:
    ```
-   # Docker Hub Credentials
-   DOCKER_HUB_USERNAME    - Your Docker Hub username
-   DOCKER_HUB_TOKEN       - Your Docker Hub access token (not password)
+   # Required secrets
+   TELEGRAM_BOT_TOKEN     - Your Telegram bot token from @BotFather
+   JWT_SECRET_KEY         - Secret key for JWT token generation
+   PROD_SSH_KEY          - Private SSH key for deployment
 
-   # Production Server Details
-   PROD_HOST             - Your production server IP/domain
-   PROD_USERNAME         - SSH username for production server
-   PROD_SSH_KEY          - Private SSH key for authentication
+   # Required variables
+   BACKEND_URL          - Your backend URL (e.g., https://api.your-domain.com)
+   FRONTEND_URL         - Your frontend URL (e.g., https://your-domain.com)
    ```
 
-3. Generate Docker Hub token:
-   - Go to Docker Hub → Account Settings → Security
-   - Click "New Access Token"
-   - Give it a name and copy the token
-
-4. Generate SSH key for deployment:
+3. Generate SSH key for deployment:
    ```bash
    ssh-keygen -t ed25519 -C "github-actions"
    # Add public key to production server's ~/.ssh/authorized_keys
@@ -140,22 +115,18 @@ docker-compose -f docker-compose.prod.yml up
 
 ### Configuration
 
-1. Create `secrets` directory:
-```bash
-mkdir secrets
-echo "your-postgres-password" > secrets/postgres_password.txt
-echo "your-grafana-password" > secrets/grafana_password.txt
-```
-
-2. Configure SSL:
+1. Configure SSL:
 ```bash
 mkdir -p nginx/ssl
 # Place your SSL certificates in nginx/ssl:
-# - fullchain.pem
-# - privkey.pem
+# - certificate.crt
+# - private.key
 ```
 
-3. Update production environment variables in `.env.prod`
+2. The system will automatically:
+   - Parse domain from BACKEND_URL
+   - Configure nginx with the domain
+   - Generate self-signed SSL certificate if none exists
 
 ### Deployment Methods
 

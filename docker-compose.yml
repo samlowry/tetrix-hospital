@@ -27,7 +27,6 @@ services:
       - FLASK_ENV=production
       - REDIS_HOST=redis
       - POSTGRES_HOST=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
       - BACKEND_URL=${BACKEND_URL}
       - WEBHOOK_URL=${BACKEND_URL}/telegram-webhook
@@ -57,8 +56,8 @@ services:
       - ./backend/setup_db.sql:/docker-entrypoint-initdb.d/setup_db.sql:ro
     environment:
       - POSTGRES_USER=tetrix
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-defaultpassword}
       - POSTGRES_DB=tetrix
+      - POSTGRES_HOST_AUTH_METHOD=trust
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tetrix -d tetrix"]
       interval: 5s
@@ -84,7 +83,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-
-secrets:
-  postgres_password:
-    file: ./secrets/postgres_password.txt
