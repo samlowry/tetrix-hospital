@@ -108,12 +108,12 @@ jobs:
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
-          for i in {1..30}; do
+          for i in {1..5}; do
             if curl -f "http://localhost:5000/health"; then
               echo "All services are healthy"
               exit 0
             fi
-            echo "Waiting for services to be healthy... ($i/30)"
+            echo "Waiting for services to be healthy... ($i/5)"
             docker-compose ps
             docker-compose logs --tail=50 app
             sleep 2
