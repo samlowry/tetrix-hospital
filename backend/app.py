@@ -1,3 +1,19 @@
+import os
+import json
+import time
+import logging
+from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 import monkey  # This must be the first import
 
 from config import WEBHOOK_PATH, WEBHOOK_URL, REDIS_HOST_DEV, REDIS_HOST_PROD, REDIS_PORT
@@ -22,6 +38,7 @@ from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram, Gauge
 import json
 import time
+from datetime import datetime
 
 from models import db, User
 from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
@@ -170,12 +187,15 @@ jobstores = {
     'default': RedisJobStore(
         jobs_key='scheduler.jobs',
         run_times_key='scheduler.runs',
-        host=os.getenv('REDIS_HOST', 'localhost'),
+        host=os.getenv('REDIS_HOST', 'redis'),  # Use service name as default
         port=int(os.getenv('REDIS_PORT', 6379)),
         db=int(os.getenv('REDIS_DB', 0)),
-        socket_timeout=5,
+        socket_timeout=30,  # Increased timeout
         retry_on_timeout=True,
-        socket_connect_timeout=5
+        socket_connect_timeout=30,  # Increased connect timeout
+        socket_keepalive=True,  # Enable keepalive
+        health_check_interval=30,  # Add health check
+        max_connections=3  # Limit connections
     )
 }
 
@@ -183,14 +203,26 @@ jobstores = {
 scheduler = BackgroundScheduler(
     jobstores=jobstores,
     job_defaults={
-        'coalesce': True,  # Combine multiple waiting instances of the same job
-        'max_instances': 1  # Only allow one instance of each job to run at a time
+        'coalesce': True,
+        'max_instances': 1,
+        'misfire_grace_time': 60  # Add grace time for misfired jobs
     },
     executors={
-        'default': {'type': 'threadpool', 'max_workers': 20}  # Use threads instead of processes
+        'default': {
+            'type': 'threadpool',
+            'max_workers': 10,  # Reduced from 20 to prevent overwhelming
+            'thread_name_prefix': 'JobExecutor'
+        }
     }
 )
-scheduler.start()
+
+# Initialize scheduler with proper error handling
+try:
+    scheduler.start()
+    logger.info("Scheduler started successfully")
+except Exception as e:
+    logger.error(f"Failed to start scheduler: {e}")
+    raise
 
 # Initialize Prometheus metrics
 metrics = PrometheusMetrics(app)
@@ -209,7 +241,8 @@ def check_redis_connection():
     try:
         redis_client.ping()
         return True
-    except Exception:
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
         return False
 
 def check_scheduler_status():
@@ -223,10 +256,12 @@ def health():
         'scheduler': check_scheduler_status()
     }
     status = all(checks.values())
-    return jsonify({
+    response = {
         'status': 'healthy' if status else 'unhealthy',
-        'checks': checks
-    }), 200 if status else 503
+        'checks': checks,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    return jsonify(response), 200 if status else 503
 
 def generate_webhook_secret():
     """Generate new webhook secret"""
