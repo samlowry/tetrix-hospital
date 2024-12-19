@@ -315,7 +315,7 @@ def run_async(coro):
 app_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(app_loop)
 
-@app.route('/telegram-webhook', methods=['POST'])
+@app.route(WEBHOOK_PATH, methods=['POST'])
 def telegram_webhook():
     if request.method == 'POST':
         try:
