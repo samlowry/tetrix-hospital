@@ -36,6 +36,10 @@ services:
       - WEBHOOK_URL=${BACKEND_URL}/telegram-webhook
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - POSTGRES_USER=tetrix
+      - POSTGRES_DB=tetrix
+      - REDIS_PORT=6379
+      - POSTGRES_PORT=5432
     networks:
       - backend
     healthcheck:
@@ -46,6 +50,7 @@ services:
     depends_on:
       - redis
       - postgres
+    restart: unless-stopped
 
   postgres:
     image: postgres:15.6-alpine
@@ -55,15 +60,16 @@ services:
       - ./backend/setup_db.sql:/docker-entrypoint-initdb.d/setup_db.sql:ro
     environment:
       - POSTGRES_USER=tetrix
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-defaultpassword}
       - POSTGRES_DB=tetrix
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tetrix"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U tetrix -d tetrix"]
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   redis:
@@ -77,15 +83,18 @@ services:
       - backend
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
 
 networks:
   frontend:
   backend:
     internal: true
+    name: tetrix_backend
+    driver: bridge
 
 volumes:
   postgres_data:
