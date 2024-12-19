@@ -10,7 +10,7 @@ services:
     ports:
       - "443:443"
     environment:
-      - PROD_HOST=${PROD_HOST}
+      - DOMAIN=${BACKEND_URL/https:\/\//}
     depends_on:
       - app
     healthcheck:
