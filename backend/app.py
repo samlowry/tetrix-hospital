@@ -42,6 +42,10 @@ if env_path.exists():
 else:
     print("No .env file found!")
 
+# Initialize webhook URL after env is loaded
+from config import init_webhook_url
+init_webhook_url()
+
 # Initialize Flask app
 app = Flask(__name__)
 
