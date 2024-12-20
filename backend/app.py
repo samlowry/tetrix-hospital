@@ -322,29 +322,35 @@ async def setup_telegram_webhook():
         # Check current webhook status
         webhook_info = await bot_manager.bot.get_webhook_info()
         current_url = webhook_info.url
+        target_url = f"{WEBHOOK_URL}"  # Base URL already includes the path
         logger.info(f"Current webhook URL: {current_url}")
         
-        # Always delete and recreate webhook to ensure clean state
-        logger.info("Setting up webhook...")
-        await bot_manager.bot.initialize()
-        await bot_manager.bot.delete_webhook(drop_pending_updates=True)
-        
-        try:
-            await bot_manager.bot.set_webhook(
-                url=WEBHOOK_URL,  # Используем константу
-                drop_pending_updates=True
-            )
-        except telegram.error.RetryAfter as e:
-            logger.warning(f"Flood control, waiting {e.retry_after} seconds")
-            await asyncio.sleep(e.retry_after)
-            await bot_manager.bot.set_webhook(
-                url=WEBHOOK_URL,  # Используем константу
-                drop_pending_updates=True
-            )
-        
-        redis_client.set(REDIS_KEYS['webhook_url'], WEBHOOK_URL)
-        set_bot_initialized()
-        logger.info(f"Webhook set to {WEBHOOK_URL}/telegram-webhook")
+        if current_url != target_url:
+            # Only update webhook if URL is different
+            logger.info("Setting up webhook...")
+            await bot_manager.bot.initialize()
+            await bot_manager.bot.delete_webhook(drop_pending_updates=True)
+            
+            try:
+                await bot_manager.bot.set_webhook(
+                    url=target_url,
+                    drop_pending_updates=True
+                )
+            except telegram.error.RetryAfter as e:
+                logger.warning(f"Flood control, waiting {e.retry_after} seconds")
+                await asyncio.sleep(e.retry_after)
+                await bot_manager.bot.set_webhook(
+                    url=target_url,
+                    drop_pending_updates=True
+                )
+            
+            redis_client.set(REDIS_KEYS['webhook_url'], target_url)
+            set_bot_initialized()
+            logger.info(f"Webhook set to {target_url}")
+        else:
+            logger.info("Webhook URL is already correct, skipping update")
+            set_bot_initialized()  # Mark as initialized even if no update needed
+            
         return True
     except Exception as e:
         logger.error(f"Failed to set webhook: {e}")
