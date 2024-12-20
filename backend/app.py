@@ -80,6 +80,11 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Add Redis configuration to app config
+app.config['REDIS_HOST'] = REDIS_HOST
+app.config['REDIS_PORT'] = REDIS_PORT
+app.config['REDIS_URL'] = REDIS_URL
+
 # Initialize extensions
 db.init_app(app)
 

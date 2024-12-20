@@ -7,7 +7,7 @@ import os
 import telegram
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from config import WEBHOOK_URL, REDIS_URL
+from config import WEBHOOK_URL
 
 logger = logging.getLogger('tetrix')
 
@@ -32,16 +32,16 @@ class BotManager:
         self.bot = telegram.Bot(token=token)
         
         # Setup webhook URL
-        self.webhook_url = WEBHOOK_URL  # Используем импортированную константу
+        self.webhook_url = WEBHOOK_URL
         
         self.application = Application.builder().token(token).build()
         self.redis = app.extensions['redis']
         
-        # Initialize limiter with Redis storage
+        # Initialize limiter with Redis client from app
         self.limiter = Limiter(
             app=app,
             key_func=get_remote_address,
-            storage_uri=REDIS_URL
+            storage_uri=f"redis://{app.config['REDIS_HOST']}:{app.config['REDIS_PORT']}/0"
         )
         
         self.setup_handlers()
