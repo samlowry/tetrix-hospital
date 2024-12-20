@@ -11,6 +11,14 @@ from config import WEBHOOK_URL, REDIS_URL
 
 logger = logging.getLogger('tetrix')
 
+def escape_md(text):
+    """Escape special characters for MarkdownV2 format."""
+    chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    escaped = str(text)
+    for char in chars:
+        escaped = escaped.replace(char, f"\\{char}")
+    return escaped
+
 class BotManager:
     def __init__(self, token: str, db, User, ton_client, app):
         """Initialize bot with dependencies"""
@@ -391,14 +399,6 @@ class BotManager:
                 filled = max(1, int((health_percentage / 100) * bar_length))  # At least 1 bar if percentage > 0
                 health_bar = "\\[" + "█" * filled + "░" * (bar_length - filled) + "\\]"
                 
-                # Escape special characters for MarkdownV2
-                def escape_md(text):
-                    chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                    escaped = str(text)
-                    for char in chars:
-                        escaped = escaped.replace(char, f"\\{char}")
-                    return escaped
-                
                 # Format message with escaped characters
                 message = f"""
 Мои жизненные показатели:
@@ -434,14 +434,6 @@ class BotManager:
     async def show_congratulations(self, telegram_id: int, message_id: Optional[int] = None, is_early_backer: bool = False, update: Update = None):
         """Show congratulations message after successful registration"""
         try:
-            # Escape special characters for MarkdownV2
-            def escape_md(text):
-                chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                escaped = str(text)
-                for char in chars:
-                    escaped = escaped.replace(char, f"\\{char}")
-                return escaped
-
             if is_early_backer:
                 # Format congratulations message for early backers
                 message = "🎉 *Отлично\\! Я чувствую новое подключение\\!*\n\n"
@@ -475,14 +467,6 @@ class BotManager:
     async def request_invite_code(self, telegram_id: int, message_id: Optional[int] = None, update: Update = None):
         """Request invite code from user who is not an early backer"""
         try:
-            # Escape special characters for MarkdownV2
-            def escape_md(text):
-                chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                escaped = str(text)
-                for char in chars:
-                    escaped = escaped.replace(char, f"\\{char}")
-                return escaped
-
             # Format message requesting invite code
             message = "✨ *Wallet Connected Successfully\\!*\n\n"
             message += "To complete your registration, please enter an invite code\\.\n"
