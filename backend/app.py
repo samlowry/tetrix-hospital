@@ -174,15 +174,21 @@ logger = setup_logging()
 is_development = os.getenv('FLASK_ENV') == 'development'
 Talisman(app,
     force_https=not is_development,
+    force_https_permanent=True,
     content_security_policy={
         'default-src': "'self'",
         'img-src': '*',
         'script-src': ["'self'", "'unsafe-inline'"],
         'style-src': ["'self'", "'unsafe-inline'"]
-    },
-    force_https_permanent=True,
-    exclude_paths=['/health']  # Exclude health check from SSL requirement
+    }
 )
+
+# Disable HTTPS for health check endpoint
+@app.before_request
+def disable_https_for_health():
+    if request.path == '/health':
+        talisman = app.extensions['talisman']
+        talisman.force_https = False
 
 # Initialize Swagger documentation
 swagger = Swagger(app, template={
