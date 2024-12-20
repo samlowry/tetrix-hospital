@@ -499,12 +499,22 @@ def init_app(app):
             logger.error(f"Error during application initialization: {str(e)}", exc_info=True)
             raise
 
-# Initialize the app
-try:
-    init_app(app)
-except Exception as e:
-    logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
-    raise
+def on_starting(server):
+    """Run before the server starts accepting requests"""
+    logger.info("Running pre-start initialization...")
+    try:
+        init_app(app)
+    except Exception as e:
+        logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
+        raise
+
+# Initialize the app (for non-Gunicorn environments)
+if not os.environ.get('GUNICORN_CMD_ARGS'):
+    try:
+        init_app(app)
+    except Exception as e:
+        logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
+        raise
 
 if __name__ == '__main__':
     app.run(

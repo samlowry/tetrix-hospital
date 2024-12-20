@@ -27,7 +27,35 @@ keepalive = 5
 # Logging
 accesslog = '-'
 errorlog = '-'
-loglevel = 'info'
+loglevel = 'debug'
+capture_output = True
+enable_stdio_inheritance = True
+
+# Log formatting
+logconfig_dict = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(asctime)s [%(levelname)s] - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    }
+}
 
 # Bind address
 bind = '0.0.0.0:5000'
@@ -53,6 +81,13 @@ graceful_timeout = 120
 
 # Preload app for better performance
 preload_app = False  # Important: Keep this False for gevent
+
+# Server hooks
+def on_starting(server):
+    """Run before the server starts accepting requests"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Running Gunicorn pre-start initialization...")
 
 # Worker class specific settings
 worker_class_args = {
