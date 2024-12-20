@@ -460,9 +460,22 @@ def telegram_webhook():
     
     abort(403)
 
+@app.errorhandler(404)
+def not_found(error):
+    # Don't log traceback for 404, just log the path
+    logger.info(f"404 for path: {request.path}")
+    return jsonify({
+        'status': 'error',
+        'message': 'Not found',
+        'code': 404
+    }), 404
+
 @app.errorhandler(Exception)
 def handle_error(error):
-    logger.error(f"Unhandled error: {str(error)}", exc_info=True)
+    # Log full traceback only for non-404 errors
+    if not isinstance(error, HTTPException) or error.code != 404:
+        logger.error(f"Unhandled error: {str(error)}", exc_info=True)
+    
     code = 500
     if isinstance(error, HTTPException):
         code = error.code
