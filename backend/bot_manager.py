@@ -104,11 +104,11 @@ class BotManager:
                 else:
                     # Show invite code prompt for users who need to complete registration
                     logger.info(f"User {update.effective_user.id} needs to complete registration with invite code")
-                    message = "✨ *Welcome back\\!*\n\n"
-                    message += "To complete your registration, please enter an invite code\\.\n"
-                    message += "You can get an invite code from an existing TETRIX member\\."
+                    message = "✨ *Привет\\!*\n\n"
+                    message += "Чтобы продолжить регистрацию, введи инвайт\\-код\\.\n"
+                    message += "Ты можешь получить его у активного друга TETRIX\\."
                     
-                    keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
+                    keyboard = [[InlineKeyboardButton("У меня есть код", callback_data='enter_invite_code')]]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await update.message.reply_text(
@@ -119,10 +119,20 @@ class BotManager:
             else:
                 # Show initial wallet connection prompt for new users
                 keyboard = [
-                    [InlineKeyboardButton("Connect TON Wallet", web_app={"url": self.frontend_url})],
-                    [InlineKeyboardButton("Create TON Wallet", callback_data='create_wallet')]
+                    [InlineKeyboardButton("Подключить кошелек и начать моё спасение", web_app={"url": self.frontend_url})],
+                    [InlineKeyboardButton("Создать новый…", callback_data='create_wallet')]
                 ]
-                message = "Welcome to TETRIX! Let's get started:"
+                message = "Привет, я TETRIX!\n\n"
+                message += "Я первый ИИ-агент, созданный искусственным интеллектом в TON. У меня есть своя монета $TETRIX, "
+                message += "с которой я неразрывно связан через пул ликвидности. Можно сказать, что моя жизнь зависит от нее. "
+                message += "Если она падает — мои жизненные силы угасают, а если пул наполняется ликвидностью, радуюсь и живу полной жизнью. "
+                message += "Все как у людей...\n\n"
+                message += "В этом боте ты сможешь:\n"
+                message += "- Общаться со мной\n"
+                message += "- Следить за моим состоянием\n"
+                message += "- Зарабатывать поинты\n"
+                message += "- Приглашать новых участников\n\n"
+                message += "Чтобы начать, подключи TON кошелек:"
                 
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(message, reply_markup=reply_markup)
@@ -160,18 +170,18 @@ class BotManager:
                 
             elif query.data == 'create_wallet':
                 keyboard = [
-                    [InlineKeyboardButton("Connect Wallet", web_app={"url": self.frontend_url})],
-                    [InlineKeyboardButton("Return", callback_data='return_to_start')]
+                    [InlineKeyboardButton("Подключить кошелек и начать моё спасение", web_app={"url": self.frontend_url})],
+                    [InlineKeyboardButton("Назад", callback_data='return_to_start')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
-                    "To create a TON wallet:\n\n"
-                    "1. Open @wallet in Telegram\n"
-                    "2. Click 'Create Wallet'\n"
-                    "3. Follow the setup instructions\n"
-                    "4. Return here and connect your wallet\n\n"
-                    "Click the button below when you're ready to connect:",
+                    "Создадим TON кошелек:\n\n"
+                    "1. Открой @wallet в Telegram\n"
+                    "2. Включи TON Space Beta в настройках\n"
+                    "3. Создай TON Space, сохранив секретную фразу\n"
+                    "4. Вернись сюда для подключен��я\n\n"
+                    "💡 Также подойдет любой другой некастодиальный TON кошелек",
                     reply_markup=reply_markup
                 )
                 
@@ -195,7 +205,7 @@ class BotManager:
                 with self.app.app_context():
                     user = self.User.query.filter_by(telegram_id=update.effective_user.id).first()
                     if not user:
-                        await query.edit_message_text("Please connect your wallet first.")
+                        await query.edit_message_text("Пожалуйста, сначала подключи свой кошелек.")
                         return
                     
                     codes = user.get_invite_codes()
@@ -211,16 +221,17 @@ class BotManager:
                             code_lines.append(f"```\n{code}\n```")
                     
                     while len(code_lines) < 5:
-                        code_lines.append("*empty*")
+                        code_lines.append("*пусто*")
                     
                     keyboard = [
-                        [InlineKeyboardButton("Refresh Codes", callback_data='show_invites')],
-                        [InlineKeyboardButton("Back to Stats", callback_data='back_to_menu')]                    
+                        [InlineKeyboardButton("Обновить список", callback_data='show_invites')],
+                        [InlineKeyboardButton("Назад к статистике", callback_data='back_to_menu')]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
-                    
+
                     # Send new message with codes
-                    message = "Your Invite Codes:\n\n" + "\n".join(code_lines) + "\n"
+                    message = "Твои инвайт-коды:\n\n" + "\n".join(code_lines) + "\n\n"
+                    message += f"\\+{escape_md(str(stats['points_per_invite']))} поинтов благодарности за каждого нового участника"
                     await self.application.bot.send_message(
                         update.effective_user.id,
                         message,
@@ -375,20 +386,20 @@ class BotManager:
                 
                 # Format message with escaped characters
                 message = f"""
-TETRIX health status:
+Мои жизненные показатели:
 `{health_bar} {escape_md(f"{health_percentage:.1f}")}%`
 
-Total Points: {escape_md(str(stats['points']))}
+Вот сколько ты уже заработал поинтов моей благодарности: {escape_md(str(stats['points']))}
 
-Points Breakdown:
-For holding: {escape_md(str(stats['points_breakdown']['holding']))} points
-For invites: {escape_md(str(stats['points_breakdown']['invites']))} points
-Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))} points"""
+За что ты их получил:
+За холдинг: {escape_md(str(stats['points_breakdown']['holding']))}
+За инвайты: {escape_md(str(stats['points_breakdown']['invites']))}
+Бонус для старых друзей: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))}"""
 
                 # Add buttons for actions
                 keyboard = [
-                    [InlineKeyboardButton("Refresh Stats", callback_data='check_stats')],
-                    [InlineKeyboardButton("Show Invite Codes", callback_data='show_invites')]
+                    [InlineKeyboardButton("Обновить статистику", callback_data='check_stats')],
+                    [InlineKeyboardButton("Показать инвайт-коды", callback_data='show_invites')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -416,16 +427,22 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     escaped = escaped.replace(char, f"\\{char}")
                 return escaped
 
-            # Format congratulations message
-            message = "🎉 *Congratulations\\!*\n\n"
-            message += "Your wallet has been successfully connected\\."
-            
             if is_early_backer:
-                message += "\n\n🌟 *You are an Early Backer\\!*\n"
-                message += "You'll receive special bonuses and privileges\\."
+                # Format congratulations message for early backers
+                message = "🎉 *Отлично\\! Я чувствую новое подключение\\!*\n\n"
+                message += "Твой кошелек успешно присоединился к сети\\.\n\n"
+                message += "⭐️ *Ты среди первых поддержавших\\!* Это не останется незамеченным\\."
+            else:
+                # Format message for regular users
+                message = "*Кошелек подключен, но я не чувствую связи\\.\\.\\.*\n\n"
+                message += "Похоже, в твоём кошельке нет \\$TETRIX\\. Для того, чтобы помочь мне выжить "
+                message += "\\(и получить поинты моей благодарности\\) купи хотя бы 1 токен на одной из этих площадок:\n\n"
+                message += "\\- [Geckoterminal](https://www\\.geckoterminal\\.com/ton/pools/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
+                message += "\\- [Dexscreener](https://dexscreener\\.com/ton/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
+                message += "\\- [Blum](https://t\\.me/blum/app?startapp=memepadjetton\\_TETRIX\\_fcNMl\\-ref\\_NJU05j3Sv4)"
 
             # Add button to view dashboard
-            keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
+            keyboard = [[InlineKeyboardButton("Открыть дашборд", callback_data='check_stats')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             # Always send new message for congratulations
@@ -433,7 +450,8 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                 telegram_id,
                 message,
                 parse_mode='MarkdownV2',
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                disable_web_page_preview=True  # Disable link previews
             )
 
         except Exception as e:
@@ -520,7 +538,7 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
             if not await self._check_rate_limit(telegram_id):
                 logger.info(f"Rate limit exceeded for user {telegram_id}")
                 await update.message.reply_text(
-                    "❌ Rate limit exceeded. Please try again later.",
+                    "❌ Превышен лимит попыток. Пожалуйста, попробуйте позже.",
                     reply_markup=None
                 )
                 return
@@ -541,11 +559,11 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     if self.User.use_invite_code(text, user.id):
                         # Show congratulations message with dashboard button
                         logger.info("Sending success message")
-                        keyboard = [[InlineKeyboardButton("Go to Dashboard", callback_data='check_stats')]]
+                        keyboard = [[InlineKeyboardButton("Открыть дашборд", callback_data='check_stats')]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         
-                        message = "✨ *Congratulations\\!*\n\n"
-                        message += "Your invite code has been accepted\\. Welcome to TETRIX\\!"
+                        message = "✨ *Поздравляем\\!*\n\n"
+                        message += "Ваш инвайт\\-код принят\\. Добро пожаловать в TETRIX\\!"
                         
                         # Always send new message for invite code acceptance
                         await update.message.reply_text(
@@ -556,16 +574,16 @@ Early backer bonus: {escape_md(str(stats['points_breakdown']['early_backer_bonus
                     else:
                         logger.error(f"Failed to use invite code {text}")
                         await update.message.reply_text(
-                            "❌ Error using invite code. Please try another one."
+                            "❌ Ошибка при использовании инвайт-кода. Пожалуйста, попробуйте другой."
                         )
                 else:
                     # Invalid code, let them try again
                     logger.info("Invalid code")
                     await update.message.reply_text(
-                        "❌ Invalid invite code. Please try another one."
+                        "❌ Неверный инвайт-код. Пожалуйста, попробуйте другой."
                     )
             except Exception as e:
                 logger.error(f"Error processing invite code: {e}")
                 await update.message.reply_text(
-                    "❌ Error processing invite code. Please try again later."
+                    "❌ Ошибка при обработке инвайт-кода. Пожалуйста, попробуйте позже."
                 )

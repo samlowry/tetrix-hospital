@@ -166,7 +166,8 @@ class User(db.Model):
         
         # Calculate points
         holding_points = 420  # Dummy value for now
-        invite_points = total_invites * 420
+        points_per_invite = 420  # Points per successful invite
+        invite_points = total_invites * points_per_invite
         early_backer_bonus = 4200 if self.is_early_backer else 0  # Use field instead of file check
         
         total_points = holding_points + invite_points + early_backer_bonus
@@ -180,6 +181,7 @@ class User(db.Model):
                 'invites': invite_points,
                 'early_backer_bonus': early_backer_bonus
             },
+            'points_per_invite': points_per_invite,
             'invite_codes': codes,
             'max_invite_slots': self.max_invite_slots,
             'ignore_slot_reset': self.ignore_slot_reset
