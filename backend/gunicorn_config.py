@@ -3,9 +3,8 @@ import multiprocessing
 # Number of worker processes
 workers = multiprocessing.cpu_count() * 2 + 1
 
-# Use gevent worker class for async support
-worker_class = 'gevent'
-worker_connections = 1000
+# Use sync worker class for stability
+worker_class = 'sync'
 
 # Maximum requests before worker restart
 max_requests = 1000
@@ -26,8 +25,7 @@ bind = '0.0.0.0:5000'
 # Preload app for faster worker startup
 preload_app = True
 
-# Gevent specific settings
-worker_tmp_dir = '/dev/shm'
+# Allow forwarded IPs
 forwarded_allow_ips = '*'
 
 # Prevent worker timeout
