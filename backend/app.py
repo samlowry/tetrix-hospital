@@ -315,7 +315,7 @@ def webhook_lock(timeout=10):
 
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
-    if not WEBHOOK_URL:  # Использ��ем константу
+    if not WEBHOOK_URL:  # Use constant
         logger.error("WEBHOOK_URL not set in environment")
         return False
     
@@ -325,6 +325,7 @@ async def setup_telegram_webhook():
         current_url = webhook_info.url
         target_url = f"{WEBHOOK_URL}"  # Base URL already includes the path
         logger.info(f"Current webhook URL: {current_url}")
+        logger.info(f"Target webhook URL: {target_url}")
         
         if current_url != target_url:
             # Only update webhook if URL is different
@@ -337,6 +338,7 @@ async def setup_telegram_webhook():
                     url=target_url,
                     drop_pending_updates=True
                 )
+                logger.info(f"Successfully set webhook to {target_url}")
             except telegram.error.RetryAfter as e:
                 logger.warning(f"Flood control, waiting {e.retry_after} seconds")
                 await asyncio.sleep(e.retry_after)
@@ -344,38 +346,47 @@ async def setup_telegram_webhook():
                     url=target_url,
                     drop_pending_updates=True
                 )
+                logger.info(f"Successfully set webhook to {target_url} after retry")
             
             redis_client.set(REDIS_KEYS['webhook_url'], target_url)
             set_bot_initialized()
-            logger.info(f"Webhook set to {target_url}")
+            logger.info(f"Webhook setup complete. URL: {target_url}")
         else:
-            logger.info("Webhook URL is already correct, skipping update")
+            logger.info(f"Webhook URL is already correct ({current_url}), skipping update")
             set_bot_initialized()  # Mark as initialized even if no update needed
             
         return True
     except Exception as e:
-        logger.error(f"Failed to set webhook: {e}")
+        logger.error(f"Failed to set webhook: {str(e)}", exc_info=True)
         return False
 
 @contextmanager
 def get_event_loop():
     """Context manager for handling event loops safely across requests"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop = None
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
     try:
         yield loop
     finally:
-        try:
-            # Cancel all running tasks
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            # Wait for tasks cancellation
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+        if loop and not loop.is_closed():
+            try:
+                # Cancel all running tasks
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                # Wait for tasks cancellation
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception as e:
+                logger.error(f"Error cleaning up event loop: {e}")
 
 def run_async(coro):
     """Helper to run coroutines safely"""
@@ -383,8 +394,14 @@ def run_async(coro):
         return loop.run_until_complete(coro)
 
 # Initialize event loop for the application
-app_loop = asyncio.new_event_loop()
-asyncio.set_event_loop(app_loop)
+try:
+    app_loop = asyncio.get_event_loop()
+    if app_loop.is_closed():
+        app_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(app_loop)
+except RuntimeError:
+    app_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(app_loop)
 
 @app.route(WEBHOOK_PATH, methods=['POST'])
 def telegram_webhook():
@@ -420,8 +437,7 @@ def telegram_webhook():
                 
                 await bot_manager.application.process_update(update)
             
-            # Use asyncio.run instead of app_loop.run_until_complete
-            asyncio.run(process_update())
+            run_async(process_update())
             return 'ok'
             
         except Exception as e:
@@ -443,22 +459,26 @@ def handle_error(error):
         'code': code
     }), code
 
-if __name__ == '__main__':
+def init_app(app):
+    """Initialize the application"""
     with app.app_context():
         db.create_all()
         
         # Initialize bot and start it
-        app_loop.run_until_complete(setup_telegram_webhook())
-        app_loop.run_until_complete(bot_manager.application.initialize())
-        app_loop.run_until_complete(bot_manager.application.start())
+        run_async(setup_telegram_webhook())
+        run_async(bot_manager.application.initialize())
+        run_async(bot_manager.application.start())
         
         # Log final webhook status
-        webhook_info = app_loop.run_until_complete(bot_manager.bot.get_webhook_info())
+        webhook_info = run_async(bot_manager.bot.get_webhook_info())
         logger.info(f"Final webhook status - URL: {webhook_info.url}, Pending updates: {webhook_info.pending_update_count}")
-        
-        # Run Flask app
-        app.run(
-            host=os.getenv('FLASK_HOST', '0.0.0.0'),
-            port=int(os.getenv('FLASK_PORT', 5000)),
-            debug=False
-        ) 
+
+# Initialize the app
+init_app(app)
+
+if __name__ == '__main__':
+    app.run(
+        host=os.getenv('FLASK_HOST', '0.0.0.0'),
+        port=int(os.getenv('FLASK_PORT', 5000)),
+        debug=False
+    ) 
