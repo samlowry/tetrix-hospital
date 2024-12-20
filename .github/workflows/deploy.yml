@@ -18,27 +18,6 @@ jobs:
       url: ${{ vars.BACKEND_URL }}
     
     steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: production
-        fetch-depth: 0  # Fetch all history for proper versioning
-
-    # Set up Docker Buildx for better caching
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      with:
-        install: true  # This makes buildx available for docker-compose
-
-    # Generate self-signed SSL certificate for initial setup
-    - name: Generate SSL Certificate
-      run: |
-        mkdir -p nginx/ssl
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-          -keyout nginx/ssl/private.key \
-          -out nginx/ssl/certificate.crt \
-          -subj "/C=US/ST=CA/L=SF/O=TetrixHospital/CN=tetrix.com"
-        chmod 644 nginx/ssl/private.key nginx/ssl/certificate.crt
-
     - name: Initial Server Setup
       uses: appleboy/ssh-action@master
       with:
@@ -50,19 +29,17 @@ jobs:
           mkdir -p /opt/tetrix-hospital/nginx/ssl
           mkdir -p /opt/tetrix-hospital/logs/redis
           
-          # Setup git and pull code
-          cd /opt/tetrix-hospital
-          git init
-          git config --global --add safe.directory /opt/tetrix-hospital
-          git remote add origin https://github.com/samlowry/tetrix-hospital.git || git remote set-url origin https://github.com/samlowry/tetrix-hospital.git
-          
-          # Switch to production branch
-          git fetch origin production
-          git checkout production || git checkout -b production
-          git reset --hard origin/production
+          # Generate SSL certificate if not exists
+          if [ ! -f /opt/tetrix-hospital/nginx/ssl/certificate.crt ]; then
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+              -keyout /opt/tetrix-hospital/nginx/ssl/private.key \
+              -out /opt/tetrix-hospital/nginx/ssl/certificate.crt \
+              -subj "/C=US/ST=CA/L=SF/O=TetrixHospital/CN=tetrix.com"
+            chmod 644 /opt/tetrix-hospital/nginx/ssl/private.key /opt/tetrix-hospital/nginx/ssl/certificate.crt
+          fi
           
           # Save environment variables with proper formatting
-          cat > .env << EOL
+          cat > /opt/tetrix-hospital/.env << EOL
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           BACKEND_URL=${{ vars.BACKEND_URL }}
@@ -70,17 +47,7 @@ jobs:
           EOL
           
           # Ensure proper permissions
-          chmod 600 .env
-
-    - name: Copy SSL Certificates
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ vars.PROD_HOST }}
-        username: root
-        key: ${{ secrets.PROD_SSH_KEY }}
-        source: "nginx/ssl/*"
-        target: "/opt/tetrix-hospital/nginx/ssl"
-        strip_components: 2
+          chmod 600 /opt/tetrix-hospital/.env
 
     - name: Deploy to production
       uses: appleboy/ssh-action@master
@@ -90,6 +57,8 @@ jobs:
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
           cd /opt/tetrix-hospital
+          
+          # Pull latest changes
           git fetch origin production
           git reset --hard origin/production
           
@@ -99,11 +68,8 @@ jobs:
           # Save current images for cleanup
           OLD_IMAGES=$(docker images -q tetrix-hospital_app)
           
-          # Build and start services with BuildKit caching
-          DOCKER_BUILDKIT=1 docker-compose build \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from type=registry,ref=tetrix-hospital_app:latest \
-            --cache-to type=inline
+          # Build and start services
+          DOCKER_BUILDKIT=0 docker-compose build --no-cache
           docker-compose up -d
           
           # Show logs for debugging
@@ -120,9 +86,6 @@ jobs:
             echo "Cleaning up old images..."
             docker rmi $OLD_IMAGES || true
           fi
-          
-          # Clean up build cache older than 7 days
-          docker builder prune -f --filter until=168h
 
     # Verify deployment with retries
     - name: Check deployment
