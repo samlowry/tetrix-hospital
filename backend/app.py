@@ -179,7 +179,9 @@ Talisman(app,
         'img-src': '*',
         'script-src': ["'self'", "'unsafe-inline'"],
         'style-src': ["'self'", "'unsafe-inline'"]
-    }
+    },
+    force_https_permanent=True,
+    exclude_paths=['/health']  # Exclude health check from SSL requirement
 )
 
 # Initialize Swagger documentation
