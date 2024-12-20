@@ -257,7 +257,7 @@ class BotManager:
             # Get current webhook info
             webhook_info = await self.bot.get_webhook_info()
             current_url = webhook_info.url
-            target_url = f"{self.webhook_url}/telegram-webhook"
+            target_url = self.webhook_url  # Use the full URL from config
 
             # Only set webhook if URL is different
             if current_url != target_url:
