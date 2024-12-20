@@ -28,8 +28,15 @@ class BotManager:
         self.ton_client = ton_client
         self.app = app
         
-        # Initialize bot with token
-        self.bot = telegram.Bot(token=token)
+        # Initialize bot with token and custom request parameters
+        request = telegram.request.HTTPXRequest(
+            connection_pool_size=8,
+            connect_timeout=20.0,
+            read_timeout=20.0,
+            write_timeout=20.0,
+            pool_timeout=20.0
+        )
+        self.bot = telegram.Bot(token=token, request=request)
         
         # Setup webhook URL
         self.webhook_url = WEBHOOK_URL
@@ -38,7 +45,7 @@ class BotManager:
         self.frontend_url = os.getenv('FRONTEND_URL', 'https://tetrix-hospital.pages.dev')
         
         # Build application but don't initialize yet
-        self.application = Application.builder().token(token).build()
+        self.application = Application.builder().token(token).request(request).build()
         self.redis = app.extensions['redis']
         
         # Initialize limiter with Redis URL from config
