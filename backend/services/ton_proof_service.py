@@ -127,6 +127,11 @@ class TonProofService:
             verify_key = nacl.signing.VerifyKey(bytes.fromhex(payload['public_key']))
             signature = b64decode(payload['proof']['signature'])
             logger.info(f"Verifying signature: {signature.hex()}")
+            logger.info(f"Public key: {payload['public_key']}")
+            logger.info(f"Payload: {payload['proof']['payload']}")
+            logger.info(f"Domain: {domain}")
+            logger.info(f"Timestamp: {timestamp}")
+            logger.info(f"Address: {address.to_string()}")
             
             verify_key.verify(result, signature)  # Verify the final hash with the signature
             logger.info("Signature verified successfully")
