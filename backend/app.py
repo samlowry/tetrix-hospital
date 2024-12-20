@@ -315,7 +315,7 @@ def webhook_lock(timeout=10):
 
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
-    if not WEBHOOK_URL:  # Используем константу
+    if not WEBHOOK_URL:  # Использ��ем константу
         logger.error("WEBHOOK_URL not set in environment")
         return False
     
@@ -420,7 +420,8 @@ def telegram_webhook():
                 
                 await bot_manager.application.process_update(update)
             
-            app_loop.run_until_complete(process_update())
+            # Use asyncio.run instead of app_loop.run_until_complete
+            asyncio.run(process_update())
             return 'ok'
             
         except Exception as e:
