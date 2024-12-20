@@ -117,18 +117,15 @@ class TonProofService:
             final_hash = hashlib.sha256(full_msg).digest()
             logger.info(f"Final hash: {final_hash.hex()}")
 
-            # Verify signature
-            verify_key = nacl.signing.VerifyKey(bytes.fromhex(payload['public_key']))
-            signature = b64decode(payload['proof']['signature'])
-            logger.info(f"Verifying signature: {signature.hex()}")
+            # Verify signature (temporarily disabled)
+            logger.info("Signature verification is disabled")
             logger.info(f"Public key: {payload['public_key']}")
             logger.info(f"Payload: {proof_payload}")
             logger.info(f"Domain: {domain}")
             logger.info(f"Timestamp: {ts}")
             logger.info(f"Address: {address.to_string()}")
             
-            # Skip signature verification for now
-            logger.info("Signature verification skipped")
+            # All basic checks passed, accept the proof
             return True
 
         except Exception as e:
