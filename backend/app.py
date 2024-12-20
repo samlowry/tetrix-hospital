@@ -315,12 +315,15 @@ def webhook_lock(timeout=10):
 
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
-    if not WEBHOOK_URL:  # Use constant
+    logger.info("Starting webhook setup...")
+    if not WEBHOOK_URL:
         logger.error("WEBHOOK_URL not set in environment")
         return False
     
+    logger.info(f"Using webhook URL: {WEBHOOK_URL}")
     try:
         # Check current webhook status
+        logger.info("Getting current webhook info...")
         webhook_info = await bot_manager.bot.get_webhook_info()
         current_url = webhook_info.url
         target_url = f"{WEBHOOK_URL}"  # Base URL already includes the path
@@ -329,11 +332,14 @@ async def setup_telegram_webhook():
         
         if current_url != target_url:
             # Only update webhook if URL is different
-            logger.info("Setting up webhook...")
+            logger.info("URLs are different, updating webhook...")
+            logger.info("Initializing bot...")
             await bot_manager.bot.initialize()
+            logger.info("Deleting current webhook...")
             await bot_manager.bot.delete_webhook(drop_pending_updates=True)
             
             try:
+                logger.info("Setting new webhook...")
                 await bot_manager.bot.set_webhook(
                     url=target_url,
                     drop_pending_updates=True
@@ -342,6 +348,7 @@ async def setup_telegram_webhook():
             except telegram.error.RetryAfter as e:
                 logger.warning(f"Flood control, waiting {e.retry_after} seconds")
                 await asyncio.sleep(e.retry_after)
+                logger.info("Retrying webhook setup...")
                 await bot_manager.bot.set_webhook(
                     url=target_url,
                     drop_pending_updates=True
@@ -461,20 +468,43 @@ def handle_error(error):
 
 def init_app(app):
     """Initialize the application"""
+    logger.info("Starting application initialization...")
     with app.app_context():
-        db.create_all()
-        
-        # Initialize bot and start it
-        run_async(setup_telegram_webhook())
-        run_async(bot_manager.application.initialize())
-        run_async(bot_manager.application.start())
-        
-        # Log final webhook status
-        webhook_info = run_async(bot_manager.bot.get_webhook_info())
-        logger.info(f"Final webhook status - URL: {webhook_info.url}, Pending updates: {webhook_info.pending_update_count}")
+        try:
+            logger.info("Creating database tables...")
+            db.create_all()
+            logger.info("Database tables created successfully")
+            
+            # Initialize bot and start it
+            logger.info("Setting up Telegram webhook...")
+            webhook_result = run_async(setup_telegram_webhook())
+            logger.info(f"Webhook setup result: {webhook_result}")
+            
+            logger.info("Initializing bot application...")
+            run_async(bot_manager.application.initialize())
+            logger.info("Bot application initialized")
+            
+            logger.info("Starting bot application...")
+            run_async(bot_manager.application.start())
+            logger.info("Bot application started")
+            
+            # Log final webhook status
+            logger.info("Getting final webhook status...")
+            webhook_info = run_async(bot_manager.bot.get_webhook_info())
+            logger.info(f"Final webhook status - URL: {webhook_info.url}, Pending updates: {webhook_info.pending_update_count}")
+            
+            logger.info("Application initialization completed successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error during application initialization: {str(e)}", exc_info=True)
+            raise
 
 # Initialize the app
-init_app(app)
+try:
+    init_app(app)
+except Exception as e:
+    logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
+    raise
 
 if __name__ == '__main__':
     app.run(
