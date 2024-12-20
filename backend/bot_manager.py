@@ -34,6 +34,9 @@ class BotManager:
         # Setup webhook URL
         self.webhook_url = WEBHOOK_URL
         
+        # Setup frontend URL
+        self.frontend_url = os.getenv('FRONTEND_URL', 'https://tetrix-hospital.pages.dev')
+        
         # Build application but don't initialize yet
         self.application = Application.builder().token(token).build()
         self.redis = app.extensions['redis']
