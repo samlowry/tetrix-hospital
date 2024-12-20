@@ -5,6 +5,7 @@ from flask_limiter.util import get_remote_address
 import logging
 import os
 import hashlib
+from config import REDIS_URL  # Import centralized Redis URL
 
 logger = logging.getLogger('tetrix')
 
@@ -19,7 +20,7 @@ def get_device_identifier():
 limiter = Limiter(
     key_func=get_device_identifier,
     default_limits=["1000 per hour", "10000 per day"],
-    storage_uri=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
+    storage_uri=REDIS_URL,  # Use centralized Redis URL
     strategy="fixed-window"
 )
 
