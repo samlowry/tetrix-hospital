@@ -2,6 +2,8 @@ import hashlib
 from base64 import b64decode
 from typing import Optional
 import logging
+import os
+from urllib.parse import urlparse
 
 import nacl.signing
 from tonsdk.utils import Address
@@ -11,12 +13,19 @@ logger = logging.getLogger('tetrix')
 
 TON_PROOF_PREFIX = b'ton-proof-item-v2/'
 TON_CONNECT_PREFIX = b'ton-connect'
+
+# Get domain from FRONTEND_URL
+frontend_url = os.getenv('FRONTEND_URL')
+if not frontend_url:
+    logger.error("FRONTEND_URL not set")
+    frontend_domain = 'localhost'
+else:
+    frontend_domain = urlparse(frontend_url).netloc
+
 ALLOWED_DOMAINS = [
-    'ton-connect.github.io',
     'localhost:5173',
     'localhost',
-    'tetrix-hospital.pages.dev',
-    '3bb1-109-245-96-58.ngrok-free.app'
+    frontend_domain
 ]
 VALID_AUTH_TIME = 15 * 60  # 15 minutes
 
