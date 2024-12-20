@@ -64,13 +64,18 @@ def check_proof():
             })
 
         # Generate JWT token
+        jwt_secret = os.environ.get('JWT_SECRET_KEY')
+        if not jwt_secret:
+            print("JWT_SECRET_KEY not set!")
+            return jsonify({'error': 'Server configuration error'}), 500
+            
         token = jwt.encode(
             {
                 'address': address,
                 'network': data.get('network'),
                 'public_key': data['public_key']
             },
-            os.environ.get('JWT_SECRET_KEY', 'dev-secret-key'),
+            jwt_secret,
             algorithm='HS256'
         )
 
