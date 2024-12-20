@@ -172,7 +172,8 @@ logger = setup_logging()
 
 # Configure security
 is_development = os.getenv('FLASK_ENV') == 'development'
-Talisman(app,
+talisman = Talisman(
+    app,
     force_https=not is_development,
     force_https_permanent=True,
     content_security_policy={
@@ -182,13 +183,6 @@ Talisman(app,
         'style-src': ["'self'", "'unsafe-inline'"]
     }
 )
-
-# Disable HTTPS for health check endpoint
-@app.before_request
-def disable_https_for_health():
-    if request.path == '/health':
-        talisman = app.extensions['talisman']
-        talisman.force_https = False
 
 # Initialize Swagger documentation
 swagger = Swagger(app, template={
@@ -258,6 +252,9 @@ except Exception as e:
     logger.error(f"Failed to start scheduler: {e}")
     raise
 
+# Add scheduler to app context
+app.scheduler = scheduler
+
 # Initialize Prometheus metrics
 metrics = PrometheusMetrics(app)
 requests_total = Counter('requests_total', 'Total requests')
@@ -281,21 +278,6 @@ def check_redis_connection():
 
 def check_scheduler_status():
     return scheduler.running
-
-@app.route('/health')
-def health():
-    checks = {
-        'db': check_db_connection(),
-        'redis': check_redis_connection(),
-        'scheduler': check_scheduler_status()
-    }
-    status = all(checks.values())
-    response = {
-        'status': 'healthy' if status else 'unhealthy',
-        'checks': checks,
-        'timestamp': datetime.utcnow().isoformat()
-    }
-    return jsonify(response), 200 if status else 503
 
 def generate_webhook_secret():
     """Generate new webhook secret"""
@@ -447,6 +429,18 @@ def telegram_webhook():
             return jsonify({"error": str(e)}), 500
     
     abort(403)
+
+@app.errorhandler(Exception)
+def handle_error(error):
+    logger.error(f"Unhandled error: {str(error)}", exc_info=True)
+    code = 500
+    if isinstance(error, HTTPException):
+        code = error.code
+    return jsonify({
+        'status': 'error',
+        'message': str(error),
+        'code': code
+    }), code
 
 if __name__ == '__main__':
     with app.app_context():

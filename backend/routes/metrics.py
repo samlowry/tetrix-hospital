@@ -43,32 +43,41 @@ def health_check():
     responses:
       200:
         description: System is healthy
-      500:
+      503:
         description: System is unhealthy
     """
     try:
         # Check database connection
         db.session.execute(text('SELECT 1'))
-        
+        db_status = True
+    except Exception:
+        db_status = False
+
+    try:
         # Check Redis connection
         redis_client = current_app.extensions['redis']
         redis_client.ping()
-        
-        # Check metrics
-        metrics = Metrics.query.first()
-        if not metrics:
-            metrics = Metrics()
-            db.session.add(metrics)
-            db.session.commit()
-        
-        return jsonify({
-            'status': 'healthy',
-            'database': 'connected',
-            'redis': 'connected',
-            'last_metrics_update': metrics.last_updated.isoformat() if metrics.last_updated else None
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 500 
+        redis_status = True
+    except Exception:
+        redis_status = False
+
+    try:
+        # Check scheduler
+        scheduler = current_app.scheduler
+        scheduler_status = scheduler.running
+    except Exception:
+        scheduler_status = False
+
+    checks = {
+        'database': db_status,
+        'redis': redis_status,
+        'scheduler': scheduler_status
+    }
+
+    response = {
+        'status': 'healthy' if all(checks.values()) else 'unhealthy',
+        'checks': checks,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+    return jsonify(response), 200 if all(checks.values()) else 503
