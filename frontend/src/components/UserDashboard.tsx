@@ -43,9 +43,9 @@ export function UserDashboard() {
 
   return (
     <Card>
-      <Title>Validation Status</Title>
-      <Text>Wallet Validated Successfully</Text>
-      <Text>Please wait while we redirect you back to Telegram...</Text>
+      <Title>Статус проверки</Title>
+      <Text>Кошелёк успешно подтверждён</Text>
+      <Text>Возвращаемся к боту...</Text>
     </Card>
   );
 } 

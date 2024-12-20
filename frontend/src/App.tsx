@@ -33,8 +33,8 @@ const App: FC = () => {
                 <h1>TETRIX</h1>
             </Header>
             <Card>
-                <h2>Connect Your Wallet</h2>
-                <p className="hint-text">Use the button below to connect your TON wallet:</p>
+                <h2>Подключить кошелёк</h2>
+                <p className="hint-text">Нажми кнопку ниже, чтобы подключить TON кошелёк:</p>
                 <WalletConnect />
             </Card>
 
