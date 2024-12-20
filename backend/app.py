@@ -74,12 +74,9 @@ CORS(app, resources={
 if os.getenv('FLASK_ENV') != 'development':  # Default to production
     # Docker internal hostname and credentials - managed by docker-compose in prod
     db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'
-    redis_host = 'redis'  # Use Docker service name in production
 else:
     # Local dev setup with standard credentials
     db_url = 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix'
-    redis_host = 'localhost'  # Use localhost in development
-
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -88,7 +85,7 @@ db.init_app(app)
 
 # Redis configuration
 REDIS_CONFIG = {
-    'host': redis_host,  # Use the environment-specific host
+    'host': REDIS_HOST,
     'port': REDIS_PORT,
     'db': 0,
     'socket_timeout': 10,
@@ -99,8 +96,6 @@ REDIS_CONFIG = {
     'max_connections': 100,
     'decode_responses': False,
     'connection_pool': redis.ConnectionPool(
-        host=redis_host,  # Use the environment-specific host here too
-        port=REDIS_PORT,
         max_connections=100,
         retry_on_timeout=True,
         socket_timeout=10,
@@ -222,7 +217,10 @@ jobstores = {
     'default': RedisJobStore(
         jobs_key='scheduler.jobs',
         run_times_key='scheduler.runs',
-        **REDIS_CONFIG
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        socket_timeout=10,
+        retry_on_timeout=True
     )
 }
 
