@@ -248,24 +248,34 @@ class BotManager:
                 await update.message.reply_text("Error processing wallet address. Please try again later.")
 
     async def start_bot(self):
-        """Start bot with webhook"""
-        logger.info("Starting bot with webhook...")
+        """Start the bot with webhook"""
+        logger.info("Starting bot...")
         try:
+            # Initialize application
             await self.application.initialize()
             
-            # Set webhook
-            await self.application.bot.set_webhook(
-                url=f"{self.webhook_url}/telegram-webhook",
-                allowed_updates=['message', 'callback_query']
-            )
-            
-            # Start webhook
+            # Get current webhook info
+            webhook_info = await self.bot.get_webhook_info()
+            current_url = webhook_info.url
+            target_url = f"{self.webhook_url}/telegram-webhook"
+
+            # Only set webhook if URL is different
+            if current_url != target_url:
+                logger.info(f"Updating webhook from {current_url} to {target_url}")
+                await self.application.bot.set_webhook(
+                    url=target_url,
+                    allowed_updates=['message', 'callback_query']
+                )
+            else:
+                logger.info("Webhook URL is already correct, skipping update")
+
+            # Start application
             await self.application.start()
-            logger.info(f"Bot webhook set to {self.webhook_url}/telegram-webhook")
-            
+            logger.info("Bot started successfully")
+            return True
         except Exception as e:
-            logger.error(f"Error starting bot webhook: {e}")
-            raise
+            logger.error(f"Error starting bot: {e}")
+            return False
 
     async def stop_bot(self):
         """Stop the bot"""
