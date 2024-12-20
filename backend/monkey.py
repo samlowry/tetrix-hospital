@@ -4,19 +4,19 @@ import warnings
 # Ignore warnings about asyncio
 warnings.filterwarnings('ignore', category=RuntimeWarning, message='coroutine .* was never awaited')
 
-# Patch before any other imports
+# Patch only what we need, keeping threading intact for APScheduler
 monkey.patch_all(
     socket=True,
     dns=True,
     time=True,
     select=True,
-    thread=True,
+    thread=False,  # Don't patch threading
     os=True,
     ssl=True,
     httplib=False,
     subprocess=True,
     sys=False,
-    aggressive=True,
+    aggressive=False,  # Less aggressive patching
     Event=False,
     builtins=True,
     signal=True

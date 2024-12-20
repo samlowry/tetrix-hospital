@@ -235,15 +235,17 @@ scheduler = BackgroundScheduler(
     executors={
         'default': {
             'type': 'threadpool',
-            'max_workers': 10
+            'max_workers': 1  # Reduce to single worker
         }
-    }
+    },
+    timezone='UTC'
 )
 
 # Initialize scheduler with proper error handling
 try:
-    scheduler.start()
-    logger.info("Scheduler started successfully")
+    if not scheduler.running:
+        scheduler.start()
+        logger.info("Scheduler started successfully")
 except Exception as e:
     logger.error(f"Failed to start scheduler: {e}")
     raise
