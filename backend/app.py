@@ -88,13 +88,19 @@ REDIS_CONFIG = {
     'host': REDIS_HOST,
     'port': REDIS_PORT,
     'db': 0,
-    'socket_timeout': 30,
+    'socket_timeout': 10,
     'retry_on_timeout': True,
-    'socket_connect_timeout': 30,
+    'socket_connect_timeout': 10,
     'socket_keepalive': True,
-    'health_check_interval': 30,
-    'max_connections': 10,
-    'decode_responses': False
+    'health_check_interval': 15,
+    'max_connections': 100,
+    'decode_responses': False,
+    'connection_pool': redis.ConnectionPool(
+        max_connections=100,
+        retry_on_timeout=True,
+        socket_timeout=10,
+        socket_connect_timeout=10
+    )
 }
 
 # Initialize Redis client
@@ -398,6 +404,11 @@ def telegram_webhook():
             logger.info(f"Processing update from user: {user_id}")
             
             async def process_update():
+                # Initialize bot if not initialized
+                if not bot_manager.application._initialized:
+                    await bot_manager.application.initialize()
+                    await bot_manager.application.start()
+                
                 update = telegram.Update.de_json(json_data, bot_manager.bot)
                 
                 # Store user session if needed
