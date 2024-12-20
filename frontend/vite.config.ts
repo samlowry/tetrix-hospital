@@ -18,14 +18,9 @@ function generateManifest(): Plugin {
         privacyPolicyUrl: `${process.env.VITE_FRONTEND_URL}/privacy.html`
       };
 
-      // Ensure dist/public directory exists
-      if (!fs.existsSync('dist/public')) {
-        fs.mkdirSync('dist/public', { recursive: true });
-      }
-
-      // Write manifest file
+      // Write manifest file to dist root
       fs.writeFileSync(
-        'dist/public/tonconnect-manifest.json',
+        'dist/tonconnect-manifest.json',
         JSON.stringify(manifestContent, null, 2)
       );
     }
