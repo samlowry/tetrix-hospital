@@ -19,6 +19,9 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
+      with:
+        ref: production
+        fetch-depth: 0  # Fetch all history for proper versioning
 
     # Set up Docker Buildx for better caching
     - name: Set up Docker Buildx
