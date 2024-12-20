@@ -423,26 +423,32 @@ def telegram_webhook():
             logger.info(f"Processing update from user: {user_id}")
             
             async def process_update():
-                # Initialize bot if not initialized
-                if not bot_manager.application._initialized:
-                    await bot_manager.application.initialize()
-                    await bot_manager.application.start()
-                
-                update = telegram.Update.de_json(json_data, bot_manager.bot)
-                
-                # Store user session if needed
-                if user_id:
-                    session_data = json.dumps({
-                        'last_activity': int(time.time()),
-                        'update_type': (
-                            update.effective_message.text if update.effective_message 
-                            else update.callback_query.data if update.callback_query 
-                            else None
-                        )
-                    })
-                    set_user_session(user_id, session_data)
-                
-                await bot_manager.application.process_update(update)
+                try:
+                    # Initialize both bot and application if needed
+                    if not bot_manager.bot._initialized or not bot_manager.application._initialized:
+                        logger.info("Bot or application not initialized, initializing now...")
+                        await bot_manager.initialize()
+                    
+                    update = telegram.Update.de_json(json_data, bot_manager.bot)
+                    
+                    # Store user session if needed
+                    if user_id:
+                        session_data = json.dumps({
+                            'last_activity': int(time.time()),
+                            'update_type': (
+                                update.effective_message.text if update.effective_message 
+                                else update.callback_query.data if update.callback_query 
+                                else None
+                            )
+                        })
+                        set_user_session(user_id, session_data)
+                    
+                    logger.info("Processing update...")
+                    await bot_manager.application.process_update(update)
+                    logger.info("Update processed successfully")
+                except Exception as e:
+                    logger.error(f"Error processing update: {e}", exc_info=True)
+                    raise
             
             run_async(process_update())
             return 'ok'
@@ -475,18 +481,15 @@ def init_app(app):
             db.create_all()
             logger.info("Database tables created successfully")
             
-            # Initialize bot and start it
+            # Initialize bot and application
+            logger.info("Initializing bot manager...")
+            run_async(bot_manager.initialize())
+            logger.info("Bot manager initialized successfully")
+            
+            # Setup webhook
             logger.info("Setting up Telegram webhook...")
             webhook_result = run_async(setup_telegram_webhook())
             logger.info(f"Webhook setup result: {webhook_result}")
-            
-            logger.info("Initializing bot application...")
-            run_async(bot_manager.application.initialize())
-            logger.info("Bot application initialized")
-            
-            logger.info("Starting bot application...")
-            run_async(bot_manager.application.start())
-            logger.info("Bot application started")
             
             # Log final webhook status
             logger.info("Getting final webhook status...")

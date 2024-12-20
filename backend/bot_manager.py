@@ -34,6 +34,7 @@ class BotManager:
         # Setup webhook URL
         self.webhook_url = WEBHOOK_URL
         
+        # Build application but don't initialize yet
         self.application = Application.builder().token(token).build()
         self.redis = app.extensions['redis']
         
@@ -44,8 +45,27 @@ class BotManager:
             storage_uri=REDIS_URL
         )
         
+        # Setup handlers before initialization
         self.setup_handlers()
         logger.info("Bot manager initialized successfully")
+
+    async def initialize(self):
+        """Initialize both bot and application"""
+        logger.info("Initializing bot and application...")
+        try:
+            if not self.bot._initialized:
+                await self.bot.initialize()
+                logger.info("Bot initialized successfully")
+            
+            if not self.application._initialized:
+                await self.application.initialize()
+                await self.application.start()
+                logger.info("Application initialized and started successfully")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error during initialization: {e}")
+            raise
 
     def setup_handlers(self):
         """Setup bot command and callback handlers"""
