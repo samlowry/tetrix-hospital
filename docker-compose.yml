@@ -27,7 +27,6 @@ services:
       - POSTGRES_HOST=postgres
       - FRONTEND_URL=${FRONTEND_URL}
       - BACKEND_URL=${BACKEND_URL}
-      - WEBHOOK_URL=${BACKEND_URL}/telegram-webhook
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - POSTGRES_USER=tetrix
