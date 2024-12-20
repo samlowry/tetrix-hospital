@@ -1,8 +1,11 @@
 import multiprocessing
 import tempfile
 
-# Use fewer workers for better stability with gevent
-workers = multiprocessing.cpu_count()
+# Use single worker for better stability with gevent
+workers = 1
+
+# Use more threads for I/O operations
+threads = multiprocessing.cpu_count() * 2
 
 # Use gevent worker class for async support
 worker_class = 'gevent'
@@ -28,9 +31,6 @@ loglevel = 'info'
 
 # Bind address
 bind = '0.0.0.0:5000'
-
-# Enable threading
-threads = 4
 
 # Gevent specific settings
 worker_tmp_dir = tempfile.gettempdir()
