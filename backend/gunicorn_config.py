@@ -1,10 +1,13 @@
 import multiprocessing
 
-# Number of worker processes
-workers = multiprocessing.cpu_count() * 2 + 1
+# Use fewer workers for bot application
+workers = 2  # Reduced from cpu_count() * 2 + 1
 
-# Use sync worker class for stability
-worker_class = 'sync'
+# Use gevent worker class
+worker_class = 'gevent'
+
+# Worker connections for gevent
+worker_connections = 1000
 
 # Maximum requests before worker restart
 max_requests = 1000
@@ -22,11 +25,14 @@ loglevel = 'info'
 # Bind address
 bind = '0.0.0.0:5000'
 
-# Preload app for faster worker startup
-preload_app = True
+# Don't preload app with gevent
+preload_app = False
 
 # Allow forwarded IPs
 forwarded_allow_ips = '*'
 
 # Prevent worker timeout
 graceful_timeout = 120
+
+# Thread configuration
+threads = 4
