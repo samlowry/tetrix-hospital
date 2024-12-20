@@ -82,8 +82,12 @@ jobs:
           # Stop all services first
           docker-compose down
           
-          # Build and start all services
-          docker-compose up -d --build
+          # Save current images for cleanup
+          OLD_IMAGES=$(docker images -q tetrix-hospital_app)
+          
+          # Build and start all services with build cache
+          DOCKER_BUILDKIT=1 docker-compose build --build-arg BUILDKIT_INLINE_CACHE=1
+          docker-compose up -d
           
           # Show logs for debugging
           echo "App logs:"
@@ -94,8 +98,14 @@ jobs:
           # Show running containers and their status
           docker ps -a
           
-          # Clean only dangling images
-          docker image prune -f
+          # Remove old app images but keep the last one
+          if [ ! -z "$OLD_IMAGES" ]; then
+            echo "Cleaning up old images..."
+            docker rmi $OLD_IMAGES || true
+          fi
+          
+          # Clean up build cache older than 7 days
+          docker builder prune -f --filter until=168h
 
     # Verify deployment with retries
     - name: Check deployment
@@ -107,7 +117,7 @@ jobs:
         script: |
           cd /opt/tetrix-hospital
           for i in {1..10}; do
-            if curl -f "http://localhost:5000/health"; then
+            if docker exec tetrix-hospital_app_1 curl -f "http://localhost:5000/health"; then
               echo "All services are healthy"
               exit 0
             fi
