@@ -23,6 +23,7 @@ else:
     frontend_domain = urlparse(frontend_url).netloc
 
 ALLOWED_DOMAINS = [
+    'ton-connect.github.io',  # Required for TON Connect
     'localhost:5173',
     'localhost',
     frontend_domain
