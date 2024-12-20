@@ -7,6 +7,9 @@ workers = multiprocessing.cpu_count()
 # Use gevent worker class for async support
 worker_class = 'gevent'
 
+# Prevent gunicorn from doing its own monkey patching
+enable_monkey_patching = False
+
 # Increase worker connections for better concurrency
 worker_connections = 1000
 
