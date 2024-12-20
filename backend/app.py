@@ -174,8 +174,8 @@ logger = setup_logging()
 is_development = os.getenv('FLASK_ENV') == 'development'
 talisman = Talisman(
     app,
-    force_https=not is_development,
-    force_https_permanent=True,
+    force_https=False,  # Disable HTTPS redirection
+    force_https_permanent=False,
     content_security_policy={
         'default-src': "'self'",
         'img-src': '*',
