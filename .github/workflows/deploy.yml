@@ -20,6 +20,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    # Set up Docker Buildx for better caching
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        install: true  # This makes buildx available for docker-compose
+
     # Generate self-signed SSL certificate for initial setup
     - name: Generate SSL Certificate
       run: |
@@ -85,8 +91,11 @@ jobs:
           # Save current images for cleanup
           OLD_IMAGES=$(docker images -q tetrix-hospital_app)
           
-          # Build and start all services with build cache
-          DOCKER_BUILDKIT=1 docker-compose build --build-arg BUILDKIT_INLINE_CACHE=1
+          # Build and start services with BuildKit caching
+          DOCKER_BUILDKIT=1 docker-compose build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from type=registry,ref=tetrix-hospital_app:latest \
+            --cache-to type=inline
           docker-compose up -d
           
           # Show logs for debugging
