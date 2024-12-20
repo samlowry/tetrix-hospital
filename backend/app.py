@@ -55,14 +55,14 @@ from services.telegram_service import TelegramService
 app = Flask(__name__)
 
 # Setup CORS
-cors_origins = [
-    'http://localhost:3000',
-    'https://tetrix-hospital.pages.dev',
-    'https://3bb1-109-245-96-58.ngrok-free.app'
-]
+frontend_url = os.getenv('FRONTEND_URL')
+if not frontend_url:
+    logger.warning("FRONTEND_URL not set, defaulting to localhost")
+    frontend_url = 'http://localhost:3000'
+
 CORS(app, resources={
     r"/*": {
-        "origins": cors_origins,
+        "origins": [frontend_url],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
         "expose_headers": ["Content-Type", "Authorization"],
