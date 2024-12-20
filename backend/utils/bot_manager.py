@@ -1,11 +1,39 @@
 import os
-from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application
+from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.ext import Application, CallbackContext
 import httpx
-from telegram.error import TimedOut, NetworkError
+from telegram.error import TimedOut, NetworkError, TelegramError
 import logging
+import asyncio
+from functools import wraps
 
 logger = logging.getLogger('tetrix')
+
+def retry_on_timeout(max_retries=3, initial_delay=1):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            delay = initial_delay
+            last_exception = None
+            
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except (TimedOut, NetworkError) as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Attempt {attempt + 1} failed with {str(e)}, retrying in {delay}s...")
+                        await asyncio.sleep(delay)
+                        delay *= 2
+                    else:
+                        logger.error(f"All {max_retries} attempts failed")
+                except Exception as e:
+                    logger.error(f"Unexpected error: {e}")
+                    raise
+            
+            raise last_exception
+        return wrapper
+    return decorator
 
 def create_inline_keyboard(buttons: list[dict]) -> InlineKeyboardMarkup:
     """Create inline keyboard from button list."""
@@ -17,6 +45,44 @@ def create_inline_keyboard(buttons: list[dict]) -> InlineKeyboardMarkup:
             url=button.get('url')
         )])
     return InlineKeyboardMarkup(keyboard)
+
+@retry_on_timeout(max_retries=3, initial_delay=1)
+async def handle_callback(update: Update, context: CallbackContext):
+    """Handle callback query with retries."""
+    query = update.callback_query
+    try:
+        # Answer callback query first
+        await query.answer()
+        
+        # Process the callback data
+        callback_data = query.data
+        if callback_data == "start":
+            # Handle start callback
+            keyboard = create_inline_keyboard([
+                {"text": "Connect Wallet", "callback_data": "connect"}
+            ])
+            await query.message.edit_text(
+                "Welcome to TETRIX! Please connect your wallet to continue.",
+                reply_markup=keyboard
+            )
+        elif callback_data == "connect":
+            # Handle connect callback
+            keyboard = create_inline_keyboard([
+                {"text": "Open TON Connect", "url": "https://ton-connect.github.io/"}
+            ])
+            await query.message.edit_text(
+                "Please connect your TON wallet to continue.",
+                reply_markup=keyboard
+            )
+    except (TimedOut, NetworkError) as e:
+        logger.error(f"Network error in callback handler: {e}")
+        raise
+    except TelegramError as e:
+        logger.error(f"Telegram error in callback handler: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in callback handler: {e}")
+        raise
 
 async def init_bot(bot_token: str = None):
     """Initialize bot with webhook if URL is provided."""
@@ -44,7 +110,8 @@ async def init_bot(bot_token: str = None):
         request=httpx.AsyncClient(
             timeout=timeout,
             pool=connection_pool,
-            http2=True
+            http2=True,
+            retries=3
         )
     )
     
