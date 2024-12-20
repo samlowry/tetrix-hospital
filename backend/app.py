@@ -93,7 +93,20 @@ REDIS_CONFIG = {
     'socket_connect_timeout': 30,
     'socket_keepalive': True,
     'health_check_interval': 30,
-    'max_connections': 3
+    'max_connections': 10,
+    'decode_responses': False,
+    'retry_on_error': [redis.exceptions.ConnectionError],
+    'retry_on_timeout': True,
+    'retry_on_connection_error': True,
+    'retry_on_connection_timeout': True,
+    'retry_on_connection_reset': True,
+    'retry_on_connection_refused': True,
+    'retry_on_connection_aborted': True,
+    'retry_on_connection_closed': True,
+    'retry_on_connection_lost': True,
+    'retry_on_connection_failure': True,
+    'retry_on_connection_error_max_times': 3,
+    'retry_on_connection_error_wait_seconds': 1
 }
 
 # Initialize Redis client
@@ -146,7 +159,17 @@ def set_user_session(user_id, session_data):
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
     'CACHE_REDIS_URL': f"redis://{REDIS_CONFIG['host']}:{REDIS_CONFIG['port']}/{REDIS_CONFIG['db']}",
-    'CACHE_DEFAULT_TIMEOUT': 300
+    'CACHE_DEFAULT_TIMEOUT': 300,
+    'CACHE_KEY_PREFIX': 'tetrix:cache:',
+    'CACHE_REDIS_HOST': REDIS_CONFIG['host'],
+    'CACHE_REDIS_PORT': REDIS_CONFIG['port'],
+    'CACHE_REDIS_DB': REDIS_CONFIG['db'],
+    'CACHE_OPTIONS': {
+        'socket_timeout': REDIS_CONFIG['socket_timeout'],
+        'socket_connect_timeout': REDIS_CONFIG['socket_connect_timeout'],
+        'socket_keepalive': REDIS_CONFIG['socket_keepalive'],
+        'retry_on_timeout': REDIS_CONFIG['retry_on_timeout']
+    }
 })
 cache.init_app(app)
 limiter.init_app(app)
@@ -210,12 +233,12 @@ scheduler = BackgroundScheduler(
     job_defaults={
         'coalesce': True,
         'max_instances': 1,
-        'misfire_grace_time': 60  # Add grace time for misfired jobs
+        'misfire_grace_time': 60
     },
     executors={
         'default': {
             'type': 'threadpool',
-            'max_workers': 10  # Reduced from 20 to prevent overwhelming
+            'max_workers': 10
         }
     }
 )
