@@ -71,12 +71,8 @@ CORS(app, resources={
 })
 
 # Configure database
-if os.getenv('FLASK_ENV') != 'development':  # Default to production
-    # Docker internal hostname and credentials - managed by docker-compose in prod
-    db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'
-else:
-    # Local dev setup with standard credentials
-    db_url = 'postgresql+psycopg://tetrix:tetrixpass@localhost:5432/tetrix'
+# Always use container names for services
+db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

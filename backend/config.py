@@ -23,12 +23,8 @@ WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
 # Redis
 # Standard Redis port - no need to make configurable as it's industry standard
 REDIS_PORT = 6379
-# Docker internal hostname and local dev hostname - controlled by docker-compose in prod
-REDIS_HOST_PROD = 'redis'
-REDIS_HOST_DEV = 'localhost'
-
-# Redis connection settings
-REDIS_HOST = REDIS_HOST_DEV if os.getenv('FLASK_ENV') == 'development' else REDIS_HOST_PROD
+# Always use redis as host for both dev and prod
+REDIS_HOST = 'redis'
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 # Construct webhook URL
