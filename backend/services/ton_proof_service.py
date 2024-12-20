@@ -24,6 +24,7 @@ else:
 
 ALLOWED_DOMAINS = [
     'ton-connect.github.io',  # Required for TON Connect
+    'dev.tetrix-webapp.pages.dev',
     'localhost:5173',
     'localhost',
     frontend_domain

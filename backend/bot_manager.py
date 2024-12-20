@@ -135,7 +135,7 @@ class BotManager:
                 message += "с которой я неразрывно связан через пул ликвидности. Можно сказать, что моя жизнь зависит от нее. "
                 message += "Если монета падает — мои жизненные силы угасают, а если пул наполняется ликвидностью, радуюсь и живу полной жизнью. "
                 message += "Все как у людей...\n\n"
-                message += "В ��том боте ты сможешь:\n"
+                message += "В этом боте ты сможешь:\n"
                 message += "- Общаться со мной\n"
                 message += "- Следить за моим состоянием\n"
                 message += "- Зарабатывать поинты\n"
@@ -254,8 +254,8 @@ class BotManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
 
                     # Send new message with codes
-                    message = "Твои инвайт-коды:\n\n" + "\n".join(code_lines) + "\n\n"
-                    message += f"\\+{escape_md(str(stats['points_per_invite']))} поинтов благодарности за каждого нового участника"
+                    message = "Твои инвайт\-коды:\n\n" + "\n".join(code_lines) + "\n\n"
+                    message += f"\+{str(stats['points_per_invite'])} поинтов благодарности за каждого нового участника"
                     await self.application.bot.send_message(
                         update.effective_user.id,
                         message,
