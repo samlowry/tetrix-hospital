@@ -11,12 +11,19 @@ import logging
 import hashlib
 import hmac
 import json
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 from base64 import b64decode
 import nacl.signing
 
 logger = logging.getLogger('tetrix')
-DOMAIN = os.getenv('DOMAIN', '3bb1-109-245-96-58.ngrok-free.app')  # Use ngrok URL as default
+
+# Get domain from FRONTEND_URL
+frontend_url = os.getenv('FRONTEND_URL')
+if not frontend_url:
+    logger.error("FRONTEND_URL not set")
+    DOMAIN = 'localhost'
+else:
+    DOMAIN = urlparse(frontend_url).netloc
 
 def parse_init_data(init_data: str) -> dict:
     """Parse and validate Telegram WebApp init data"""
