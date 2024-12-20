@@ -26,7 +26,8 @@ ALLOWED_DOMAINS = [
     'ton-connect.github.io',  # Required for TON Connect
     'localhost:5173',
     'localhost',
-    frontend_domain
+    frontend_domain,
+    'dev.tetrix-webapp.pages.dev'  # Add dev subdomain
 ]
 VALID_AUTH_TIME = 15 * 60  # 15 minutes
 
@@ -133,7 +134,7 @@ class TonProofService:
             logger.info(f"Timestamp: {timestamp}")
             logger.info(f"Address: {address.to_string()}")
             
-            verify_key.verify(result, signature)  # Verify the final hash with the signature
+            verify_key.verify(msg, signature)  # Verify the original message with the signature
             logger.info("Signature verified successfully")
             return True
 

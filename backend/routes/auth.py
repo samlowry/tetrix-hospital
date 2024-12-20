@@ -7,6 +7,9 @@ from utils.decorators import limiter, log_api_call
 import logging
 import os
 from urllib.parse import urlparse
+from services.ton_proof_service import TON_PROOF_PREFIX
+from tonsdk.utils import Address
+import hashlib
 
 auth = Blueprint('auth', __name__)
 payloads = {}  # In-memory storage for payloads
@@ -87,15 +90,47 @@ def register_user():
         for p in payloads_to_remove:
             payloads.pop(p)
 
+        # Parse address
+        addr = Address(address)
+        if not addr:
+            return jsonify({'error': 'Invalid address'}), 400
+
+        # Prepare message components
+        wc = addr.wc.to_bytes(4, byteorder='big')
+        ts = proof['timestamp'].to_bytes(8, byteorder='little')
+        dl = proof['domain']['lengthBytes'].to_bytes(4, byteorder='little')
+        
+        # Construct message
+        msg = b''.join([
+            TON_PROOF_PREFIX,
+            wc,
+            addr.hash_part,
+            dl,
+            proof['domain']['value'].encode(),
+            ts,
+            proof['payload'].encode()
+        ])
+        
+        # Calculate message hash
+        msg_hash = hashlib.sha256(msg).digest()
+        
+        # Construct full message with prefix
+        full_msg = b''.join([
+            bytes([0xff, 0xff]),
+            b'ton-connect',
+            msg_hash
+        ])
+        
+        # Calculate final hash
+        result = hashlib.sha256(full_msg).digest()
+        
         # Verify signature
+        signature = b64decode(proof['signature'])
+        public_key = b64decode(proof['public_key'])
+        
+        verify_key = VerifyKey(public_key)
         try:
-            message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
-            message_bytes = message.encode()
-            signature = b64decode(proof['signature'])
-            public_key = b64decode(proof['public_key'])
-            
-            verify_key = VerifyKey(public_key)
-            verify_key.verify(message_bytes, signature)
+            verify_key.verify(result, signature)
             logger.info("Signature verification successful")
         except Exception as e:
             logger.error(f"Signature verification failed: {e}")
@@ -135,7 +170,7 @@ def register_user():
         })
 
     except Exception as e:
-        logger.error(f"Registration error: {e}")
+        logger.error(f"Error registering user: {e}")
         return jsonify({'error': str(e)}), 500
 
 @auth.route('/check_proof', methods=['POST'])
@@ -151,9 +186,39 @@ def check_proof():
         if not all([address, proof]):
             return jsonify({'error': 'Missing required fields'}), 400
             
-        # Reconstruct message
-        message = f"ton-proof-item-v2/{len(DOMAIN)}/{DOMAIN}/{address}/{proof['timestamp']}/{proof['payload']}"
-        message_bytes = message.encode()
+        # Parse address
+        addr = Address(address)
+        if not addr:
+            return jsonify({'error': 'Invalid address'}), 400
+
+        # Prepare message components
+        wc = addr.wc.to_bytes(4, byteorder='big')
+        ts = proof['timestamp'].to_bytes(8, byteorder='little')
+        dl = proof['domain']['lengthBytes'].to_bytes(4, byteorder='little')
+        
+        # Construct message
+        msg = b''.join([
+            TON_PROOF_PREFIX,
+            wc,
+            addr.hash_part,
+            dl,
+            proof['domain']['value'].encode(),
+            ts,
+            proof['payload'].encode()
+        ])
+        
+        # Calculate message hash
+        msg_hash = hashlib.sha256(msg).digest()
+        
+        # Construct full message with prefix
+        full_msg = b''.join([
+            bytes([0xff, 0xff]),
+            b'ton-connect',
+            msg_hash
+        ])
+        
+        # Calculate final hash
+        result = hashlib.sha256(full_msg).digest()
         
         # Verify signature
         signature = b64decode(proof['signature'])
@@ -161,7 +226,7 @@ def check_proof():
         
         verify_key = VerifyKey(public_key)
         try:
-            verify_key.verify(message_bytes, signature)
+            verify_key.verify(result, signature)
             return jsonify({'status': 'success'})
         except Exception as e:
             return jsonify({'error': 'Invalid signature'}), 401
