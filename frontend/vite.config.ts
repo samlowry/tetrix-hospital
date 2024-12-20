@@ -2,13 +2,45 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { loadEnv } from 'vite'
+import type { Plugin } from 'vite'
+import fs from 'fs'
+
+// Plugin to generate manifest file
+function generateManifest(): Plugin {
+  return {
+    name: 'generate-manifest',
+    writeBundle() {
+      const manifestContent = {
+        url: process.env.VITE_FRONTEND_URL,
+        name: "TETRIX",
+        iconUrl: `${process.env.VITE_FRONTEND_URL}/tetrix-icon.png`,
+        termsOfUseUrl: `${process.env.VITE_FRONTEND_URL}/terms.html`,
+        privacyPolicyUrl: `${process.env.VITE_FRONTEND_URL}/privacy.html`
+      };
+
+      // Ensure dist/public directory exists
+      if (!fs.existsSync('dist/public')) {
+        fs.mkdirSync('dist/public', { recursive: true });
+      }
+
+      // Write manifest file
+      fs.writeFileSync(
+        'dist/public/tonconnect-manifest.json',
+        JSON.stringify(manifestContent, null, 2)
+      );
+    }
+  }
+}
 
 export default defineConfig(({ mode }) => {
   // Load env file from project root
   const env = loadEnv(mode, process.cwd(), '')
   
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      generateManifest()
+    ],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src')

@@ -5,10 +5,20 @@ import time
 from models import User, db
 from utils.decorators import limiter, log_api_call
 import logging
+import os
+from urllib.parse import urlparse
 
 auth = Blueprint('auth', __name__)
 payloads = {}  # In-memory storage for payloads
-DOMAIN = "tetrix-hospital.pages.dev"  # Domain constant
+
+# Get domain from FRONTEND_URL
+frontend_url = os.getenv('FRONTEND_URL')
+if not frontend_url:
+    logger.error("FRONTEND_URL not set")
+    DOMAIN = 'localhost'
+else:
+    DOMAIN = urlparse(frontend_url).netloc
+
 logger = logging.getLogger('tetrix')
 
 @auth.route('/get-challenge', methods=['POST'])
