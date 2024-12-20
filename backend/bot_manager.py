@@ -135,7 +135,7 @@ class BotManager:
                 message += "с которой я неразрывно связан через пул ликвидности. Можно сказать, что моя жизнь зависит от нее. "
                 message += "Если монета падает — мои жизненные силы угасают, а если пул наполняется ликвидностью, радуюсь и живу полной жизнью. "
                 message += "Все как у людей...\n\n"
-                message += "В этом боте ты сможешь:\n"
+                message += "В ��том боте ты сможешь:\n"
                 message += "- Общаться со мной\n"
                 message += "- Следить за моим состоянием\n"
                 message += "- Зарабатывать поинты\n"
@@ -232,6 +232,7 @@ class BotManager:
                         return
                     
                     codes = user.get_invite_codes()
+                    stats = user.get_stats()  # Get stats before using it
                     
                     # Format invite codes
                     code_lines = []
@@ -400,16 +401,13 @@ class BotManager:
                 health_bar = "\\[" + "█" * filled + "░" * (bar_length - filled) + "\\]"
                 
                 # Format message with escaped characters
-                message = f"""
-Мои жизненные показатели:
-`{health_bar} {escape_md(f"{health_percentage:.1f}")}%`
-
-Вот сколько ты уже заработал поинтов моей благодарности: {escape_md(str(stats['points']))}
-
-За что ты их получил:
-За холдинг: {escape_md(str(stats['points_breakdown']['holding']))}
-За инвайты: {escape_md(str(stats['points_breakdown']['invites']))}
-Бонус для старых друзей: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))}"""
+                message = "Мои жизненные показатели:"
+                message += f"\n`{health_bar} {escape_md(f'{health_percentage:.1f}')}%`\n\n"
+                message += f"Вот сколько ты уже заработал поинтов моей благодарности: {escape_md(str(stats['points']))}\n\n"
+                message += "За что ты их получил:\n"
+                message += f"За холдинг: {escape_md(str(stats['points_breakdown']['holding']))}\n"
+                message += f"За инвайты: {escape_md(str(stats['points_breakdown']['invites']))}\n"
+                message += f"Бонус для старых друзей: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))}"
 
                 # Add buttons for actions
                 keyboard = [
@@ -443,7 +441,7 @@ class BotManager:
                 # Format message for regular users
                 message = "*Кошелек подключен, но я не чувствую связи\\.\\.\\.*\n\n"
                 message += "Похоже, в твоём кошельке нет \\$TETRIX\\. Для того, чтобы помочь мне выжить "
-                message += "\\(и получить поинты моей благодарности\\) купи хотя бы 1 токен на одной из этих площадок:\n\n"
+                message += "\\(и получить поинты моей благодарности\\) купи хотя бы 1 токен на одной из эти�� площадок:\n\n"
                 message += "\\- [Geckoterminal](https://www\\.geckoterminal\\.com/ton/pools/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
                 message += "\\- [Dexscreener](https://dexscreener\\.com/ton/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
                 message += "\\- [Blum](https://t\\.me/blum/app?startapp=memepadjetton\\_TETRIX\\_fcNMl\\-ref\\_NJU05j3Sv4)"
