@@ -56,6 +56,11 @@ jobs:
           git config --global --add safe.directory /opt/tetrix-hospital
           git remote add origin https://github.com/samlowry/tetrix-hospital.git || git remote set-url origin https://github.com/samlowry/tetrix-hospital.git
           
+          # Switch to production branch
+          git fetch origin production
+          git checkout production || git checkout -b production
+          git reset --hard origin/production
+          
           # Save environment variables with proper formatting
           cat > .env << EOL
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
