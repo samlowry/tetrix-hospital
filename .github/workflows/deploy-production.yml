@@ -12,7 +12,7 @@ jobs:
       - name: Deploy to production server
         uses: appleboy/ssh-action@master
         with:
-          host: tetrix.hospital.backend.host
+          host: ${{ vars.PROD_HOST }}
           username: root
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
