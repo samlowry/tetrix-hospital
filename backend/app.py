@@ -94,19 +94,7 @@ REDIS_CONFIG = {
     'socket_keepalive': True,
     'health_check_interval': 30,
     'max_connections': 10,
-    'decode_responses': False,
-    'retry_on_error': [redis.exceptions.ConnectionError],
-    'retry_on_timeout': True,
-    'retry_on_connection_error': True,
-    'retry_on_connection_timeout': True,
-    'retry_on_connection_reset': True,
-    'retry_on_connection_refused': True,
-    'retry_on_connection_aborted': True,
-    'retry_on_connection_closed': True,
-    'retry_on_connection_lost': True,
-    'retry_on_connection_failure': True,
-    'retry_on_connection_error_max_times': 3,
-    'retry_on_connection_error_wait_seconds': 1
+    'decode_responses': False
 }
 
 # Initialize Redis client
