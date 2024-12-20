@@ -100,7 +100,9 @@ REDIS_CONFIG = {
         max_connections=100,
         retry_on_timeout=True,
         socket_timeout=10,
-        socket_connect_timeout=10
+        socket_connect_timeout=10,
+        host=REDIS_HOST,
+        port=REDIS_PORT
     )
 }
 
@@ -153,12 +155,9 @@ def set_user_session(user_id, session_data):
 # Configure cache
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_URL': f"redis://{REDIS_CONFIG['host']}:{REDIS_CONFIG['port']}/{REDIS_CONFIG['db']}",
+    'CACHE_REDIS_URL': REDIS_URL,  # Use centralized Redis URL
     'CACHE_DEFAULT_TIMEOUT': 300,
     'CACHE_KEY_PREFIX': 'tetrix:cache:',
-    'CACHE_REDIS_HOST': REDIS_CONFIG['host'],
-    'CACHE_REDIS_PORT': REDIS_CONFIG['port'],
-    'CACHE_REDIS_DB': REDIS_CONFIG['db'],
     'CACHE_OPTIONS': {
         'socket_timeout': REDIS_CONFIG['socket_timeout'],
         'socket_connect_timeout': REDIS_CONFIG['socket_connect_timeout'],
