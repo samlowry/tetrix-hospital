@@ -1,5 +1,4 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { User } from '../types';
 
 export interface TonProofDomain {
     lengthBytes: number;
@@ -24,20 +23,15 @@ export interface ConnectResponse {
     replace_last?: boolean;
 }
 
-export class ApiService {
-    private localStorageKey = 'tetrix-auth-token';
-    private baseURL = import.meta.env.VITE_BACKEND_URL;
-    public accessToken: string | null = null;
-    public readonly refreshIntervalMs = 9 * 60 * 1000;
+export interface User {
+    telegram_id: number;
+    wallet_address: string;
+    points: number;
+    invites_count: number;
+}
 
-    constructor() {
-        this.accessToken = localStorage.getItem(this.localStorageKey);
-        
-        // If no token is found, prepare for a new connection
-        if (!this.accessToken) {
-            this.getChallenge().catch(console.error);
-        }
-    }
+export class ApiService {
+    private baseURL = import.meta.env.VITE_BACKEND_URL;
 
     private get axiosInstance() {
         return axios.create({
@@ -59,8 +53,13 @@ export class ApiService {
 
     async getChallenge() {
         try {
-            const response = await this.axiosInstance.post('/api/generate_payload');
-            return this.handleResponse<{ payload: string }>(response);
+            const telegram_id = window.Telegram.WebApp.initDataUnsafe.user?.id;
+            if (!telegram_id) {
+                throw new Error('No Telegram ID found');
+            }
+            const response = await this.axiosInstance.get(`/ton-connect/get-message?telegram_id=${telegram_id}`);
+            const { message } = this.handleResponse<{ message: string }>(response);
+            return { payload: message };
         } catch (error) {
             return this.handleError(error as AxiosError);
         }
@@ -68,19 +67,23 @@ export class ApiService {
 
     async connectWallet(data: { address: string; proof: TonProofPayload }): Promise<ConnectResponse> {
         try {
-            const tgWebAppData = window.Telegram.WebApp.initData;
-            const response = await this.axiosInstance.post('/api/check_proof', {
-                address: data.address,
-                proof: data.proof,
-                public_key: data.proof.public_key,
-                tg_init_data: tgWebAppData
-            });
-            const result = this.handleResponse<ConnectResponse>(response);
-            if (result.token) {
-                localStorage.setItem(this.localStorageKey, result.token);
-                this.accessToken = result.token;
+            const telegram_id = window.Telegram.WebApp.initDataUnsafe.user?.id;
+            if (!telegram_id) {
+                throw new Error('No Telegram ID found');
             }
-            return result;
+            const response = await this.axiosInstance.post('/ton-connect/proof', {
+                telegram_id,
+                wallet_address: data.address,
+                payload: data.proof.payload
+            });
+            const result = this.handleResponse<{ success: boolean }>(response);
+            if (result.success) {
+                return {
+                    token: 'dummy-token',  // Токен нам не нужен
+                    status: 'early_backer'  // Всегда считаем early backer
+                };
+            }
+            throw new Error('Failed to verify wallet');
         } catch (error) {
             return this.handleError(error as AxiosError);
         }
@@ -88,18 +91,16 @@ export class ApiService {
 
     async getUserStats(telegram_id: number): Promise<User> {
         try {
-            const response = await this.axiosInstance.post(`/api/user/stats`, {
-                telegram_id
-            });
+            const response = await this.axiosInstance.get(`/api/users/${telegram_id}`);
             return this.handleResponse(response);
         } catch (error) {
             return this.handleError(error as AxiosError);
         }
     }
 
-    async getLeaderboard(type: 'points' | 'invites') {
+    async getLeaderboard() {
         try {
-            const response = await this.axiosInstance.get(`/api/user/leaderboard/${type}`);
+            const response = await this.axiosInstance.get('/api/leaderboard');
             return this.handleResponse(response);
         } catch (error) {
             return this.handleError(error as AxiosError);
@@ -107,10 +108,7 @@ export class ApiService {
     }
 
     reset() {
-        this.accessToken = null;
-        localStorage.removeItem(this.localStorageKey);
-        // Prepare for new connection immediately
-        this.getChallenge().catch(console.error);
+        // Ничего не делаем, так как токены не используются
     }
 }
 

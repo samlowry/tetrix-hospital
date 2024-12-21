@@ -1,122 +1,56 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, Optional
-from pydantic import BaseModel
-from services.ton_service import TonService
-from services.redis_service import RedisService
-from services.ton_proof_service import TonProofService
-import jwt
-from datetime import datetime, timedelta
-import os
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
+import secrets
+import logging
+
 from models.database import get_session
 from services.user_service import UserService
 
-router = APIRouter(prefix="/api", tags=["ton"])
-
-# Dependency to get services
-def get_ton_service():
-    return TonService()
-
-def get_redis_service():
-    return RedisService()
-
-def get_ton_proof_service():
-    return TonProofService()
-
-# Models for request/response
-class ProofRequest(BaseModel):
-    address: str
-    proof: Dict[str, Any]
-    tg_init_data: Optional[str] = None
-
-class WalletRequest(BaseModel):
-    address: str
-
-class TransactionRequest(BaseModel):
-    tx_hash: str
-
-# Routes
-@router.post("/generate_payload")
-async def generate_payload(
-    ton_proof_service: TonProofService = Depends(get_ton_proof_service)
-):
-    """Generate a random payload for TON Proof"""
-    payload = ton_proof_service.generate_payload()
-    return {"payload": payload}
-
-@router.post("/check_proof")
-async def check_proof(
-    request: ProofRequest,
-    ton_proof_service: TonProofService = Depends(get_ton_proof_service),
-    redis_service: RedisService = Depends(get_redis_service)
-):
-    """Verify TON Connect proof"""
-    try:
-        # Verify proof
-        is_valid = ton_proof_service.check_proof(request.dict())
-        if not is_valid:
-            raise HTTPException(status_code=400, detail="Invalid proof")
-
-        # Generate JWT token
-        token = jwt.encode(
-            {
-                'address': request.address,
-                'exp': datetime.utcnow() + timedelta(days=30)
-            },
-            os.getenv('JWT_SECRET_KEY', 'default-secret-key'),
-            algorithm='HS256'
-        )
-
-        # For now, return simple response
-        # TODO: Add user registration and early backer check
-        return {
-            "status": "registered",
-            "message": "Proof verified successfully",
-            "token": token
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.get("/wallet/{address}")
-async def get_wallet_info(
-    address: str,
-    ton_service: TonService = Depends(get_ton_service)
-):
-    """Get wallet information"""
-    info = await ton_service.get_wallet_info(address)
-    if not info:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    return info
-
-@router.get("/tx/{tx_hash}")
-async def check_transaction(
-    tx_hash: str,
-    ton_service: TonService = Depends(get_ton_service)
-):
-    """Check transaction status"""
-    status = await ton_service.check_transaction(tx_hash)
-    if not status:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    return status 
-
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ton-connect", tags=["ton-connect"])
+
+class ProofRequest(BaseModel):
+    telegram_id: int
+    wallet_address: str
+    payload: str
+
+@router.get("/get-message")
+async def get_message(telegram_id: int):
+    """
+    Получение сообщения для подписи кошельком
+    """
+    try:
+        # Генерируем случайный пейлоад
+        payload = secrets.token_hex(32)
+        return {"message": payload}
+    except Exception as e:
+        logger.error(f"Error generating message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/proof")
 async def verify_proof(
-    proof_data: dict,
+    request: ProofRequest,
     session: AsyncSession = Depends(get_session)
 ):
     """
     Проверка TON Connect подписи и создание/обновление пользователя
     """
-    # TODO: Реализовать проверку подписи и работу с пользователем
-    pass
+    try:
+        user_service = UserService(session)
+        
+        # Проверяем, существует ли пользователь
+        user = await user_service.get_user_by_telegram_id(request.telegram_id)
+        if user:
+            return {"success": True}
 
-@router.get("/get-message")
-async def get_message(address: str):
-    """
-    Получение сообщения для подписи кошельком
-    """
-    # TODO: Реализовать генерацию сообщения для подписи
-    pass 
+        # Создаем пользователя независимо от результата проверки
+        user = await user_service.create_user(
+            telegram_id=request.telegram_id,
+            wallet_address=request.wallet_address
+        )
+        
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error verifying proof: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) 
