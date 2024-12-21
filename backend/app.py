@@ -42,7 +42,7 @@ import time
 from datetime import datetime
 
 from models import db, User
-from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
+from routes import user_bp, metrics_bp, ton_connect_bp
 from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
@@ -201,7 +201,6 @@ swagger = Swagger(app, template={
 ton_client = TonClient()
 
 # Register blueprints
-app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(user_bp, url_prefix='/user')
 app.register_blueprint(metrics_bp, url_prefix='/')
 app.register_blueprint(ton_connect_bp)
