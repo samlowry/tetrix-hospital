@@ -109,19 +109,24 @@ app.extensions['redis'] = redis_client
 
 # Redis keys for bot state
 REDIS_KEYS = {
-    'initialized': 'bot:initialized',
-    'webhook_url': 'bot:webhook_url',
+    'bot': 'bot',
     'bot_state': 'bot:state',
-    'user_sessions': 'bot:user_sessions:{}',  # Format with user_id
-    'webhook_secret': 'webhook_secret',
-    'webhook_lock': 'webhook_lock'
+    'bot_data': 'bot:data',
+    'webhook_url': 'bot:webhook_url',
+    'user_data': 'bot:user_data',
+    'chat_data': 'bot:chat_data',
+    'callback_data': 'bot:callback_data',
+    'conversations': 'bot:conversations',
+    'user_sessions': 'user_sessions',
 }
 
 
 def get_bot_state():
     """Get bot state from Redis"""
     state = redis_client.get(REDIS_KEYS['bot_state'])
-    return state.decode('utf-8') if state else None
+    if not state:
+        return None
+    return state.decode('utf-8')
 
 
 def set_bot_state(state):
@@ -237,98 +242,6 @@ def check_redis_connection():
         return True
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
-        return False
-
-
-def generate_webhook_secret():
-    """Generate new webhook secret"""
-    import secrets
-    return secrets.token_urlsafe(32)
-
-
-def get_webhook_secret():
-    """Get webhook secret from Redis"""
-    secret = redis_client.get(REDIS_KEYS['webhook_secret'])
-    if not secret:
-        secret = generate_webhook_secret().encode('utf-8')
-        redis_client.set(REDIS_KEYS['webhook_secret'], secret)
-    return secret.decode('utf-8')
-
-
-@contextmanager
-def webhook_lock(timeout=10):
-    """Lock for webhook initialization"""
-    lock_id = generate_webhook_secret()  # Используем как уникальный ID
-    lock_timeout = timeout + 1
-
-    # Try to acquire lock
-    acquired = redis_client.set(
-        REDIS_KEYS['webhook_lock'],
-        lock_id,
-        ex=lock_timeout,
-        nx=True
-    )
-
-    try:
-        yield acquired
-    finally:
-        # Release lock only if we acquired it and it's still ours
-        if acquired and redis_client.get(REDIS_KEYS['webhook_lock']) == lock_id.encode('utf-8'):
-            redis_client.delete(REDIS_KEYS['webhook_lock'])
-
-
-async def setup_telegram_webhook():
-    """Setup Telegram webhook for receiving updates"""
-    logger.info("Starting webhook setup...")
-    if not WEBHOOK_URL:
-        logger.error("WEBHOOK_URL not set in environment")
-        return False
-
-    logger.info(f"Using webhook URL: {WEBHOOK_URL}")
-    try:
-        # Check current webhook status
-        logger.info("Getting current webhook info...")
-        webhook_info = await bot_manager.bot.get_webhook_info()
-        current_url = webhook_info.url
-        target_url = f"{WEBHOOK_URL}"  # Base URL already includes the path
-        logger.info(f"Current webhook URL: {current_url}")
-        logger.info(f"Target webhook URL: {target_url}")
-
-        if current_url != target_url:
-            # Only update webhook if URL is different
-            logger.info("URLs are different, updating webhook...")
-            logger.info("Initializing bot...")
-            await bot_manager.bot.initialize()
-            logger.info("Deleting current webhook...")
-            await bot_manager.bot.delete_webhook(drop_pending_updates=True)
-
-            try:
-                logger.info("Setting new webhook...")
-                await bot_manager.bot.set_webhook(
-                    url=target_url,
-                    drop_pending_updates=True
-                )
-                logger.info(f"Successfully set webhook to {target_url}")
-            except telegram.error.RetryAfter as e:
-                logger.warning(f"Flood control, waiting {e.retry_after} seconds")
-                await asyncio.sleep(e.retry_after)
-                logger.info("Retrying webhook setup...")
-                await bot_manager.bot.set_webhook(
-                    url=target_url,
-                    drop_pending_updates=True
-                )
-                logger.info(f"Successfully set webhook to {target_url} after retry")
-
-            redis_client.set(REDIS_KEYS['webhook_url'], target_url)
-            set_bot_initialized()
-            logger.info(f"Webhook setup complete. URL: {target_url}")
-        else:
-            logger.info(f"Webhook URL is already correct ({current_url}), skipping update")
-            set_bot_initialized()  # Mark as initialized even if no update needed
-
-        return True
-    except Exception as e:
-        logger.error(f"Failed to set webhook: {str(e)}", exc_info=True)
         return False
 
 
