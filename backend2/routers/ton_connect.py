@@ -7,6 +7,9 @@ from services.ton_proof_service import TonProofService
 import jwt
 from datetime import datetime, timedelta
 import os
+from sqlalchemy.ext.asyncio import AsyncSession
+from models.database import get_session
+from services.user_service import UserService
 
 router = APIRouter(prefix="/api", tags=["ton"])
 
@@ -96,3 +99,24 @@ async def check_transaction(
     if not status:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return status 
+
+router = APIRouter(prefix="/ton-connect", tags=["ton-connect"])
+
+@router.post("/proof")
+async def verify_proof(
+    proof_data: dict,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Проверка TON Connect подписи и создание/обновление пользователя
+    """
+    # TODO: Реализовать проверку подписи и работу с пользователем
+    pass
+
+@router.get("/get-message")
+async def get_message(address: str):
+    """
+    Получение сообщения для подписи кошельком
+    """
+    # TODO: Реализовать генерацию сообщения для подписи
+    pass 

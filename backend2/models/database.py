@@ -1,35 +1,31 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base, sessionmaker
-from config import DATABASE_URL
+from sqlalchemy.orm import sessionmaker, declarative_base
+from typing import AsyncGenerator
 
-# Create async engine
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=True,  # Set to False in production
-    future=True
-)
+DATABASE_URL = "postgresql+asyncpg://tetrix@postgres:5432/tetrix"
 
-# Create async session factory
-async_session = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+engine = create_async_engine(DATABASE_URL, echo=True)
+async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# Create declarative base
 Base = declarative_base()
 
-# Dependency to get DB session
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session() as session:
         try:
             yield session
         finally:
             await session.close()
 
-# Initialize database
 async def init_db():
+    """
+    Создание всех таблиц в базе данных
+    """
     async with engine.begin() as conn:
-        # Uncomment next line to recreate all tables on startup
-        # await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all) 
+        await conn.run_sync(Base.metadata.create_all)
+
+async def drop_db():
+    """
+    Удаление всех таблиц из базы данных
+    """
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)

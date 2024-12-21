@@ -1,51 +1,50 @@
-import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config import (
-    FRONTEND_URL, FASTAPI_HOST, FASTAPI_PORT,
-    DATABASE_URL
-)
-from routers import ton_connect
+import uvicorn
+from contextlib import asynccontextmanager
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] - %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger(__name__)
+# Роутеры
+from routers import telegram, ton_connect, api
+from models.database import init_db
 
-# Initialize FastAPI app
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await init_db()  # Создаем таблицы если их нет
+    await telegram.setup_webhook()
+    yield
+    # Shutdown
+    pass
+
+# Создаем FastAPI приложение
 app = FastAPI(
-    title="TETRIX Bot API",
-    description="API for TETRIX Token Bot System",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    title="Tetrix Hospital Bot",
+    lifespan=lifespan
 )
 
-# Setup CORS
+# Настраиваем CORS для веб-приложения
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=["*"],  # Для разработки разрешаем все источники
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
-# Include routers
-app.include_router(ton_connect.router)
+# Подключаем роутеры
+app.include_router(telegram.router)  # Telegram бот
+app.include_router(ton_connect.router)  # TON Connect авторизация
+app.include_router(api.router)  # API для партнерского приложения
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+# Тестовый эндпоинт
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Tetrix Hospital Bot is running"}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(
         "app:app",
-        host=FASTAPI_HOST,
-        port=FASTAPI_PORT,
+        host="0.0.0.0",
+        port=5000,
         reload=True
     ) 

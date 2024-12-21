@@ -1,20 +1,23 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, BigInteger
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, BigInteger, Boolean, DateTime, func
+from sqlalchemy.orm import relationship
 from .database import Base
 
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "user"
 
     id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True, nullable=False, index=True)
-    address = Column(String, unique=True, nullable=False, index=True)
+    wallet_address = Column(String, unique=True, nullable=False)
+    telegram_id = Column(BigInteger, unique=True, nullable=False)
+    registration_date = Column(DateTime(timezone=True), server_default=func.now())
+    last_slot_reset = Column(DateTime(timezone=True), server_default=func.now())
+    max_invite_slots = Column(Integer, default=5)
+    ignore_slot_reset = Column(Boolean, default=False)
     is_early_backer = Column(Boolean, default=False)
     is_fully_registered = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    wallet_data = Column(JSONB, nullable=True)  # Store additional wallet info
-    settings = Column(JSONB, nullable=True, default=dict)  # User preferences/settings
+
+    # Relationships
+    created_codes = relationship("InviteCode", foreign_keys="InviteCode.creator_id", back_populates="creator")
+    used_codes = relationship("InviteCode", foreign_keys="InviteCode.used_by_id", back_populates="used_by")
 
     def __repr__(self):
-        return f"<User(id={self.id}, telegram_id={self.telegram_id}, address={self.address})>" 
+        return f"<User(id={self.id}, telegram_id={self.telegram_id}, wallet_address={self.wallet_address})>" 
