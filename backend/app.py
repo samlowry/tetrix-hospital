@@ -35,14 +35,12 @@ from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
 import telegram
 from functools import partial
-from prometheus_flask_exporter import PrometheusMetrics
-from prometheus_client import Counter, Histogram, Gauge
 import json
 import time
 from datetime import datetime
 
 from models import db, User
-from routes import user_bp, metrics_bp, ton_connect_bp
+from routes import user_bp, ton_connect_bp
 from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
@@ -202,7 +200,6 @@ ton_client = TonClient()
 
 # Register blueprints
 app.register_blueprint(user_bp, url_prefix='/user')
-app.register_blueprint(metrics_bp, url_prefix='/')
 app.register_blueprint(ton_connect_bp)
 
 # Initialize bot manager
@@ -216,12 +213,6 @@ bot_manager = BotManager(
 
 # Add bot manager to app context
 app.bot_manager = bot_manager
-
-# Initialize Prometheus metrics
-metrics = PrometheusMetrics(app)
-requests_total = Counter('requests_total', 'Total requests')
-request_latency = Histogram('request_latency_seconds', 'Request latency')
-active_users = Gauge('active_users', 'Number of active users')
 
 
 def check_db_connection():

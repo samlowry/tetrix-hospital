@@ -96,15 +96,6 @@ export class ApiService {
         }
     }
 
-    async getMetrics() {
-        try {
-            const response = await this.axiosInstance.get('/metrics');
-            return this.handleResponse(response);
-        } catch (error) {
-            return this.handleError(error as AxiosError);
-        }
-    }
-
     async getLeaderboard(type: 'points' | 'invites') {
         try {
             const response = await this.axiosInstance.get(`/user/leaderboard/${type}`);
@@ -119,31 +110,6 @@ export class ApiService {
         localStorage.removeItem(this.localStorageKey);
         // Prepare for new connection immediately
         this.getChallenge().catch(console.error);
-    }
-
-    async checkFirstBacker(address: string) {
-        try {
-            const response = await this.axiosInstance.post('/user/check_first_backer', {
-                address
-            });
-            return this.handleResponse(response);
-        } catch (error) {
-            return this.handleError(error as AxiosError);
-        }
-    }
-
-    async registerEarlyBacker(address: string, proof: TonProofPayload): Promise<{ success: boolean }> {
-        try {
-            const tgWebAppData = window.Telegram.WebApp.initData;
-            const response = await this.axiosInstance.post('/user/register_early_backer', {
-                address,
-                tg_init_data: tgWebAppData,
-                proof
-            });
-            return this.handleResponse(response);
-        } catch (error) {
-            return this.handleError(error as AxiosError);
-        }
     }
 }
 
