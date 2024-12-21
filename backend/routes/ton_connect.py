@@ -6,6 +6,7 @@ from services.telegram_service import TelegramService
 import jwt
 import os
 from config import WEBHOOK_URL
+from flasgger import swag_from
 
 bp = Blueprint('ton_connect', __name__, url_prefix='/api')
 ton_proof_service = TonProofService()
@@ -13,14 +14,91 @@ user_service = UserService()
 
 @bp.route('/generate_payload', methods=['POST'])
 @limiter.limit("100 per minute")
+@swag_from({
+    'tags': ['TON Connect'],
+    'summary': 'Generate payload for TON Proof',
+    'description': 'Generate a random payload that will be used for TON Connect proof. This endpoint is used by the frontend during wallet connection.',
+    'responses': {
+        '200': {
+            'description': 'Generated payload',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'payload': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def generate_payload():
     """Generate a random payload for TON Proof."""
     payload = ton_proof_service.generate_payload()
     return jsonify({'payload': payload})
 
 @bp.route('/check_proof', methods=['POST'])
+@swag_from({
+    'tags': ['TON Connect'],
+    'summary': 'Verify TON Connect proof',
+    'description': 'Verify TON Connect proof and register user. This endpoint is used by the frontend after getting proof from the wallet.',
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'address': {'type': 'string', 'description': 'TON wallet address'},
+                    'proof': {
+                        'type': 'object',
+                        'properties': {
+                            'type': {'type': 'string', 'enum': ['ton_proof']},
+                            'domain': {
+                                'type': 'object',
+                                'properties': {
+                                    'lengthBytes': {'type': 'integer'},
+                                    'value': {'type': 'string'}
+                                }
+                            },
+                            'timestamp': {'type': 'integer'},
+                            'payload': {'type': 'string'},
+                            'signature': {'type': 'string'},
+                            'state_init': {'type': 'string'},
+                            'public_key': {'type': 'string'}
+                        }
+                    },
+                    'tg_init_data': {'type': 'string', 'description': 'Telegram WebApp init data'}
+                },
+                'required': ['address', 'proof']
+            }
+        }
+    ],
+    'responses': {
+        '200': {
+            'description': 'Proof verification result',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'status': {'type': 'string', 'enum': ['registered', 'early_backer', 'need_invite']},
+                    'message': {'type': 'string'},
+                    'button': {'type': 'string'},
+                    'replace_last': {'type': 'boolean'}
+                }
+            }
+        },
+        '400': {
+            'description': 'Invalid proof or data',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def check_proof():
-    """Verify TON Connect proof and issue JWT token."""
+    """Verify TON Connect proof."""
     try:
         data = request.get_json()
         if not data:
@@ -57,27 +135,10 @@ def check_proof():
         if existing_user:
             print(f"User {address} already registered")
             return jsonify({
-                'token': token,
                 'status': 'registered',
                 'message': 'Already registered',
                 'replace_last': False
             })
-
-        # Generate JWT token
-        jwt_secret = os.environ.get('JWT_SECRET_KEY')
-        if not jwt_secret:
-            print("JWT_SECRET_KEY not set!")
-            return jsonify({'error': 'Server configuration error'}), 500
-            
-        token = jwt.encode(
-            {
-                'address': address,
-                'network': data.get('network'),
-                'public_key': data['public_key']
-            },
-            jwt_secret,
-            algorithm='HS256'
-        )
 
         if is_early_backer:
             print(f"Registering early backer {address}...")
@@ -107,7 +168,6 @@ def check_proof():
                     print(f"Error showing congratulations: {e}")
 
             return jsonify({
-                'token': token,
                 'status': 'early_backer',
                 'message': 'Welcome, early backer! 🌟',
                 'button': 'Continue to Stats',
@@ -140,7 +200,6 @@ def check_proof():
                     print(f"Error requesting invite code: {e}")
 
             return jsonify({
-                'token': token,
                 'status': 'need_invite',
                 'message': 'Please send invite code in chat',
                 'replace_last': False

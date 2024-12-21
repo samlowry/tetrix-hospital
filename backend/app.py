@@ -192,6 +192,14 @@ swagger = Swagger(app, template={
         "title": "TETRIX Bot API",
         "description": "API for TETRIX Token Bot System",
         "version": "1.0.0"
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "X-API-Key",
+            "in": "header",
+            "description": "API key for authentication (required only for /api/user/* endpoints)"
+        }
     }
 })
 
@@ -199,8 +207,8 @@ swagger = Swagger(app, template={
 ton_client = TonClient()
 
 # Register blueprints
-app.register_blueprint(user_bp, url_prefix='/user')
 app.register_blueprint(ton_connect_bp)
+app.register_blueprint(user_bp)
 
 # Initialize bot manager
 bot_manager = BotManager(

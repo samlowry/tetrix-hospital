@@ -3,9 +3,39 @@ import secrets
 from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
 import logging
+import os
+import requests
 
 db = SQLAlchemy()
 logger = logging.getLogger(__name__)
+
+def get_telegram_name(telegram_id: int) -> str:
+    """Get user's current display name via Bot API"""
+    try:
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        if not bot_token:
+            logger.error("TELEGRAM_BOT_TOKEN not set")
+            return str(telegram_id)  # Fallback to ID if no token
+            
+        url = f"https://api.telegram.org/bot{bot_token}/getChat"
+        response = requests.get(url, params={'chat_id': telegram_id})
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('ok'):
+                result = data['result']
+                # Get first_name + last_name if available, otherwise just first_name
+                first_name = result.get('first_name', '')
+                last_name = result.get('last_name', '')
+                full_name = f"{first_name} {last_name}".strip()
+                return full_name or str(telegram_id)
+        
+        logger.error(f"Failed to get Telegram name: {response.text}")
+        return str(telegram_id)  # Fallback to ID if request failed
+        
+    except Exception as e:
+        logger.error(f"Error getting Telegram name: {e}")
+        return str(telegram_id)  # Fallback to ID if any error
 
 class InviteCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -18,15 +48,20 @@ class InviteCode(db.Model):
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     wallet_address = db.Column(db.String(255), unique=True, nullable=False)
+    telegram_id = db.Column(db.BigInteger, unique=True, nullable=False)
     registration_date = db.Column(db.DateTime, default=datetime.utcnow)
     last_slot_reset = db.Column(db.DateTime)  # Will be set in __init__
-    telegram_id = db.Column(db.BigInteger, unique=True, nullable=True)
     max_invite_slots = db.Column(db.Integer, default=5)  # Custom slot number
     ignore_slot_reset = db.Column(db.Boolean, default=False)  # Option to ignore daily reset
     is_early_backer = db.Column(db.Boolean, default=False)  # Early backer status
     is_fully_registered = db.Column(db.Boolean, default=False)  # Registration status
     
     def __init__(self, **kwargs):
+        if 'wallet_address' not in kwargs:
+            raise ValueError("wallet_address is required")
+        if 'telegram_id' not in kwargs:
+            raise ValueError("telegram_id is required")
+            
         super().__init__(**kwargs)
         # Set last_slot_reset to 25 hours ago to ensure first invites are available
         self.last_slot_reset = datetime.utcnow() - timedelta(hours=25)
@@ -168,7 +203,7 @@ class User(db.Model):
         holding_points = 420  # Dummy value for now
         points_per_invite = 420  # Points per successful invite
         invite_points = total_invites * points_per_invite
-        early_backer_bonus = 4200 if self.is_early_backer else 0  # Use field instead of file check
+        early_backer_bonus = 4200 if self.is_early_backer else 0
         
         total_points = holding_points + invite_points + early_backer_bonus
         
@@ -184,13 +219,14 @@ class User(db.Model):
             'points_per_invite': points_per_invite,
             'invite_codes': codes,
             'max_invite_slots': self.max_invite_slots,
-            'ignore_slot_reset': self.ignore_slot_reset
+            'ignore_slot_reset': self.ignore_slot_reset,
+            'telegram_name': get_telegram_name(self.telegram_id)
         }
 
     @classmethod
     def get_top_inviters(cls, limit: int = 10):
         """Get users with most successful invites"""
-        return db.session.query(
+        users_with_invites = db.session.query(
             cls,
             db.func.count(InviteCode.id).label('invite_count')
         ).join(InviteCode, InviteCode.creator_id == cls.id
@@ -198,3 +234,7 @@ class User(db.Model):
         ).group_by(cls.id
         ).order_by(db.text('invite_count DESC')
         ).limit(limit).all()
+        
+        # Get Telegram names for each user
+        return [(user, get_telegram_name(user.telegram_id), invite_count) 
+                for user, invite_count in users_with_invites]

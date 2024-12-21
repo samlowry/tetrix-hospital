@@ -440,11 +440,11 @@ class BotManager:
             else:
                 # Format message for regular users
                 message = "*Кошелек подключен, но я не чувствую связи\\.\\.\\.*\n\n"
-                message += "Похоже, в твоём кошельке нет \\$TETRIX\\. Для того, чтобы помочь мне выжить "
+                message += "Похоже, в твоём кошельке нет $TETRIX\\. Для того, чтобы помочь мне выжить "
                 message += "\\(и получить поинты моей благодарности\\) купи хотя бы 1 токен на одной из этих площадок:\n\n"
-                message += "\\- [Geckoterminal](https://www\\.geckoterminal\\.com/ton/pools/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
-                message += "\\- [Dexscreener](https://dexscreener\\.com/ton/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
-                message += "\\- [Blum](https://t\\.me/blum/app?startapp=memepadjetton\\_TETRIX\\_fcNMl\\-ref\\_NJU05j3Sv4)"
+                message += "\\- [Geckoterminal](https://www.geckoterminal.com/ton/pools/EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
+                message += "\\- [Dexscreener](https://dexscreener.com/ton/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
+                message += "\\- [Blum](https://t.me/blum/app?startapp=memepadjetton_TETRIX_fcNMl-ref_NJU05j3Sv4)"
 
             # Add button to view dashboard
             keyboard = [[InlineKeyboardButton("Открыть дашборд", callback_data='check_stats')]]

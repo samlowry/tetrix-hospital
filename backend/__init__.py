@@ -6,9 +6,11 @@ from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
+from flask_migrate import Migrate
 from backend.routes import auth, user, metrics, ton_connect
 
 db = SQLAlchemy()
+migrate = Migrate()
 cache = Cache()
 limiter = Limiter(
     key_func=get_remote_address,
@@ -26,6 +28,7 @@ def create_app(test_config=None):
     # Initialize extensions
     CORS(app)
     db.init_app(app)
+    migrate.init_app(app, db)
     cache.init_app(app)
     limiter.init_app(app)
     Talisman(app, force_https=False)

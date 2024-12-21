@@ -43,8 +43,7 @@ export class ApiService {
         return axios.create({
             baseURL: this.baseURL,
             headers: {
-                'ngrok-skip-browser-warning': 'true',
-                ...(this.accessToken ? { 'Authorization': `Bearer ${this.accessToken}` } : {})
+                'ngrok-skip-browser-warning': 'true'
             }
         });
     }
@@ -87,9 +86,11 @@ export class ApiService {
         }
     }
 
-    async getUserStats(address: string): Promise<User> {
+    async getUserStats(telegram_id: number): Promise<User> {
         try {
-            const response = await this.axiosInstance.get(`/user/${address}/stats`);
+            const response = await this.axiosInstance.post(`/api/user/stats`, {
+                telegram_id
+            });
             return this.handleResponse(response);
         } catch (error) {
             return this.handleError(error as AxiosError);
@@ -98,7 +99,7 @@ export class ApiService {
 
     async getLeaderboard(type: 'points' | 'invites') {
         try {
-            const response = await this.axiosInstance.get(`/user/leaderboard/${type}`);
+            const response = await this.axiosInstance.get(`/api/user/leaderboard/${type}`);
             return this.handleResponse(response);
         } catch (error) {
             return this.handleError(error as AxiosError);

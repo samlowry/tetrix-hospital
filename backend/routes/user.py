@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app
-from flask_caching import Cache
 from models import User, db
-from utils.decorators import limiter, log_api_call
+from utils.decorators import limiter, log_api_call, require_api_key
 from services.ton_proof_service import TON_PROOF_PREFIX, TON_CONNECT_PREFIX, TonProofService
 from tonsdk.utils import Address
 import os
@@ -14,6 +13,7 @@ import json
 from urllib.parse import parse_qs, urlparse
 from base64 import b64decode
 import nacl.signing
+from flasgger import swag_from
 
 logger = logging.getLogger('tetrix')
 
@@ -72,50 +72,248 @@ def normalize_address(address):
     # Convert to uppercase and remove any non-hex characters
     return address.upper().strip()
 
-user = Blueprint('user', __name__)
-cache = Cache()
+user = Blueprint('user', __name__, url_prefix='/api/user')
 
-@user.route('/<wallet_address>/stats', methods=['GET'])
+@user.route('/stats', methods=['POST'])
 @log_api_call
-def get_user_stats(wallet_address):
-    user = User.query.filter_by(wallet_address=wallet_address).first()
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    return jsonify(user.get_stats())
+@require_api_key
+@swag_from({
+    'tags': ['User'],
+    'summary': 'Get user statistics',
+    'description': 'Get detailed statistics for a user by their Telegram ID',
+    'security': [
+        {"ApiKeyAuth": []}
+    ],
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'telegram_id': {
+                        'type': 'integer',
+                        'description': 'Telegram user ID'
+                    }
+                },
+                'required': ['telegram_id']
+            }
+        }
+    ],
+    'responses': {
+        '200': {
+            'description': 'User statistics',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'points': {'type': 'integer'},
+                    'total_invites': {'type': 'integer'},
+                    'registration_date': {'type': 'string', 'format': 'date-time'},
+                    'points_breakdown': {
+                        'type': 'object',
+                        'properties': {
+                            'holding': {'type': 'integer'},
+                            'invites': {'type': 'integer'},
+                            'early_backer_bonus': {'type': 'integer'}
+                        }
+                    },
+                    'points_per_invite': {'type': 'integer'},
+                    'invite_codes': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'code': {'type': 'string'},
+                                'status': {'type': 'string', 'enum': ['active', 'used_today']}
+                            }
+                        }
+                    },
+                    'max_invite_slots': {'type': 'integer'},
+                    'ignore_slot_reset': {'type': 'boolean'}
+                }
+            }
+        },
+        '400': {
+            'description': 'Bad request',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        '401': {
+            'description': 'Invalid API key',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        '404': {
+            'description': 'User not found',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
+def get_user_stats():
+    try:
+        # Полчаем telegram_id из тела запроса
+        data = request.get_json()
+        if not data or 'telegram_id' not in data:
+            return jsonify({'error': 'Telegram ID is required'}), 400
+            
+        telegram_id = data['telegram_id']
+        
+        # Ищем пользователя по telegram_id
+        user = User.query.filter_by(telegram_id=telegram_id).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify(user.get_stats())
+    except Exception as e:
+        logger.error(f"Error getting user stats: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @user.route('/leaderboard/points', methods=['GET'])
-@cache.cached(timeout=60)  # Cache for 1 minute
+@require_api_key
+@swag_from({
+    'tags': ['Leaderboard'],
+    'summary': 'Get points leaderboard',
+    'description': 'Get top users sorted by their total points',
+    'security': [
+        {"ApiKeyAuth": []}
+    ],
+    'parameters': [
+        {
+            'name': 'limit',
+            'in': 'query',
+            'type': 'integer',
+            'description': 'Number of users to return (default: 10, max: 100)',
+            'required': False
+        }
+    ],
+    'responses': {
+        '200': {
+            'description': 'Points leaderboard',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'leaderboard': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'telegram_name': {'type': 'string'},
+                                'points': {'type': 'integer'},
+                                'rank': {'type': 'integer'}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        '401': {
+            'description': 'Invalid API key',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_points_leaderboard():
     try:
         limit = min(int(request.args.get('limit', 10)), 100)
-        users = User.query.order_by(User.points.desc()).limit(limit).all()
+        users = User.query.all()
+        
+        # Получаем статистику для каждого пользователя и сортируем по points
+        users_with_stats = [(user, user.get_stats()) for user in users]
+        users_with_stats.sort(key=lambda x: x[1]['points'], reverse=True)
+        users_with_stats = users_with_stats[:limit]
         
         return jsonify({
             'leaderboard': [{
-                'wallet_address': user.wallet_address,
-                'points': user.points,
+                'telegram_name': stats['telegram_name'],
+                'points': stats['points'],
                 'rank': idx + 1
-            } for idx, user in enumerate(users)]
+            } for idx, (user, stats) in enumerate(users_with_stats)]
         })
     except Exception as e:
+        logger.error(f"Error getting points leaderboard: {e}")
         return jsonify({'error': str(e)}), 500
 
 @user.route('/leaderboard/invites', methods=['GET'])
-@cache.cached(timeout=60)
+@require_api_key
+@swag_from({
+    'tags': ['Leaderboard'],
+    'summary': 'Get invites leaderboard',
+    'description': 'Get top users sorted by their successful invites count',
+    'security': [
+        {"ApiKeyAuth": []}
+    ],
+    'parameters': [
+        {
+            'name': 'limit',
+            'in': 'query',
+            'type': 'integer',
+            'description': 'Number of users to return (default: 10, max: 100)',
+            'required': False
+        }
+    ],
+    'responses': {
+        '200': {
+            'description': 'Invites leaderboard',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'leaderboard': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'telegram_name': {'type': 'string'},
+                                'total_invites': {'type': 'integer'},
+                                'rank': {'type': 'integer'}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        '401': {
+            'description': 'Invalid API key',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_invite_leaderboard():
     try:
         limit = min(int(request.args.get('limit', 10)), 100)
         
-        # Get top inviters
+        # Get top inviters with their Telegram names
         top_inviters = User.get_top_inviters(limit)
         
         return jsonify({
             'leaderboard': [{
-                'wallet_address': user.wallet_address,
+                'telegram_name': telegram_name,
                 'total_invites': invite_count,
                 'rank': idx + 1
-            } for idx, (user, invite_count) in enumerate(top_inviters)]
+            } for idx, (user, telegram_name, invite_count) in enumerate(top_inviters)]
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

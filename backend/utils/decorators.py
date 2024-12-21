@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import request
+from flask import request, jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
@@ -26,11 +26,16 @@ limiter = Limiter(
 
 def log_api_call(f):
     @wraps(f)
-    def decorated(*args, **kwargs):
-        try:
-            logger.info(f"API call: {f.__name__} - Device: {get_device_identifier()}")
-            return f(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error in {f.__name__}: {str(e)}")
-            raise
-    return decorated 
+    def decorated_function(*args, **kwargs):
+        logger.info(f"API call: {request.method} {request.path}")
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        if api_key != 'kusaikuracsubalkfheaksjfhakjfhka':
+            return jsonify({'error': 'Invalid API key'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
