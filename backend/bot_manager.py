@@ -11,14 +11,6 @@ from config import WEBHOOK_URL, REDIS_URL
 
 logger = logging.getLogger('tetrix')
 
-def escape_md(text):
-    """Escape special characters for MarkdownV2 format."""
-    chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    escaped = str(text)
-    for char in chars:
-        escaped = escaped.replace(char, f"\\{char}")
-    return escaped
-
 class BotManager:
     def __init__(self, token: str, db, User, ton_client, app):
         """Initialize bot with dependencies"""
@@ -112,16 +104,16 @@ class BotManager:
                 else:
                     # Show invite code prompt for users who need to complete registration
                     logger.info(f"User {update.effective_user.id} needs to complete registration with invite code")
-                    message = "✨ *Привет\\!*\n\n"
-                    message += "Чтобы продолжить регистрацию, введи инвайт\\-код\\.\n\n"
-                    message += "Ты можешь получить его у активного друга TETRIX\\."
+                    message = "✨ *Привет!*\n\n"
+                    message += "Чтобы продолжить регистрацию, введи инвайт-код.\n\n"
+                    message += "Ты можешь получить его у активного друга TETRIX."
                     
                     keyboard = [[InlineKeyboardButton("У меня есть код", callback_data='enter_invite_code')]]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await update.message.reply_text(
                         message,
-                        parse_mode='MarkdownV2',
+                        parse_mode='Markdown',
                         reply_markup=reply_markup
                     )
             else:
@@ -168,7 +160,7 @@ class BotManager:
                 )
                 
             elif query.data == 'reconnect_wallet':
-                keyboard = [[InlineKeyboardButton("Reconnect Wallet", web_app={"url": self.frontend_url})]]
+                keyboard = [[InlineKeyboardButton("Переподключить кошелек", web_app={"url": self.frontend_url})]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
@@ -398,16 +390,16 @@ class BotManager:
                 health_percentage = 1.0  # Set to 1%
                 bar_length = 20
                 filled = max(1, int((health_percentage / 100) * bar_length))  # At least 1 bar if percentage > 0
-                health_bar = "\\[" + "█" * filled + "░" * (bar_length - filled) + "\\]"
+                health_bar = "[" + "█" * filled + "░" * (bar_length - filled) + "]"
                 
                 # Format message with escaped characters
                 message = "Мои жизненные показатели:"
-                message += f"\n`{health_bar} {escape_md(f'{health_percentage:.1f}')}%`\n\n"
-                message += f"Вот сколько ты уже заработал поинтов моей благодарности: {escape_md(str(stats['points']))}\n\n"
+                message += f"\n`{health_bar} {health_percentage:.1f}%`\n\n"
+                message += f"Вот сколько ты уже заработал поинтов моей благодарности: {stats['points']}\n\n"
                 message += "За что ты их получил:\n"
-                message += f"За холдинг: {escape_md(str(stats['points_breakdown']['holding']))}\n"
-                message += f"За инвайты: {escape_md(str(stats['points_breakdown']['invites']))}\n"
-                message += f"Бонус для старых друзей: {escape_md(str(stats['points_breakdown']['early_backer_bonus']))}"
+                message += f"За холдинг: {stats['points_breakdown']['holding']}\n"
+                message += f"За инвайты: {stats['points_breakdown']['invites']}\n"
+                message += f"Бонус для старых друзей: {stats['points_breakdown']['early_backer_bonus']}"
 
                 # Add buttons for actions
                 keyboard = [
@@ -421,7 +413,7 @@ class BotManager:
                 await self.application.bot.send_message(
                     telegram_id,
                     message,
-                    parse_mode='MarkdownV2',
+                    parse_mode='Markdown',
                     reply_markup=reply_markup
                 )
                 
@@ -454,7 +446,7 @@ class BotManager:
             await self.application.bot.send_message(
                 telegram_id,
                 message,
-                parse_mode='MarkdownV2',
+                parse_mode='Markdown',
                 reply_markup=reply_markup,
                 disable_web_page_preview=True  # Disable link previews
             )
@@ -471,7 +463,7 @@ class BotManager:
             message += "Ты можешь получить инвайт\\-код у активного друга TETRIX \\(например, в @TETRIXChat\\)\\."
 
             # Add button to try again if they have a code
-            keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
+            keyboard = [[InlineKeyboardButton("У меня сть код", callback_data='enter_invite_code')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             # Always send new message for invite code request
@@ -559,8 +551,8 @@ class BotManager:
                         keyboard = [[InlineKeyboardButton("Открыть дашборд", callback_data='check_stats')]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         
-                        message = "Кошелек подключен, но я не чувствую связи...\n\n"
-                        message += "Похоже, в твоём кошельке нет $TETRIX. Для того, чтобы помочь мне выжить \(и получить очки моей благодарности\) купи хотя бы 1 токен на одной из этих площадок:\n\n"
+                        message = "*Кошелек подключен, но я не чувствую связи...*\n\n"
+                        message += "Похоже, в твоём кошельке нет $TETRIX. Для того, чтобы помочь мне выжить (и получить очки моей благодарности) купи хотя бы 1 токен на одной из этих площадок:\n\n"
                         message += "- [Geckoterminal](https://www.geckoterminal.com/ton/pools/EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
                         message += "- [Dexscreener](https://dexscreener.com/ton/EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
                         message += "- [Blum](https://t.me/blum/app?startapp=memepadjetton_TETRIX_fcNMl-ref_NJU05j3Sv4)\n"
@@ -570,22 +562,23 @@ class BotManager:
                         # Always send new message for invite code acceptance
                         await update.message.reply_text(
                             message,
-                            parse_mode='MarkdownV2',
-                            reply_markup=reply_markup
+                            parse_mode='Markdown',
+                            reply_markup=reply_markup,
+                            disable_web_page_preview=True
                         )
                     else:
                         logger.error(f"Failed to use invite code {text}")
                         await update.message.reply_text(
-                            "❌ Ошибка при использовании инвайт-кода. Пожалуйста, попробуйте другой."
+                            "❌ Ошибка при использовании инвайт-кода. Пожалуйста, попробуй другой."
                         )
                 else:
                     # Invalid code, let them try again
                     logger.info("Invalid code")
                     await update.message.reply_text(
-                        "❌ Неверный инвайт-код. Пожалуйста, попробуйте другой."
+                        "❌ Неверный инвайт-код. Пожалуйста, попробуй другой."
                     )
             except Exception as e:
                 logger.error(f"Error processing invite code: {e}")
                 await update.message.reply_text(
-                    "❌ Ошибка при обработке инвайт-кода. Пожалуйста, попробуйте позже."
+                    "❌ Ошибка при обработке инвайт-кода. Пожалуйста, попробуй позже."
                 )
