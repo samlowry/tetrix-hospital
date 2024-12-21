@@ -19,8 +19,8 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 # Backup file name
 BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.sql"
 
-# Perform the backup using Docker exec
-/usr/bin/docker exec "$CONTAINER_NAME" pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"
+# Perform the backup using Docker exec with proper connection settings
+/usr/bin/docker exec "$CONTAINER_NAME" pg_dump -h localhost -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"
 
 # Compress the backup
 gzip "$BACKUP_FILE"
