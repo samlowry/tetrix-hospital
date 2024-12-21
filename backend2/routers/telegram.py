@@ -236,7 +236,7 @@ async def handle_callback_query(
                 reply_markup={
                     "inline_keyboard": [
                         [{"text": BUTTONS["refresh_invites"], "callback_data": "show_invites"}],
-                        [{"text": BUTTONS["back"], "callback_data": "check_stats"}]
+                        [{"text": BUTTONS["back_to_stats"], "callback_data": "check_stats"}]
                     ]
                 }
             )
@@ -248,16 +248,16 @@ async def handle_callback_query(
                 telegram_id,
                 text=STATS_TEMPLATE.format(
                     points=stats['points'],
-                    total_invites=stats['total_invites'],
-                    available_slots=available_slots,
+                    progress_bar="[" + "█" + "░" * 19 + "] 1.0%",
                     holding_points=stats['points_breakdown']['holding'],
                     invite_points=stats['points_breakdown']['invites'],
                     early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
                 ),
+                parse_mode="Markdown",
                 reply_markup={
                     "inline_keyboard": [
-                        [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}],
-                        [{"text": BUTTONS["refresh_stats"], "callback_data": "check_stats"}]
+                        [{"text": BUTTONS["refresh_stats"], "callback_data": "check_stats"}],
+                        [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
                     ]
                 }
             )
