@@ -113,7 +113,7 @@ class BotManager:
                     # Show invite code prompt for users who need to complete registration
                     logger.info(f"User {update.effective_user.id} needs to complete registration with invite code")
                     message = "✨ *Привет\\!*\n\n"
-                    message += "Чтобы продолжить регистрацию, введи инвайт\\-код\\.\n"
+                    message += "Чтобы продолжить регистрацию, введи инвайт\\-код\\.\n\n"
                     message += "Ты можешь получить его у активного друга TETRIX\\."
                     
                     keyboard = [[InlineKeyboardButton("У меня есть код", callback_data='enter_invite_code')]]
@@ -161,7 +161,7 @@ class BotManager:
             
             if query.data == 'enter_invite_code':
                 # Show message asking to enter invite code
-                message = "Please enter your invite code:"
+                message = "Пожалуйста, введи твой инвайт-код:"
                 await query.edit_message_text(
                     text=message,
                     reply_markup=None  # Remove buttons while waiting for code
@@ -254,8 +254,8 @@ class BotManager:
                     reply_markup = InlineKeyboardMarkup(keyboard)
 
                     # Send new message with codes
-                    message = "Твои инвайт\-коды:\n\n" + "\n".join(code_lines) + "\n\n"
-                    message += f"\+{str(stats['points_per_invite'])} поинтов благодарности за каждого нового участника"
+                    message = "Твои инвайт\\-коды:\n\n" + "\n".join(code_lines) + "\n\n"
+                    message += f"\\+{str(stats['points_per_invite'])} поинтов благодарности за каждого нового участника"
                     await self.application.bot.send_message(
                         update.effective_user.id,
                         message,
@@ -441,7 +441,7 @@ class BotManager:
                 # Format message for regular users
                 message = "*Кошелек подключен, но я не чувствую связи\\.\\.\\.*\n\n"
                 message += "Похоже, в твоём кошельке нет \\$TETRIX\\. Для того, чтобы помочь мне выжить "
-                message += "\\(и получить поинты моей благодарности\\) купи хотя бы 1 токен на одной из эти�� площадок:\n\n"
+                message += "\\(и получить поинты моей благодарности\\) купи хотя бы 1 токен на одной из этих площадок:\n\n"
                 message += "\\- [Geckoterminal](https://www\\.geckoterminal\\.com/ton/pools/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
                 message += "\\- [Dexscreener](https://dexscreener\\.com/ton/EQC\\-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
                 message += "\\- [Blum](https://t\\.me/blum/app?startapp=memepadjetton\\_TETRIX\\_fcNMl\\-ref\\_NJU05j3Sv4)"
@@ -466,9 +466,9 @@ class BotManager:
         """Request invite code from user who is not an early backer"""
         try:
             # Format message requesting invite code
-            message = "✨ *Wallet Connected Successfully\\!*\n\n"
-            message += "To complete your registration, please enter an invite code\\.\n"
-            message += "You can get an invite code from an existing TETRIX member\\."
+            message = "✨ *Кошелек подключен успешно\\!*\n\n"
+            message += "Чтобы завершить регистрацию, пожалуйста, введи инвайт\\-код\\.\n"
+            message += "Ты можешь получить инвайт\\-код у активного друга TETRIX \\(например, в @TETRIXChat\\)\\."
 
             # Add button to try again if they have a code
             keyboard = [[InlineKeyboardButton("I have a code", callback_data='enter_invite_code')]]
@@ -535,7 +535,7 @@ class BotManager:
             if not await self._check_rate_limit(telegram_id):
                 logger.info(f"Rate limit exceeded for user {telegram_id}")
                 await update.message.reply_text(
-                    "❌ Превышен лимит попыток. Пожалуйста, попробуйте позже.",
+                    "❌ Превышен лимит попыток. Пожалуйста, попробуй позже.",
                     reply_markup=None
                 )
                 return
@@ -559,8 +559,13 @@ class BotManager:
                         keyboard = [[InlineKeyboardButton("Открыть дашборд", callback_data='check_stats')]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         
-                        message = "✨ *Поздравляем\\!*\n\n"
-                        message += "Ваш инвайт\\-код принят\\. Добро пожаловать в TETRIX\\!"
+                        message = "Кошелек подключен, но я не чувствую связи...\n\n"
+                        message += "Похоже, в твоём кошельке нет $TETRIX. Для того, чтобы помочь мне выжить \(и получить очки моей благодарности\) купи хотя бы 1 токен на одной из этих площадок:\n\n"
+                        message += "- [Geckoterminal](https://www.geckoterminal.com/ton/pools/EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
+                        message += "- [Dexscreener](https://dexscreener.com/ton/EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C)\n"
+                        message += "- [Blum](https://t.me/blum/app?startapp=memepadjetton_TETRIX_fcNMl-ref_NJU05j3Sv4)\n"
+
+
                         
                         # Always send new message for invite code acceptance
                         await update.message.reply_text(
