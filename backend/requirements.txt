@@ -18,3 +18,8 @@ requests==2.32.3
 tonsdk==1.0.15
 prometheus-flask-exporter==0.23.0
 prometheus-client==0.19.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+asyncpg==0.29.0
+SQLAlchemy[asyncio]==2.0.27
+PyNaCl==1.5.0
