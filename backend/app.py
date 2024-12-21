@@ -370,6 +370,42 @@ def handle_error(error):
     }), code
 
 
+async def setup_telegram_webhook():
+    """Setup Telegram webhook for receiving updates"""
+    logger.info("Starting webhook setup...")
+    if not WEBHOOK_URL:
+        logger.error("WEBHOOK_URL not set in environment")
+        return False
+
+    logger.info(f"Using webhook URL: {WEBHOOK_URL}")
+    try:
+        # Check current webhook status
+        logger.info("Getting current webhook info...")
+        webhook_info = await bot_manager.bot.get_webhook_info()
+        current_url = webhook_info.url
+        target_url = WEBHOOK_URL  # URL already includes the path
+        logger.info(f"Current webhook URL: {current_url}")
+        logger.info(f"Target webhook URL: {target_url}")
+
+        if current_url != target_url:
+            # Only update webhook if URL is different
+            logger.info("URLs are different, updating webhook...")
+            await bot_manager.bot.delete_webhook(drop_pending_updates=True)
+            await bot_manager.bot.set_webhook(
+                url=target_url,
+                drop_pending_updates=True
+            )
+            logger.info(f"Successfully set webhook to {target_url}")
+            redis_client.set(REDIS_KEYS['webhook_url'], target_url)
+        else:
+            logger.info(f"Webhook URL is already correct ({current_url}), skipping update")
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {str(e)}", exc_info=True)
+        return False
+
+
 def init_app(app):
     """Initialize the application"""
     logger.info("Starting application initialization...")
