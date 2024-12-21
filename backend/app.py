@@ -56,9 +56,6 @@ app = Flask(__name__)
 
 # Setup CORS
 frontend_url = os.getenv('FRONTEND_URL')
-if not frontend_url:
-    logger.warning("FRONTEND_URL not set, defaulting to localhost")
-    frontend_url = 'http://localhost:3000'
 
 CORS(app, resources={
     r"/*": {
@@ -76,10 +73,6 @@ db_url = 'postgresql+psycopg://tetrix:tetrixpass@postgres:5432/tetrix'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Add Redis configuration to app config
-app.config['REDIS_HOST'] = REDIS_HOST
-app.config['REDIS_PORT'] = REDIS_PORT
-app.config['REDIS_URL'] = REDIS_URL
 
 # Initialize extensions
 db.init_app(app)
@@ -122,35 +115,42 @@ REDIS_KEYS = {
     'webhook_lock': 'webhook_lock'
 }
 
+
 def get_bot_state():
     """Get bot state from Redis"""
     state = redis_client.get(REDIS_KEYS['bot_state'])
     return state.decode('utf-8') if state else None
 
+
 def set_bot_state(state):
     """Set bot state in Redis"""
     redis_client.set(REDIS_KEYS['bot_state'], state)
+
 
 def is_bot_initialized():
     """Check if bot is initialized"""
     return redis_client.get(REDIS_KEYS['initialized']) == b'true'
 
+
 def set_bot_initialized():
     """Mark bot as initialized"""
     redis_client.set(REDIS_KEYS['initialized'], 'true')
+
 
 def get_user_session(user_id):
     """Get user session from Redis"""
     session = redis_client.get(REDIS_KEYS['user_sessions'].format(user_id))
     return session.decode('utf-8') if session else None
 
+
 def set_user_session(user_id, session_data):
     """Set user session in Redis"""
     redis_client.set(
-        REDIS_KEYS['user_sessions'].format(user_id), 
+        REDIS_KEYS['user_sessions'].format(user_id),
         session_data,
         ex=3600  # 1 hour expiration
     )
+
 
 # Configure cache
 cache = Cache(config={
@@ -261,12 +261,14 @@ requests_total = Counter('requests_total', 'Total requests')
 request_latency = Histogram('request_latency_seconds', 'Request latency')
 active_users = Gauge('active_users', 'Number of active users')
 
+
 def check_db_connection():
     try:
         db.session.execute('SELECT 1')
         return True
     except Exception:
         return False
+
 
 def check_redis_connection():
     try:
@@ -276,13 +278,16 @@ def check_redis_connection():
         logger.error(f"Redis health check failed: {e}")
         return False
 
+
 def check_scheduler_status():
     return scheduler.running
+
 
 def generate_webhook_secret():
     """Generate new webhook secret"""
     import secrets
     return secrets.token_urlsafe(32)
+
 
 def get_webhook_secret():
     """Get webhook secret from Redis"""
@@ -292,12 +297,13 @@ def get_webhook_secret():
         redis_client.set(REDIS_KEYS['webhook_secret'], secret)
     return secret.decode('utf-8')
 
+
 @contextmanager
 def webhook_lock(timeout=10):
     """Lock for webhook initialization"""
     lock_id = generate_webhook_secret()  # Используем как уникальный ID
     lock_timeout = timeout + 1
-    
+
     # Try to acquire lock
     acquired = redis_client.set(
         REDIS_KEYS['webhook_lock'],
@@ -305,7 +311,7 @@ def webhook_lock(timeout=10):
         ex=lock_timeout,
         nx=True
     )
-    
+
     try:
         yield acquired
     finally:
@@ -313,13 +319,14 @@ def webhook_lock(timeout=10):
         if acquired and redis_client.get(REDIS_KEYS['webhook_lock']) == lock_id.encode('utf-8'):
             redis_client.delete(REDIS_KEYS['webhook_lock'])
 
+
 async def setup_telegram_webhook():
     """Setup Telegram webhook for receiving updates"""
     logger.info("Starting webhook setup...")
     if not WEBHOOK_URL:
         logger.error("WEBHOOK_URL not set in environment")
         return False
-    
+
     logger.info(f"Using webhook URL: {WEBHOOK_URL}")
     try:
         # Check current webhook status
@@ -329,7 +336,7 @@ async def setup_telegram_webhook():
         target_url = f"{WEBHOOK_URL}"  # Base URL already includes the path
         logger.info(f"Current webhook URL: {current_url}")
         logger.info(f"Target webhook URL: {target_url}")
-        
+
         if current_url != target_url:
             # Only update webhook if URL is different
             logger.info("URLs are different, updating webhook...")
@@ -337,7 +344,7 @@ async def setup_telegram_webhook():
             await bot_manager.bot.initialize()
             logger.info("Deleting current webhook...")
             await bot_manager.bot.delete_webhook(drop_pending_updates=True)
-            
+
             try:
                 logger.info("Setting new webhook...")
                 await bot_manager.bot.set_webhook(
@@ -354,18 +361,19 @@ async def setup_telegram_webhook():
                     drop_pending_updates=True
                 )
                 logger.info(f"Successfully set webhook to {target_url} after retry")
-            
+
             redis_client.set(REDIS_KEYS['webhook_url'], target_url)
             set_bot_initialized()
             logger.info(f"Webhook setup complete. URL: {target_url}")
         else:
             logger.info(f"Webhook URL is already correct ({current_url}), skipping update")
             set_bot_initialized()  # Mark as initialized even if no update needed
-            
+
         return True
     except Exception as e:
         logger.error(f"Failed to set webhook: {str(e)}", exc_info=True)
         return False
+
 
 @contextmanager
 def get_event_loop():
@@ -379,7 +387,7 @@ def get_event_loop():
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    
+
     try:
         yield loop
     finally:
@@ -395,10 +403,12 @@ def get_event_loop():
             except Exception as e:
                 logger.error(f"Error cleaning up event loop: {e}")
 
+
 def run_async(coro):
     """Helper to run coroutines safely"""
     with get_event_loop() as loop:
         return loop.run_until_complete(coro)
+
 
 # Initialize event loop for the application
 try:
@@ -410,6 +420,7 @@ except RuntimeError:
     app_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(app_loop)
 
+
 @app.route(WEBHOOK_PATH, methods=['POST'])
 def telegram_webhook():
     if request.method == 'POST':
@@ -417,48 +428,49 @@ def telegram_webhook():
             json_data = request.get_json(force=True)
             # Get user_id from message or callback_query
             user_id = (
-                json_data.get('message', {}).get('from', {}).get('id') or 
+                json_data.get('message', {}).get('from', {}).get('id') or
                 json_data.get('callback_query', {}).get('from', {}).get('id')
             )
             logger.info(f"Processing update from user: {user_id}")
-            
+
             async def process_update():
                 try:
                     # Initialize both bot and application if needed
                     if not bot_manager.bot._initialized or not bot_manager.application._initialized:
                         logger.info("Bot or application not initialized, initializing now...")
                         await bot_manager.initialize()
-                    
+
                     update = telegram.Update.de_json(json_data, bot_manager.bot)
-                    
+
                     # Store user session if needed
                     if user_id:
                         session_data = json.dumps({
                             'last_activity': int(time.time()),
                             'update_type': (
-                                update.effective_message.text if update.effective_message 
-                                else update.callback_query.data if update.callback_query 
+                                update.effective_message.text if update.effective_message
+                                else update.callback_query.data if update.callback_query
                                 else None
                             )
                         })
                         set_user_session(user_id, session_data)
-                    
+
                     logger.info("Processing update...")
                     await bot_manager.application.process_update(update)
                     logger.info("Update processed successfully")
                 except Exception as e:
                     logger.error(f"Error processing update: {e}", exc_info=True)
                     raise
-            
+
             run_async(process_update())
             return 'ok'
-            
+
         except Exception as e:
             logger.error(f"Error processing webhook: {e}")
             logger.exception(e)
             return jsonify({"error": str(e)}), 500
-    
+
     abort(403)
+
 
 @app.errorhandler(404)
 def not_found(error):
@@ -470,12 +482,13 @@ def not_found(error):
         'code': 404
     }), 404
 
+
 @app.errorhandler(Exception)
 def handle_error(error):
     # Log full traceback only for non-404 errors
     if not isinstance(error, HTTPException) or error.code != 404:
         logger.error(f"Unhandled error: {str(error)}", exc_info=True)
-    
+
     code = 500
     if isinstance(error, HTTPException):
         code = error.code
@@ -485,6 +498,7 @@ def handle_error(error):
         'code': code
     }), code
 
+
 def init_app(app):
     """Initialize the application"""
     logger.info("Starting application initialization...")
@@ -493,27 +507,28 @@ def init_app(app):
             logger.info("Creating database tables...")
             db.create_all()
             logger.info("Database tables created successfully")
-            
+
             # Initialize bot and application
             logger.info("Initializing bot manager...")
             run_async(bot_manager.initialize())
             logger.info("Bot manager initialized successfully")
-            
+
             # Setup webhook
             logger.info("Setting up Telegram webhook...")
             webhook_result = run_async(setup_telegram_webhook())
             logger.info(f"Webhook setup result: {webhook_result}")
-            
+
             # Log final webhook status
             logger.info("Getting final webhook status...")
             webhook_info = run_async(bot_manager.bot.get_webhook_info())
             logger.info(f"Final webhook status - URL: {webhook_info.url}, Pending updates: {webhook_info.pending_update_count}")
-            
+
             logger.info("Application initialization completed successfully")
             return True
         except Exception as e:
             logger.error(f"Error during application initialization: {str(e)}", exc_info=True)
             raise
+
 
 def on_starting(server):
     """Run before the server starts accepting requests"""
@@ -523,6 +538,7 @@ def on_starting(server):
     except Exception as e:
         logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
         raise
+
 
 # Initialize the app (for non-Gunicorn environments)
 if not os.environ.get('GUNICORN_CMD_ARGS'):
@@ -537,4 +553,4 @@ if __name__ == '__main__':
         host=os.getenv('FLASK_HOST', '0.0.0.0'),
         port=int(os.getenv('FLASK_PORT', 5000)),
         debug=False
-    ) 
+    )
