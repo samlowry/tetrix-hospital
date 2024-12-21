@@ -218,7 +218,7 @@ async def handle_callback_query(
                 # Экранируем специальные символы для Markdown V2
                 code = code_info['code'].replace('-', '\\-')
                 if code_info['status'] == 'used':
-                    code_lines.append(f"~{code}~")
+                    code_lines.append(f"~{code}~\n")
                 else:
                     code_lines.append(f"```\n{code}\n```")
             

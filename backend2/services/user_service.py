@@ -88,7 +88,10 @@ class UserService:
         if not user.is_fully_registered:
             return []
 
-        # Получаем неиспользованные коды
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Получаем все неиспользованные коды (без учета даты создания)
         result = await self.session.execute(
             select(InviteCode)
             .where(InviteCode.creator_id == user.id)
@@ -96,10 +99,20 @@ class UserService:
         )
         unused_codes = result.scalars().all()
 
-        # Генерируем новые коды, если нужно
-        available_slots = await self.get_available_invite_slots(user)
-        codes_needed = available_slots - len(unused_codes)
+        # Получаем коды, использованные сегодня
+        result = await self.session.execute(
+            select(InviteCode)
+            .where(InviteCode.creator_id == user.id)
+            .where(InviteCode.used_by_id.isnot(None))
+            .where(InviteCode.used_at >= today_start)
+        )
+        used_today_codes = result.scalars().all()
 
+        # Общее количество кодов не должно превышать max_invite_slots
+        total_codes = len(unused_codes) + len(used_today_codes)
+        codes_needed = max(0, user.max_invite_slots - total_codes)
+
+        # Генерируем новые коды, если нужно
         if codes_needed > 0:
             for _ in range(codes_needed):
                 while True:
@@ -114,16 +127,20 @@ class UserService:
                 invite = InviteCode(
                     code=code,
                     creator_id=user.id,
-                    created_at=datetime.utcnow()
+                    created_at=now
                 )
                 self.session.add(invite)
 
             await self.session.commit()
 
-        # Получаем все актуальные коды
+        # Получаем все актуальные коды (все неиспользованные + использованные сегодня)
         result = await self.session.execute(
             select(InviteCode)
             .where(InviteCode.creator_id == user.id)
+            .where(
+                (InviteCode.used_by_id.is_(None)) |
+                ((InviteCode.used_by_id.isnot(None)) & (InviteCode.used_at >= today_start))
+            )
             .order_by(InviteCode.created_at.desc())
         )
         all_codes = result.scalars().all()
