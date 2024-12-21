@@ -27,24 +27,16 @@ from flask_talisman import Talisman
 from flasgger import Swagger
 from flask_caching import Cache
 import redis
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-import asyncio
 from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
 import telegram
-from functools import partial
-import json
-import time
-from datetime import datetime
+import asyncio
 
 from models import db, User
 from routes import user_bp, ton_connect_bp
 from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
-from services.telegram_service import TelegramService
 
 # Initialize Flask app
 app = Flask(__name__)
