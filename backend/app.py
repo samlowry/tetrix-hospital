@@ -30,8 +30,6 @@ import redis
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.redis import RedisJobStore
 import asyncio
 from werkzeug.exceptions import HTTPException
 from contextlib import contextmanager
@@ -45,7 +43,6 @@ from datetime import datetime
 
 from models import db, User
 from routes import auth_bp, user_bp, metrics_bp, ton_connect_bp
-from routes.metrics import update_metrics
 from utils import limiter, setup_logging
 from bot_manager import BotManager
 from ton_client import TonClient
@@ -221,47 +218,6 @@ bot_manager = BotManager(
 # Add bot manager to app context
 app.bot_manager = bot_manager
 
-# Redis-based job store config
-jobstores = {
-    'default': RedisJobStore(
-        jobs_key='scheduler.jobs',
-        run_times_key='scheduler.runs',
-        host=REDIS_HOST,
-        port=REDIS_PORT,
-        socket_timeout=10,
-        retry_on_timeout=True
-    )
-}
-
-# Setup scheduler with Redis store
-scheduler = BackgroundScheduler(
-    jobstores=jobstores,
-    job_defaults={
-        'coalesce': True,
-        'max_instances': 1,
-        'misfire_grace_time': 60
-    },
-    executors={
-        'default': {
-            'type': 'threadpool',
-            'max_workers': 1  # Reduce to single worker
-        }
-    },
-    timezone='UTC'
-)
-
-# Initialize scheduler with proper error handling
-try:
-    if not scheduler.running:
-        scheduler.start()
-        logger.info("Scheduler started successfully")
-except Exception as e:
-    logger.error(f"Failed to start scheduler: {e}")
-    raise
-
-# Add scheduler to app context
-app.scheduler = scheduler
-
 # Initialize Prometheus metrics
 metrics = PrometheusMetrics(app)
 requests_total = Counter('requests_total', 'Total requests')
@@ -284,10 +240,6 @@ def check_redis_connection():
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
         return False
-
-
-def check_scheduler_status():
-    return scheduler.running
 
 
 def generate_webhook_secret():

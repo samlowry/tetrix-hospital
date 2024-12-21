@@ -6,19 +6,19 @@ warnings.filterwarnings('ignore', category=RuntimeWarning, message='coroutine .*
 
 # Check if already patched to prevent double patching
 if not monkey.is_module_patched('socket'):
-    # Patch only what we need, keeping threading intact for APScheduler
+    # Patch all necessary modules
     monkey.patch_all(
         socket=True,
         dns=True,
         time=True,
         select=True,
-        thread=False,  # Don't patch threading
+        thread=False,
         os=True,
         ssl=True,
         httplib=False,
         subprocess=True,
         sys=False,
-        aggressive=False,  # Less aggressive patching
+        aggressive=False,
         Event=False,
         builtins=True,
         signal=True

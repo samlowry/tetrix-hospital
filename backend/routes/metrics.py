@@ -6,25 +6,6 @@ from utils.decorators import log_api_call
 
 metrics = Blueprint('metrics', __name__)
 
-async def update_metrics():
-    """Update metrics in database"""
-    try:
-        # For now, we'll use a dummy value for holders
-        holders = 420  # This will be updated with real calculation later
-        
-        metrics = Metrics.query.first()
-        if not metrics:
-            metrics = Metrics()
-            db.session.add(metrics)
-            
-        metrics.holder_count = holders
-        metrics.last_updated = datetime.utcnow()
-        
-        db.session.commit()
-    except Exception as e:
-        print(f"Error updating metrics: {e}")
-        db.session.rollback()
-
 @metrics.route('/metrics', methods=['GET'])
 def get_metrics():
     metrics = Metrics.query.first()
@@ -61,17 +42,9 @@ def health_check():
     except Exception:
         redis_status = False
 
-    try:
-        # Check scheduler
-        scheduler = current_app.scheduler
-        scheduler_status = scheduler.running
-    except Exception:
-        scheduler_status = False
-
     checks = {
         'database': db_status,
-        'redis': redis_status,
-        'scheduler': scheduler_status
+        'redis': redis_status
     }
 
     response = {
