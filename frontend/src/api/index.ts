@@ -57,7 +57,9 @@ export class ApiService {
             if (!telegram_id) {
                 throw new Error('No Telegram ID found');
             }
-            const response = await this.axiosInstance.get(`/ton-connect/get-message?telegram_id=${telegram_id}`);
+            const response = await this.axiosInstance.post('/ton-connect/get-message', {
+                telegram_id
+            });
             const { message } = this.handleResponse<{ message: string }>(response);
             return { payload: message };
         } catch (error) {
@@ -91,7 +93,9 @@ export class ApiService {
 
     async getUserStats(telegram_id: number): Promise<User> {
         try {
-            const response = await this.axiosInstance.get(`/api/users/${telegram_id}`);
+            const response = await this.axiosInstance.post('/api/users', {
+                telegram_id
+            });
             return this.handleResponse(response);
         } catch (error) {
             return this.handleError(error as AxiosError);

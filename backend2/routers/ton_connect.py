@@ -15,24 +15,27 @@ from routers.telegram import send_telegram_message
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ton-connect", tags=["ton-connect"])
 
+class MessageRequest(BaseModel):
+    telegram_id: int
+
 class ProofRequest(BaseModel):
     telegram_id: int
     wallet_address: str
     payload: str
 
-@router.get("/get-message")
-async def get_message(telegram_id: int):
+@router.post("/get-message")
+async def get_message(request: MessageRequest):
     """
     Get message for wallet signature
     """
     try:
-        logger.info(f"[TON_CONNECT] Received get_message request for telegram_id={telegram_id}")
+        logger.info(f"[TON_CONNECT] Received get_message request for telegram_id={request.telegram_id}")
         # Generate random payload
         payload = secrets.token_hex(32)
-        logger.info(f"[TON_CONNECT] Generated payload={payload} for telegram_id={telegram_id}")
+        logger.info(f"[TON_CONNECT] Generated payload={payload} for telegram_id={request.telegram_id}")
         return {"message": payload}
     except Exception as e:
-        logger.error(f"[TON_CONNECT] Error generating message for telegram_id={telegram_id}: {e}", exc_info=True)
+        logger.error(f"[TON_CONNECT] Error generating message for telegram_id={request.telegram_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/proof")
