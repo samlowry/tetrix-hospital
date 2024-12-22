@@ -105,4 +105,67 @@ async def get_leaderboard(
             'rank': idx + 1
         })
     
-    return leaderboard 
+    return leaderboard
+
+@router.post("/combined", response_model=Dict)
+async def get_combined_stats(
+    request: UserRequest,
+    session: AsyncSession = Depends(get_session),
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Get combined user statistics and leaderboard position
+    """
+    user_service = UserService(session)
+    
+    # Get user stats
+    user = await user_service.get_user_by_telegram_id(request.telegram_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_stats = await user_service.get_user_stats(user)
+    
+    # Get all users for ranking
+    result = await session.execute(select(User))
+    users = result.scalars().all()
+    
+    # Get stats for each user and sort by points
+    user_stats_list = []
+    for u in users:
+        stats = await user_service.get_user_stats(u)
+        user_stats_list.append((u, stats))
+    
+    # Sort by points in descending order
+    user_stats_list.sort(key=lambda x: x[1]['points'], reverse=True)
+    
+    # Find user's rank
+    user_rank = next((idx + 1 for idx, (u, _) in enumerate(user_stats_list) if u.id == user.id), 0)
+    total_users = len(user_stats_list)
+    
+    # Get top 10 for leaderboard section
+    leaderboard = []
+    for idx, (u, stats) in enumerate(user_stats_list[:10]):
+        telegram_name = await get_telegram_name(u.telegram_id)
+        leaderboard.append({
+            'telegram_name': telegram_name,
+            'points': stats['points'],
+            'total_invites': stats['total_invites'],
+            'rank': idx + 1
+        })
+    
+    # Combine all information
+    return {
+        'user': {
+            'telegram_id': user.telegram_id,
+            'wallet_address': user.wallet_address,
+            'registration_date': user.registration_date.isoformat(),
+            'is_early_backer': user.is_early_backer,
+            'is_fully_registered': user.is_fully_registered,
+            **user_stats
+        },
+        'ranking': {
+            'rank': user_rank,
+            'total_users': total_users,
+            'percentile': round((total_users - user_rank + 1) / total_users * 100, 2)
+        },
+        'leaderboard': leaderboard
+    } 
