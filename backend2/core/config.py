@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     # Application
     FLASK_ENV: str = "development"
     JWT_SECRET_KEY: str
-    TETRIX_CONTRACT_ADDRESS: str
     
     # Hardcoded for security - obscure webhook path with random suffix
     WEBHOOK_PATH: str = '/telegram-webhook9eu3f3843ry9834843'
@@ -48,5 +47,5 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 @lru_cache()
-def get_settings() -> Settings:
+def get_settings():
     return Settings() 

@@ -1,5 +1,8 @@
 version: '3.8' 
 
+x-docker-compose:
+  remove-orphans: true
+
 services:
   app:
     build: 
