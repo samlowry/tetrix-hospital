@@ -39,7 +39,12 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="Tetrix Hospital Bot",
-    lifespan=lifespan
+    lifespan=lifespan,
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+        "tryItOutEnabled": True,
+        "displayRequestDuration": True
+    }
 )
 
 # Configure CORS for web application

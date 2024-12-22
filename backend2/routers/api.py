@@ -4,9 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.database import get_session
 from services.user_service import UserService
+from services.tetrix_service import TetrixService
 from models.user import User
 from typing import List, Dict
 from pydantic import BaseModel
+from redis.asyncio import Redis
+from core.deps import get_redis
 import os
 import aiohttp
 import logging
@@ -107,16 +110,30 @@ async def get_leaderboard(
     
     return leaderboard
 
-@router.post("/combined", response_model=Dict)
-async def get_combined_stats(
-    request: UserRequest,
+@router.get("/tetrix-state", response_model=Dict)
+async def get_tetrix_state(
+    redis: Redis = Depends(get_redis),
     session: AsyncSession = Depends(get_session),
     api_key: str = Depends(get_api_key)
 ):
     """
-    Get combined user statistics and leaderboard position
+    Get TETRIX token metrics
+    """
+    tetrix_service = TetrixService(redis, session)
+    return await tetrix_service.get_metrics()
+
+@router.post("/combined", response_model=Dict)
+async def get_combined_stats(
+    request: UserRequest,
+    session: AsyncSession = Depends(get_session),
+    redis: Redis = Depends(get_redis),
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Get combined user statistics, leaderboard position and TETRIX metrics
     """
     user_service = UserService(session)
+    tetrix_service = TetrixService(redis, session)
     
     # Get user stats
     user = await user_service.get_user_by_telegram_id(request.telegram_id)
@@ -152,6 +169,9 @@ async def get_combined_stats(
             'rank': idx + 1
         })
     
+    # Get TETRIX metrics
+    tetrix_metrics = await tetrix_service.get_metrics()
+    
     # Combine all information
     return {
         'user': {
@@ -167,5 +187,6 @@ async def get_combined_stats(
             'total_users': total_users,
             'percentile': round((total_users - user_rank + 1) / total_users * 100, 2)
         },
-        'leaderboard': leaderboard
+        'leaderboard': leaderboard,
+        'tetrix': tetrix_metrics
     } 

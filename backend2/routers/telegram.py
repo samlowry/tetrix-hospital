@@ -13,6 +13,7 @@ from services.redis_service import RedisService, UserStatus
 from core.deps import get_redis
 from core.config import get_settings
 from locales.ru import *  # Import all messages
+from services.tetrix_service import TetrixService
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -82,7 +83,9 @@ async def answer_callback_query(callback_query_id: str) -> bool:
 async def handle_start_command(
     telegram_id: int,
     user_service: UserService,
-    redis_service: RedisService
+    redis_service: RedisService,
+    redis: Redis,
+    session: AsyncSession
 ) -> bool:
     """Handle /start command"""
     # Check if user exists in DB
@@ -124,10 +127,16 @@ async def handle_start_command(
     stats = await user_service.get_user_stats(user)
     available_invites = await user_service.get_available_invites(user)
     
+    # Get TETRIX metrics
+    tetrix_service = TetrixService(redis, session)
+    tetrix_metrics = await tetrix_service.get_metrics()
+    
     return await send_telegram_message(
         telegram_id,
         text=WELCOME_BACK.format(
-            progress_bar="[" + "█" + "░" * 19 + "] 1.0%",
+            health_bar=tetrix_metrics['health']['bar'],
+            strength_bar=tetrix_metrics['strength']['bar'],
+            mood_bar=tetrix_metrics['mood']['bar'],
             points=stats['points'],
             total_invites=stats['total_invites'],
             available_slots=available_invites
@@ -179,7 +188,9 @@ async def handle_callback_query(
     telegram_id: int,
     callback_data: str,
     user_service: UserService,
-    redis_service: RedisService
+    redis_service: RedisService,
+    redis: Redis,
+    session: AsyncSession
 ) -> bool:
     """Handle callback requests from buttons"""
     if callback_data == "create_wallet":
@@ -257,12 +268,16 @@ async def handle_callback_query(
         else:
             stats = await user_service.get_user_stats(user)
             available_invites = await user_service.get_available_invites(user)
+            tetrix_service = TetrixService(redis, session)
+            tetrix_metrics = await tetrix_service.get_metrics()
             
             return await send_telegram_message(
                 telegram_id,
                 text=STATS_TEMPLATE.format(
                     points=stats['points'],
-                    progress_bar="[" + "█" + "░" * 19 + "] 1.0%",
+                    health_bar=tetrix_metrics['health']['bar'],
+                    strength_bar=tetrix_metrics['strength']['bar'],
+                    mood_bar=tetrix_metrics['mood']['bar'],
                     holding_points=stats['points_breakdown']['holding'],
                     invite_points=stats['points_breakdown']['invites'],
                     early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
@@ -302,7 +317,7 @@ async def telegram_webhook(
             
             # Handle /start command
             if text == "/start":
-                success = await handle_start_command(telegram_id, user_service, redis_service)
+                success = await handle_start_command(telegram_id, user_service, redis_service, redis, session)
                 return {"ok": success}
             
             # Check user status
@@ -345,7 +360,9 @@ async def telegram_webhook(
                 telegram_id,
                 callback_query.get("data", ""),
                 user_service,
-                redis_service
+                redis_service,
+                redis,
+                session
             )
             return {"ok": success}
         
