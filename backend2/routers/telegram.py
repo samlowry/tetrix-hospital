@@ -152,7 +152,9 @@ async def handle_invite_code(
     # Check code
     if await user_service.use_invite_code(code, user):
         await redis_service.set_status_registered(telegram_id)
-        return await send_telegram_message(
+        
+        # First send registration complete message
+        success = await send_telegram_message(
             telegram_id,
             text=REGISTRATION_COMPLETE,
             parse_mode="Markdown",
@@ -161,6 +163,28 @@ async def handle_invite_code(
                     "text": BUTTONS["open_menu"],
                     "callback_data": "check_stats"
                 }]]
+            }
+        )
+        
+        if not success:
+            return False
+            
+        # Then show stats
+        stats = await user_service.get_user_stats(user)
+        available_slots = await user_service.get_available_invite_slots(user)
+        
+        return await send_telegram_message(
+            telegram_id,
+            text=WELCOME_BACK.format(
+                points=stats['points'],
+                total_invites=stats['total_invites'],
+                available_slots=available_slots
+            ),
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}],
+                    [{"text": BUTTONS["stats"], "callback_data": "check_stats"}]
+                ]
             }
         )
     else:
@@ -379,3 +403,69 @@ async def telegram_webhook(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await session.close()
+
+@router.post("/proof")
+async def verify_proof(
+    request: ProofRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Verify TON Connect signature and create/update user
+    """
+    try:
+        user_service = UserService(session)
+        
+        # Check if user exists with this telegram_id
+        user = await user_service.get_user_by_telegram_id(request.telegram_id)
+        if user:
+            return {"success": True}
+
+        # Check if user exists with this wallet
+        user = await user_service.get_user_by_wallet_address(request.wallet_address)
+        if user:
+            logger.error(f"Wallet {request.wallet_address} already registered to telegram_id {user.telegram_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="This wallet is already registered to another user"
+            )
+
+        # Create user
+        try:
+            user = await user_service.create_user(
+                telegram_id=request.telegram_id,
+                wallet_address=request.wallet_address
+            )
+            logger.info(f"Created user with telegram_id={request.telegram_id}, wallet={request.wallet_address}, early_backer={user.is_early_backer}")
+            
+            # Send welcome message based on user type
+            if user.is_early_backer:
+                # Early backer - show special welcome message
+                await send_telegram_message(
+                    request.telegram_id,
+                    text=WELCOME_EARLY_BACKER,
+                    parse_mode="Markdown"
+                )
+            else:
+                # Regular user - request invite code
+                await send_telegram_message(
+                    request.telegram_id,
+                    text=WELCOME_NEED_INVITE,
+                    parse_mode="Markdown",
+                    reply_markup={
+                        "inline_keyboard": [[{
+                            "text": BUTTONS["have_invite"],
+                            "callback_data": "enter_invite_code"
+                        }]]
+                    }
+                )
+            
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error creating user: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying proof: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
