@@ -21,11 +21,6 @@ router = APIRouter(tags=["telegram"])
 # Hardcoded for security - obscure webhook path with random suffix
 WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
 
-class ProofRequest(BaseModel):
-    telegram_id: int
-    wallet_address: str
-    payload: str
-
 async def setup_webhook() -> bool:
     """Set up webhook for bot during application startup"""
     webhook_url = f"{settings.BACKEND_URL}{WEBHOOK_PATH}"
@@ -361,90 +356,3 @@ async def telegram_webhook(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await session.close()
-
-@router.post("/proof")
-async def verify_proof(
-    request: ProofRequest,
-    session: AsyncSession = Depends(get_session),
-    redis: Redis = Depends(get_redis)
-):
-    """
-    Verify TON Connect signature and create/update user
-    """
-    try:
-        logger.info(f"Starting verify_proof for telegram_id={request.telegram_id}, wallet={request.wallet_address}")
-        user_service = UserService(session)
-        redis_service = RedisService(redis)
-        
-        # Check if user exists with this telegram_id
-        user = await user_service.get_user_by_telegram_id(request.telegram_id)
-        if user:
-            logger.info(f"User already exists with telegram_id={request.telegram_id}")
-            return {"success": True}
-
-        # Check if user exists with this wallet
-        user = await user_service.get_user_by_wallet_address(request.wallet_address)
-        if user:
-            logger.error(f"Wallet {request.wallet_address} already registered to telegram_id {user.telegram_id}")
-            raise HTTPException(
-                status_code=400,
-                detail="This wallet is already registered to another user"
-            )
-
-        # Create user
-        try:
-            logger.info(f"Creating new user with telegram_id={request.telegram_id}, wallet={request.wallet_address}")
-            user = await user_service.create_user(
-                telegram_id=request.telegram_id,
-                wallet_address=request.wallet_address
-            )
-            logger.info(f"Created user with telegram_id={request.telegram_id}, wallet={request.wallet_address}, early_backer={user.is_early_backer}")
-            
-            # Send welcome message based on user type
-            if user.is_early_backer:
-                # Early backer - show special welcome message
-                logger.info(f"Setting status registered for early backer telegram_id={request.telegram_id}")
-                await redis_service.set_status_registered(request.telegram_id)
-                
-                logger.info(f"Sending WELCOME_EARLY_BACKER message to telegram_id={request.telegram_id}")
-                message_sent = await send_telegram_message(
-                    request.telegram_id,
-                    text=WELCOME_EARLY_BACKER,
-                    parse_mode="Markdown",
-                    reply_markup={
-                        "inline_keyboard": [
-                            [{"text": BUTTONS["stats"], "callback_data": "check_stats"}],
-                            [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
-                        ]
-                    }
-                )
-                logger.info(f"WELCOME_EARLY_BACKER message sent: {message_sent}")
-            else:
-                # Regular user - request invite code
-                logger.info(f"Setting status waiting_invite for regular user telegram_id={request.telegram_id}")
-                await redis_service.set_status_waiting_invite(request.telegram_id)
-                
-                logger.info(f"Sending WELCOME_NEED_INVITE message to telegram_id={request.telegram_id}")
-                message_sent = await send_telegram_message(
-                    request.telegram_id,
-                    text=WELCOME_NEED_INVITE,
-                    parse_mode="Markdown",
-                    reply_markup={
-                        "inline_keyboard": [[{
-                            "text": BUTTONS["have_invite"],
-                            "callback_data": "enter_invite_code"
-                        }]]
-                    }
-                )
-                logger.info(f"WELCOME_NEED_INVITE message sent: {message_sent}")
-            
-            return {"success": True}
-        except Exception as e:
-            logger.error(f"Error creating user: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=str(e))
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error verifying proof: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
