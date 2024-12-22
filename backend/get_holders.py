@@ -11,6 +11,7 @@ def fetch_top_jetton_holders(jetton_address, limit=1000, offset=0):
             API_ENDPOINT,
             params={
                 "jetton_address": jetton_address,
+                "exclude_zero_balance": "true",
                 "limit": limit,
                 "offset": offset,
                 "sort": "desc"
