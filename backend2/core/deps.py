@@ -9,8 +9,8 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
     Получение Redis клиента
     """
     client = Redis(
-        host="localhost",
-        port=6379,
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
         db=0,
         decode_responses=True
     )
