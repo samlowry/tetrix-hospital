@@ -2,7 +2,7 @@ from redis.asyncio import Redis, ConnectionPool
 from datetime import timedelta, datetime
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -51,16 +51,12 @@ class RedisService:
         return cls(redis)
 
     # Методы для работы со статусом пользователя
-    async def get_user_status(self, telegram_id: int) -> Optional[dict]:
-        """Получение статуса пользователя"""
-        key = REDIS_KEYS['user_status'].format(telegram_id)
-        status = await self.redis.get(key)
-        if status:
-            try:
-                return json.loads(status)
-            except json.JSONDecodeError:
-                logger.error(f"Failed to decode status for user {telegram_id}")
-        return None
+    async def get_user_status(self, telegram_id: int) -> Optional[UserStatus]:
+        """Get user status"""
+        value = await self.get_user_status_value(telegram_id)
+        if value is None:
+            return None
+        return UserStatus(value)
 
     async def set_user_status(self, telegram_id: int, status: dict) -> bool:
         """Установка статуса пользователя"""
@@ -96,16 +92,17 @@ class RedisService:
         })
 
     async def get_user_status_value(self, telegram_id: int) -> Optional[str]:
-        """Получение значения статуса пользователя"""
-        status = await self.get_user_status(telegram_id)
-        return status.get('status') if status else None
+        """Get user status value"""
+        key = f"user:{telegram_id}:status"
+        value = await self.redis.get(key)
+        return value.decode('utf-8') if value else None
 
     # Методы для работы с состоянием пользователя
-    async def get_user_state(self, telegram_id: int) -> str:
-        """Получение текущего состояния пользователя"""
+    async def get_user_state(self, telegram_id: int) -> Optional[Dict]:
+        """Get current user state"""
         key = f"user:{telegram_id}:state"
-        state = await self.redis.get(key)
-        return state or ""
+        value = await self.redis.get(key)
+        return json.loads(value) if value else None
 
     async def set_user_state(self, telegram_id: int, state: str) -> bool:
         """Установка состояния пользователя"""
@@ -132,10 +129,10 @@ class RedisService:
         return True
 
     # Методы для работы с состоянием бота
-    async def get_bot_state(self) -> str:
-        """Получение состояния бота"""
-        state = await self.redis.get(REDIS_KEYS['bot_state'])
-        return state or ""
+    async def get_bot_state(self) -> Optional[Dict]:
+        """Get bot state"""
+        value = await self.redis.get('bot:state')
+        return json.loads(value) if value else None
 
     async def set_bot_state(self, state: str) -> bool:
         """Установка состояния бота"""
@@ -143,8 +140,9 @@ class RedisService:
         return True
 
     async def is_bot_initialized(self) -> bool:
-        """Проверка инициализации бота"""
-        return await self.redis.get(REDIS_KEYS['initialized']) == 'true'
+        """Check if bot is initialized"""
+        value = await self.redis.get('bot:initialized')
+        return value == b'true'
 
     async def set_bot_initialized(self) -> bool:
         """Отметка об инициализации бота"""
@@ -152,15 +150,11 @@ class RedisService:
         return True
 
     # Методы для работы с сессиями
-    async def get_user_session(self, user_id: int) -> dict:
-        """Получение сессии пользователя"""
-        session = await self.redis.get(f"{REDIS_KEYS['user_sessions']}:{user_id}")
-        if session:
-            try:
-                return json.loads(session)
-            except json.JSONDecodeError:
-                logger.error(f"Failed to decode session for user {user_id}")
-        return {}
+    async def get_user_session(self, telegram_id: int) -> Optional[Dict]:
+        """Get user session"""
+        key = f"user:{telegram_id}:session"
+        value = await self.redis.get(key)
+        return json.loads(value) if value else None
 
     async def set_user_session(self, user_id: int, session_data: dict) -> bool:
         """Установка сессии пользователя"""
@@ -182,10 +176,11 @@ class RedisService:
         await self.redis.delete(*keys)
         return True
 
-    async def health_check(self) -> bool:
-        """Проверка доступности Redis"""
+    async def check_redis_health(self) -> bool:
+        """Check Redis availability"""
         try:
-            return await self.redis.ping()
+            await self.redis.ping()
+            return True
         except Exception as e:
             logger.error(f"Redis health check failed: {e}")
             return False 

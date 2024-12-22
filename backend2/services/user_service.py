@@ -13,7 +13,7 @@ from typing import Optional, List, Dict
 logger = logging.getLogger(__name__)
 
 def utc_now() -> datetime:
-    """Возвращает текущее время в UTC"""
+    """Returns current UTC time"""
     return datetime.utcnow()
 
 class UserService:
@@ -25,12 +25,12 @@ class UserService:
         telegram_id: int,
         wallet_address: str
     ) -> User:
-        """Создание нового пользователя"""
-        # Проверяем early_backer статус
+        """Create a new user"""
+        # Check early_backer status
         is_early_backer = False
         try:
             logger.info(f"Checking early backer status for wallet: {wallet_address}")
-            # Используем относительный путь от app.py
+            # Use relative path from app.py
             file_path = 'first_backers.txt'
             logger.info(f"Looking for first_backers.txt at: {file_path}")
             
@@ -38,7 +38,7 @@ class UserService:
                 early_backers = f.read().splitlines()
                 logger.info(f"Loaded {len(early_backers)} early backers")
                 logger.info(f"First few backers: {early_backers[:5]}")
-                # Нормализуем адрес кошелька для сравнения
+                # Normalize wallet address for comparison
                 wallet_address = wallet_address.strip().lower()
                 early_backers = [addr.strip().lower() for addr in early_backers]
                 is_early_backer = wallet_address in early_backers
@@ -52,7 +52,7 @@ class UserService:
             max_invite_slots=5,
             ignore_slot_reset=False,
             is_early_backer=is_early_backer,
-            is_fully_registered=is_early_backer  # Early backers автоматически fully registered
+            is_fully_registered=is_early_backer  # Early backers are automatically fully registered
         )
         
         self.session.add(user)
@@ -61,21 +61,21 @@ class UserService:
         return user
 
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
-        """Получение пользователя по telegram_id"""
+        """Get user by telegram_id"""
         result = await self.session.execute(
             select(User).where(User.telegram_id == telegram_id)
         )
         return result.scalar_one_or_none()
 
     async def get_user_by_wallet_address(self, wallet_address: str) -> Optional[User]:
-        """Получение пользователя по адресу кошелька"""
+        """Get user by wallet address"""
         result = await self.session.execute(
             select(User).where(User.wallet_address == wallet_address)
         )
         return result.scalar_one_or_none()
 
     async def update_user(self, user: User, **kwargs) -> User:
-        """Обновление данных пользователя"""
+        """Update user data"""
         for key, value in kwargs.items():
             if hasattr(user, key):
                 setattr(user, key, value)
@@ -88,7 +88,7 @@ class UserService:
             raise
 
     async def get_available_invite_slots(self, user: User) -> int:
-        """Возвращает количество доступных слотов для инвайтов"""
+        """Returns the number of available invite slots"""
         if not user.is_fully_registered:
             return 0
 
@@ -96,13 +96,13 @@ class UserService:
             return user.max_invite_slots
 
         now = utc_now()
-        # Проверяем, нужно ли сбросить слоты
+        # Check if slots need to be reset
         if user.last_slot_reset and (now - user.last_slot_reset > timedelta(days=1)):
             user.last_slot_reset = now
             await self.session.commit()
             return user.max_invite_slots
 
-        # Считаем использованные слоты за последние 24 часа
+        # Count used slots in the last 24 hours
         result = await self.session.execute(
             select(func.count(InviteCode.id))
             .where(InviteCode.creator_id == user.id)
@@ -112,14 +112,14 @@ class UserService:
         return max(0, user.max_invite_slots - used_slots)
 
     async def generate_invite_codes(self, user: User) -> List[Dict]:
-        """Генерация инвайт-кодов для пользователя"""
+        """Generate invite codes for user"""
         if not user.is_fully_registered:
             return []
 
         now = utc_now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Получаем все неиспользованные коды (без учета даты создания)
+        # Get all unused codes (regardless of creation date)
         result = await self.session.execute(
             select(InviteCode)
             .where(InviteCode.creator_id == user.id)
@@ -127,7 +127,7 @@ class UserService:
         )
         unused_codes = result.scalars().all()
 
-        # Получаем коды, использованные сегодня
+        # Get codes used today
         result = await self.session.execute(
             select(InviteCode)
             .where(InviteCode.creator_id == user.id)
@@ -136,16 +136,16 @@ class UserService:
         )
         used_today_codes = result.scalars().all()
 
-        # Общее количество кодов не должно превышать max_invite_slots
+        # Total number of codes should not exceed max_invite_slots
         total_codes = len(unused_codes) + len(used_today_codes)
         codes_needed = max(0, user.max_invite_slots - total_codes)
 
-        # Генерируем новые коды, если нужно
+        # Generate new codes if needed
         if codes_needed > 0:
             for _ in range(codes_needed):
                 while True:
                     code = secrets.token_hex(8)
-                    # Проверяем уникальность кода
+                    # Check code uniqueness
                     result = await self.session.execute(
                         select(InviteCode).where(InviteCode.code == code)
                     )
@@ -161,7 +161,7 @@ class UserService:
 
             await self.session.commit()
 
-        # Получаем все актуальные коды (все неиспользованные + использованные сегодня)
+        # Get all current codes (all unused + used today)
         result = await self.session.execute(
             select(InviteCode)
             .where(InviteCode.creator_id == user.id)
@@ -180,7 +180,7 @@ class UserService:
         } for code in all_codes]
 
     async def verify_invite_code(self, code: str) -> Optional[InviteCode]:
-        """Проверка валидности инвайт-кода"""
+        """Verify invite code validity"""
         result = await self.session.execute(
             select(InviteCode)
             .where(InviteCode.code == code)
@@ -189,7 +189,7 @@ class UserService:
         return result.scalar_one_or_none()
 
     async def use_invite_code(self, code: str, user: User) -> bool:
-        """Использование инвайт-кода"""
+        """Use invite code"""
         invite = await self.verify_invite_code(code)
         if not invite:
             return False
@@ -206,8 +206,8 @@ class UserService:
             return False
 
     async def get_user_stats(self, user: User) -> Dict:
-        """Получение статистики пользователя"""
-        # Подсчет успешных инвайтов
+        """Get user statistics"""
+        # Count successful invites
         result = await self.session.execute(
             select(func.count(InviteCode.id))
             .where(InviteCode.creator_id == user.id)
@@ -215,11 +215,11 @@ class UserService:
         )
         total_invites = result.scalar_one()
 
-        # Получение текущих кодов
+        # Get current codes
         codes = await self.generate_invite_codes(user)
 
-        # Расчет поинтов
-        holding_points = 420  # Пока заглушка
+        # Calculate points
+        holding_points = 420  # Placeholder
         points_per_invite = 420
         invite_points = total_invites * points_per_invite
         early_backer_bonus = 4200 if user.is_early_backer else 0
@@ -242,7 +242,7 @@ class UserService:
         }
 
     async def get_top_inviters(self, limit: int = 10) -> List[tuple]:
-        """Получение топ пользователей по количеству инвайтов"""
+        """Get top users by number of invites"""
         result = await self.session.execute(
             select(User, func.count(InviteCode.id).label('invite_count'))
             .join(InviteCode, InviteCode.creator_id == User.id)
@@ -254,7 +254,7 @@ class UserService:
         return result.all()
 
     async def delete_user(self, user: User) -> bool:
-        """Удаление пользователя"""
+        """Delete user"""
         try:
             await self.session.delete(user)
             await self.session.commit()
