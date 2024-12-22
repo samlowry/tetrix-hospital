@@ -29,36 +29,61 @@ class UserService:
         # Check early_backer status
         is_early_backer = False
         try:
-            logger.info(f"Checking early backer status for wallet: {wallet_address}")
+            logger.info(f"[USER_SERVICE] Starting create_user for telegram_id={telegram_id}, wallet={wallet_address}")
+            
+            # Check if user already exists
+            existing_user = await self.get_user_by_telegram_id(telegram_id)
+            if existing_user:
+                logger.info(f"[USER_SERVICE] User already exists with telegram_id={telegram_id}")
+                return existing_user
+
+            logger.info(f"[USER_SERVICE] Checking early backer status for wallet: {wallet_address}")
             # Use relative path from app.py
             file_path = 'first_backers.txt'
-            logger.info(f"Looking for first_backers.txt at: {file_path}")
+            logger.info(f"[USER_SERVICE] Looking for first_backers.txt at: {file_path}")
             
-            with open(file_path, 'r') as f:
-                early_backers = f.read().splitlines()
-                logger.info(f"Loaded {len(early_backers)} early backers")
-                logger.info(f"First few backers: {early_backers[:5]}")
-                # Normalize wallet address for comparison
-                wallet_address = wallet_address.strip().lower()
-                early_backers = [addr.strip().lower() for addr in early_backers]
-                is_early_backer = wallet_address in early_backers
-                logger.info(f"Is early backer: {is_early_backer}")
-        except Exception as e:
-            logger.error(f"Error checking early backer status: {e}")
+            try:
+                with open(file_path, 'r') as f:
+                    early_backers = f.read().splitlines()
+                    logger.info(f"[USER_SERVICE] Loaded {len(early_backers)} early backers")
+                    logger.info(f"[USER_SERVICE] First few backers: {early_backers[:5]}")
+                    # Normalize wallet address for comparison
+                    wallet_address = wallet_address.strip().lower()
+                    early_backers = [addr.strip().lower() for addr in early_backers]
+                    is_early_backer = wallet_address in early_backers
+                    logger.info(f"[USER_SERVICE] Is early backer check result: {is_early_backer} for wallet {wallet_address}")
+            except FileNotFoundError:
+                logger.error(f"[USER_SERVICE] first_backers.txt not found at {file_path}")
+                raise
+            except Exception as e:
+                logger.error(f"[USER_SERVICE] Error reading first_backers.txt: {e}", exc_info=True)
+                raise
 
-        user = User(
-            telegram_id=telegram_id,
-            wallet_address=wallet_address,
-            max_invite_slots=5,
-            ignore_slot_reset=False,
-            is_early_backer=is_early_backer,
-            is_fully_registered=is_early_backer  # Early backers are automatically fully registered
-        )
-        
-        self.session.add(user)
-        await self.session.commit()
-        await self.session.refresh(user)
-        return user
+            logger.info(f"[USER_SERVICE] Creating new user object with telegram_id={telegram_id}, is_early_backer={is_early_backer}")
+            user = User(
+                telegram_id=telegram_id,
+                wallet_address=wallet_address,
+                max_invite_slots=5,
+                ignore_slot_reset=False,
+                is_early_backer=is_early_backer,
+                is_fully_registered=is_early_backer  # Early backers are automatically fully registered
+            )
+            
+            logger.info("[USER_SERVICE] Adding user to session")
+            self.session.add(user)
+            
+            logger.info("[USER_SERVICE] Committing session")
+            await self.session.commit()
+            
+            logger.info("[USER_SERVICE] Refreshing user object")
+            await self.session.refresh(user)
+            
+            logger.info(f"[USER_SERVICE] User created successfully: telegram_id={telegram_id}, is_early_backer={is_early_backer}")
+            return user
+            
+        except Exception as e:
+            logger.error(f"[USER_SERVICE] Error in create_user: {e}", exc_info=True)
+            raise
 
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
         """Get user by telegram_id"""

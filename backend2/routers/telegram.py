@@ -5,6 +5,7 @@ import logging
 from typing import Optional, Dict, Any
 import json
 import aiohttp
+from pydantic import BaseModel
 
 from models.database import get_session
 from services.user_service import UserService
@@ -19,6 +20,11 @@ router = APIRouter(tags=["telegram"])
 
 # Hardcoded for security - obscure webhook path with random suffix
 WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
+
+class ProofRequest(BaseModel):
+    telegram_id: int
+    wallet_address: str
+    payload: str
 
 async def setup_webhook() -> bool:
     """Set up webhook for bot during application startup"""
@@ -53,11 +59,14 @@ async def send_telegram_message(chat_id: int, **kwargs) -> bool:
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": chat_id, **kwargs}
     
+    logger.info(f"Sending telegram message to chat_id={chat_id}")
+    
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=data) as response:
             if response.status == 200:
+                logger.info(f"Message sent successfully to chat_id={chat_id}")
                 return True
-            logger.error(f"Error sending message: {await response.text()}")
+            logger.error(f"Error sending message to chat_id={chat_id}. Status: {response.status}")
             return False
 
 async def answer_callback_query(callback_query_id: str) -> bool:
@@ -109,13 +118,7 @@ async def handle_start_command(
         return await send_telegram_message(
             telegram_id,
             text=WELCOME_NEED_INVITE,
-            parse_mode="Markdown",
-            reply_markup={
-                "inline_keyboard": [[{
-                    "text": BUTTONS["have_invite"],
-                    "callback_data": "enter_invite_code"
-                }]]
-            }
+            parse_mode="Markdown"
         )
     
     # Fully registered user
@@ -153,50 +156,23 @@ async def handle_invite_code(
     if await user_service.use_invite_code(code, user):
         await redis_service.set_status_registered(telegram_id)
         
-        # First send registration complete message
-        success = await send_telegram_message(
+        # Send only registration complete message with button
+        return await send_telegram_message(
             telegram_id,
             text=REGISTRATION_COMPLETE,
             parse_mode="Markdown",
             reply_markup={
                 "inline_keyboard": [[{
-                    "text": BUTTONS["open_menu"],
+                    "text": BUTTONS["stats"],
                     "callback_data": "check_stats"
                 }]]
-            }
-        )
-        
-        if not success:
-            return False
-            
-        # Then show stats
-        stats = await user_service.get_user_stats(user)
-        available_slots = await user_service.get_available_invite_slots(user)
-        
-        return await send_telegram_message(
-            telegram_id,
-            text=WELCOME_BACK.format(
-                points=stats['points'],
-                total_invites=stats['total_invites'],
-                available_slots=available_slots
-            ),
-            reply_markup={
-                "inline_keyboard": [
-                    [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}],
-                    [{"text": BUTTONS["stats"], "callback_data": "check_stats"}]
-                ]
-            }
+            },
+            disable_web_page_preview=True
         )
     else:
         return await send_telegram_message(
             telegram_id,
-            text=INVALID_INVITE_CODE,
-            reply_markup={
-                "inline_keyboard": [[{
-                    "text": BUTTONS["have_invite"],
-                    "callback_data": "enter_invite_code"
-                }]]
-            }
+            text=INVALID_INVITE_CODE
         )
 
 async def handle_callback_query(
@@ -242,12 +218,6 @@ async def handle_callback_query(
                     }]
                 ]
             }
-        )
-    
-    elif callback_data == "enter_invite_code":
-        return await send_telegram_message(
-            telegram_id,
-            text=ENTER_INVITE_CODE
         )
     
     elif callback_data in ["check_stats", "show_invites"]:
@@ -357,33 +327,16 @@ async def telegram_webhook(
             if user and not user.is_fully_registered:
                 logger.info(f"User {telegram_id} registered with early_backer={user.is_early_backer}")
                 if user.is_early_backer:
-                    # Early backer - show special welcome and stats
+                    # Early backer - already welcomed in /proof endpoint
                     await redis_service.set_status_registered(telegram_id)
-                    stats = await user_service.get_user_stats(user)
-                    await send_telegram_message(
-                        telegram_id,
-                        text=WELCOME_EARLY_BACKER,
-                        parse_mode="Markdown",
-                        reply_markup={
-                            "inline_keyboard": [
-                                [{"text": BUTTONS["stats"], "callback_data": "check_stats"}],
-                                [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
-                            ]
-                        }
-                    )
+                    return {"ok": True}
                 else:
                     # Regular user - request invite code
                     await redis_service.set_status_waiting_invite(telegram_id)
                     await send_telegram_message(
                         telegram_id,
                         text=WELCOME_NEED_INVITE,
-                        parse_mode="Markdown",
-                        reply_markup={
-                            "inline_keyboard": [[{
-                                "text": BUTTONS["have_invite"],
-                                "callback_data": "enter_invite_code"
-                            }]]
-                        }
+                        parse_mode="Markdown"
                     )
                 return {"ok": True}
             
@@ -407,17 +360,21 @@ async def telegram_webhook(
 @router.post("/proof")
 async def verify_proof(
     request: ProofRequest,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    redis: Redis = Depends(get_redis)
 ):
     """
     Verify TON Connect signature and create/update user
     """
     try:
+        logger.info(f"Starting verify_proof for telegram_id={request.telegram_id}, wallet={request.wallet_address}")
         user_service = UserService(session)
+        redis_service = RedisService(redis)
         
         # Check if user exists with this telegram_id
         user = await user_service.get_user_by_telegram_id(request.telegram_id)
         if user:
+            logger.info(f"User already exists with telegram_id={request.telegram_id}")
             return {"success": True}
 
         # Check if user exists with this wallet
@@ -431,6 +388,7 @@ async def verify_proof(
 
         # Create user
         try:
+            logger.info(f"Creating new user with telegram_id={request.telegram_id}, wallet={request.wallet_address}")
             user = await user_service.create_user(
                 telegram_id=request.telegram_id,
                 wallet_address=request.wallet_address
@@ -440,14 +398,29 @@ async def verify_proof(
             # Send welcome message based on user type
             if user.is_early_backer:
                 # Early backer - show special welcome message
-                await send_telegram_message(
+                logger.info(f"Setting status registered for early backer telegram_id={request.telegram_id}")
+                await redis_service.set_status_registered(request.telegram_id)
+                
+                logger.info(f"Sending WELCOME_EARLY_BACKER message to telegram_id={request.telegram_id}")
+                message_sent = await send_telegram_message(
                     request.telegram_id,
                     text=WELCOME_EARLY_BACKER,
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
+                    reply_markup={
+                        "inline_keyboard": [
+                            [{"text": BUTTONS["stats"], "callback_data": "check_stats"}],
+                            [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
+                        ]
+                    }
                 )
+                logger.info(f"WELCOME_EARLY_BACKER message sent: {message_sent}")
             else:
                 # Regular user - request invite code
-                await send_telegram_message(
+                logger.info(f"Setting status waiting_invite for regular user telegram_id={request.telegram_id}")
+                await redis_service.set_status_waiting_invite(request.telegram_id)
+                
+                logger.info(f"Sending WELCOME_NEED_INVITE message to telegram_id={request.telegram_id}")
+                message_sent = await send_telegram_message(
                     request.telegram_id,
                     text=WELCOME_NEED_INVITE,
                     parse_mode="Markdown",
@@ -458,14 +431,15 @@ async def verify_proof(
                         }]]
                     }
                 )
+                logger.info(f"WELCOME_NEED_INVITE message sent: {message_sent}")
             
             return {"success": True}
         except Exception as e:
-            logger.error(f"Error creating user: {e}")
+            logger.error(f"Error creating user: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error verifying proof: {e}")
+        logger.error(f"Error verifying proof: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
