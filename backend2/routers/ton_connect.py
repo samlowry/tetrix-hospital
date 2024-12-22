@@ -18,10 +18,10 @@ class ProofRequest(BaseModel):
 @router.get("/get-message")
 async def get_message(telegram_id: int):
     """
-    Получение сообщения для подписи кошельком
+    Get message for wallet signature
     """
     try:
-        # Генерируем случайный пейлоад
+        # Generate random payload
         payload = secrets.token_hex(32)
         return {"message": payload}
     except Exception as e:
@@ -34,7 +34,7 @@ async def verify_proof(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Проверка TON Connect подписи и создание/обно��ление пользователя
+    Проверка TON Connect подписи и создание/обновление пользователя
     """
     try:
         user_service = UserService(session)

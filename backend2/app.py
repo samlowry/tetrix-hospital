@@ -3,40 +3,40 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
 
-# Роутеры
+# Routers
 from routers import telegram, ton_connect, api
 from models.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await init_db()  # Создаем таблицы если их нет
+    await init_db()  # Create tables if they don't exist
     await telegram.setup_webhook()
     yield
     # Shutdown
     pass
 
-# Создаем FastAPI приложение
+# Create FastAPI application
 app = FastAPI(
     title="Tetrix Hospital Bot",
     lifespan=lifespan
 )
 
-# Настраиваем CORS для веб-приложения
+# Configure CORS for web application
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Для разработки разрешаем все источники
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
-# Подключаем роутеры
-app.include_router(telegram.router)  # Telegram бот
-app.include_router(ton_connect.router)  # TON Connect авторизация
-app.include_router(api.router)  # API для партнерского приложения
+# Connect routers
+app.include_router(telegram.router)  # Telegram bot
+app.include_router(ton_connect.router)  # TON Connect authorization
+app.include_router(api.router)  # API for partner application
 
-# Тестовый эндпоинт
+# Test endpoint
 @app.get("/")
 async def root():
     return {"status": "ok", "message": "Tetrix Hospital Bot is running"}

@@ -11,7 +11,7 @@ async def get_user(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Получение информации о пользователе
+    Get user information
     """
     user_service = UserService(session)
     user = await user_service.get_user_by_telegram_id(telegram_id)
@@ -24,7 +24,7 @@ async def get_leaderboard(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Получение лидерборда
+    Get leaderboard
     """
-    # TODO: Реализовать получение лидерборда
+    # TODO: Implement leaderboard retrieval
     pass 

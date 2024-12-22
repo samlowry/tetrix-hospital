@@ -11,7 +11,7 @@ from services.user_service import UserService
 from services.redis_service import RedisService, UserStatus
 from core.deps import get_redis
 from core.config import get_settings
-from locales.ru import *  # Импортируем все сообщения
+from locales.ru import *  # Import all messages
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -21,11 +21,11 @@ router = APIRouter(tags=["telegram"])
 WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
 
 async def setup_webhook() -> bool:
-    """Установка вебхука для бота при запуске приложения"""
+    """Set up webhook for bot during application startup"""
     webhook_url = f"{settings.BACKEND_URL}{WEBHOOK_PATH}"
     
     async with aiohttp.ClientSession() as session:
-        # Проверяем текущий вебхук
+        # Check current webhook
         async with session.get(
             f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getWebhookInfo"
         ) as response:
@@ -36,7 +36,7 @@ async def setup_webhook() -> bool:
                     logger.info(f"Webhook already set to {webhook_url}")
                     return True
     
-        # Устанавливаем новый вебхук
+        # Set new webhook
         async with session.post(
             f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/setWebhook",
             json={"url": webhook_url}
@@ -49,7 +49,7 @@ async def setup_webhook() -> bool:
             return True
 
 async def send_telegram_message(chat_id: int, **kwargs) -> bool:
-    """Отправка сообщения через Telegram API"""
+    """Send message via Telegram API"""
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": chat_id, **kwargs}
     
@@ -61,7 +61,7 @@ async def send_telegram_message(chat_id: int, **kwargs) -> bool:
             return False
 
 async def answer_callback_query(callback_query_id: str) -> bool:
-    """Отвечаем на callback query, чтобы убрать состояние загрузки с кнопки"""
+    """Answer callback query to remove loading state from button"""
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
     data = {"callback_query_id": callback_query_id}
     
@@ -77,12 +77,12 @@ async def handle_start_command(
     user_service: UserService,
     redis_service: RedisService
 ) -> bool:
-    """Обработка команды /start"""
-    # Проверяем, есть ли пользователь в БД
+    """Handle /start command"""
+    # Check if user exists in DB
     user = await user_service.get_user_by_telegram_id(telegram_id)
     
     if not user:
-        # Новый пользователь - отправляем на подключение кошелька
+        # New user - send to wallet connection
         await redis_service.set_status_waiting_wallet(telegram_id)
         return await send_telegram_message(
             telegram_id,
@@ -102,9 +102,9 @@ async def handle_start_command(
             }
         )
     
-    # Проверяем статус регистрации
+    # Check registration status
     if not user.is_fully_registered and not user.is_early_backer:
-        # Пользователь с кошельком, но без инвайт-кода
+        # User with wallet but without invite code
         await redis_service.set_status_waiting_invite(telegram_id)
         return await send_telegram_message(
             telegram_id,
@@ -118,7 +118,7 @@ async def handle_start_command(
             }
         )
     
-    # Полностью зарегистрированный пользователь
+    # Fully registered user
     await redis_service.set_status_registered(telegram_id)
     stats = await user_service.get_user_stats(user)
     available_slots = await user_service.get_available_invite_slots(user)
@@ -144,12 +144,12 @@ async def handle_invite_code(
     user_service: UserService,
     redis_service: RedisService
 ) -> bool:
-    """Обработка введенного инвайт-кода"""
+    """Handle entered invite code"""
     user = await user_service.get_user_by_telegram_id(telegram_id)
     if not user:
         return False
 
-    # Проверяем код
+    # Check code
     if await user_service.use_invite_code(code, user):
         await redis_service.set_status_registered(telegram_id)
         return await send_telegram_message(
@@ -181,7 +181,7 @@ async def handle_callback_query(
     user_service: UserService,
     redis_service: RedisService
 ) -> bool:
-    """Обработка callback-запросов от кнопок"""
+    """Handle callback requests from buttons"""
     if callback_data == "create_wallet":
         return await send_telegram_message(
             telegram_id,
@@ -201,7 +201,7 @@ async def handle_callback_query(
         )
     
     elif callback_data == "back_to_start":
-        # Возвращаемся к начальному меню
+        # Return to initial menu
         return await send_telegram_message(
             telegram_id,
             text=WELCOME_NEW_USER,
@@ -235,7 +235,7 @@ async def handle_callback_query(
             codes = await user_service.generate_invite_codes(user)
             code_lines = []
             for code_info in codes:
-                # Экранируем специальные символы для Markdown V2
+                # Escape special characters for Markdown V2
                 code = code_info['code'].replace('-', '\\-')
                 if code_info['status'] == 'used':
                     code_lines.append(f"~{code}~\n")
@@ -290,12 +290,12 @@ async def telegram_webhook(
     session: AsyncSession = Depends(get_session),
     redis: Redis = Depends(get_redis)
 ):
-    """Обработка входящих обновлений от Telegram"""
+    """Handle incoming updates from Telegram"""
     try:
         user_service = UserService(session)
         redis_service = RedisService(redis)
         
-        # Получаем данные из update
+        # Get data from update
         message = update.get("message", {})
         callback_query = update.get("callback_query", {})
         
@@ -306,15 +306,15 @@ async def telegram_webhook(
             
             text = message.get("text", "")
             
-            # Обработка команды /start
+            # Handle /start command
             if text == "/start":
                 success = await handle_start_command(telegram_id, user_service, redis_service)
                 return {"ok": success}
             
-            # Проверяем статус пользователя
+            # Check user status
             status = await redis_service.get_user_status_value(telegram_id)
             
-            # Если ожидаем инвайт-код
+            # If waiting for invite code
             if status == UserStatus.WAITING_INVITE.value and text:
                 success = await handle_invite_code(telegram_id, text, user_service, redis_service)
                 return {"ok": success}
@@ -325,15 +325,15 @@ async def telegram_webhook(
             if not telegram_id or not callback_query_id:
                 return {"ok": False}
             
-            # Отвечаем на callback query сразу
+            # Answer callback query immediately
             await answer_callback_query(callback_query_id)
             
-            # Проверяем, не зарегистрировался ли пользователь только что
+            # Check if user just registered
             user = await user_service.get_user_by_telegram_id(telegram_id)
             if user and not user.is_fully_registered:
                 logger.info(f"User {telegram_id} registered with early_backer={user.is_early_backer}")
                 if user.is_early_backer:
-                    # Early backer - показываем специальное приветствие и статистику
+                    # Early backer - show special welcome and stats
                     await redis_service.set_status_registered(telegram_id)
                     stats = await user_service.get_user_stats(user)
                     await send_telegram_message(
@@ -348,7 +348,7 @@ async def telegram_webhook(
                         }
                     )
                 else:
-                    # Обычный пользователь - запрашиваем инвайт-код
+                    # Regular user - request invite code
                     await redis_service.set_status_waiting_invite(telegram_id)
                     await send_telegram_message(
                         telegram_id,
@@ -363,7 +363,7 @@ async def telegram_webhook(
                     )
                 return {"ok": True}
             
-            # Обработка callback-запросов
+            # Handle callback requests
             success = await handle_callback_query(
                 telegram_id,
                 callback_query.get("data", ""),

@@ -1,3 +1,3 @@
 """
-Пакет с роутерами FastAPI приложения
+FastAPI application routers package
 """ 
