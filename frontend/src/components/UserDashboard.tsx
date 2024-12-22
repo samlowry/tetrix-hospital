@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useTonAddress } from '@tonconnect/ui-react';
 
@@ -31,29 +31,21 @@ export function UserDashboard() {
   const [showCloseButton, setShowCloseButton] = useState(false);
 
   useEffect(() => {
-    async function handleValidation() {
-      if (!userAddress) return;
+    if (!userAddress) return;
 
-      try {
-        console.log('Validation successful, starting countdown...');
-        const timer = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              setShowCloseButton(true);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+    console.log('Validation successful, starting countdown...');
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setShowCloseButton(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-        return () => clearInterval(timer);
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    }
-
-    handleValidation();
+    return () => clearInterval(timer);
   }, [userAddress]);
 
   const handleClose = () => {
