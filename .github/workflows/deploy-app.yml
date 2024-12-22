@@ -19,7 +19,12 @@ jobs:
           username: root
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
+            # Install Docker if not exists
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com | sh
+            fi
+            
             cd /opt/tetrix-hospital && \
             git pull && \
-            docker-compose build app && \
-            docker-compose up -d app
+            docker compose build app && \
+            docker compose up -d app
