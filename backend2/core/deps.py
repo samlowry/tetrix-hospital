@@ -6,7 +6,7 @@ settings = get_settings()
 
 async def get_redis() -> AsyncGenerator[Redis, None]:
     """
-    Get Redis client
+    Получение Redis клиента
     """
     client = Redis(
         host="localhost",

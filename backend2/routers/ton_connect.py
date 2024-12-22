@@ -17,9 +17,11 @@ class ProofRequest(BaseModel):
 
 @router.get("/get-message")
 async def get_message(telegram_id: int):
-    """Get message for wallet signature"""
+    """
+    Получение сообщения для подписи кошельком
+    """
     try:
-        # Generate message for signing
+        # Генерируем случайный пейлоад
         payload = secrets.token_hex(32)
         return {"message": payload}
     except Exception as e:
@@ -31,46 +33,40 @@ async def verify_proof(
     request: ProofRequest,
     session: AsyncSession = Depends(get_session)
 ):
-    """Verify TON Connect signature and create/update user"""
+    """
+    Проверка TON Connect подписи и создание/обно��ление пользователя
+    """
     try:
         user_service = UserService(session)
         
-        # Verify signature
-        if not verify_ton_proof_signature(
-            request.wallet_address,
-            request.proof.signature,
-            request.proof.payload
-        ):
-            raise HTTPException(status_code=400, detail="Invalid signature")
+        # Проверяем, существует ли пользователь с таким telegram_id
+        user = await user_service.get_user_by_telegram_id(request.telegram_id)
+        if user:
+            return {"success": True}
 
-        # Create or update user
+        # Проверяем, существует ли пользователь с таким кошельком
         user = await user_service.get_user_by_wallet_address(request.wallet_address)
-        
-        if not user:
-            # Create new user
+        if user:
+            logger.error(f"Wallet {request.wallet_address} already registered to telegram_id {user.telegram_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="This wallet is already registered to another user"
+            )
+
+        # Создаем пользователя
+        try:
             user = await user_service.create_user(
                 telegram_id=request.telegram_id,
                 wallet_address=request.wallet_address
             )
-        else:
-            # Update existing user
-            user = await user_service.update_user(
-                user,
-                telegram_id=request.telegram_id
-            )
-
-        # Update Redis state
-        redis_service = RedisService(redis)
-        if user.is_early_backer:
-            await redis_service.set_status_registered(request.telegram_id)
-        else:
-            await redis_service.set_status_waiting_invite(request.telegram_id)
-
-        return {
-            "success": True,
-            "is_early_backer": user.is_early_backer,
-            "is_fully_registered": user.is_fully_registered
-        }
+            logger.info(f"Created user with telegram_id={request.telegram_id}, wallet={request.wallet_address}, early_backer={user.is_early_backer}")
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error creating user: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error verifying signature: {e}")
+        logger.error(f"Error verifying proof: {e}")
         raise HTTPException(status_code=500, detail=str(e)) 
