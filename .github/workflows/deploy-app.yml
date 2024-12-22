@@ -21,7 +21,5 @@ jobs:
           script: |
             cd /opt/tetrix-hospital && \
             git pull && \
-            docker ps | grep tetrix-hospital_app_1 && docker stop tetrix-hospital_app_1 || true && \
-            docker ps -a | grep tetrix-hospital_app_1 && docker rm tetrix-hospital_app_1 || true && \
-            docker build -t tetrix-hospital_app:latest . -f backend/Dockerfile && \
+            docker-compose build app && \
             docker-compose up -d app

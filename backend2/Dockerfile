@@ -17,18 +17,24 @@ RUN mkdir -p /app/ssl && \
     -days 365 \
     -subj "/CN=tetrix.lol"
 
-# Install Python dependencies
-COPY backend2/requirements.txt .
-RUN pip install -r requirements.txt
+# Install Python dependencies first to utilize Docker cache
+COPY backend2/requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY backend2/ .
-
-# Create logs directory
+# Create necessary directories
 RUN mkdir -p /app/logs
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# Run FastAPI with uvicorn using SSL
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"] 
+# Copy only necessary application code
+COPY backend2/app.py .
+COPY backend2/core ./core
+COPY backend2/models ./models
+COPY backend2/routers ./routers
+COPY backend2/services ./services
+COPY backend2/locales ./locales
+COPY backend2/gunicorn_config.py .
+
+# Run with gunicorn
+CMD ["gunicorn", "--config", "gunicorn_config.py", "--certfile", "/app/ssl/cert.pem", "--keyfile", "/app/ssl/key.pem", "app:app"]
