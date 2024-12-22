@@ -27,13 +27,8 @@ RUN mkdir -p /app/logs
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# Copy only necessary application code
-COPY backend2/app.py .
-COPY backend2/core ./core
-COPY backend2/models ./models
-COPY backend2/routers ./routers
-COPY backend2/services ./services
-COPY backend2/locales ./locales
+# Copy the entire backend2 folder
+COPY backend2/ .
 
 # Run with uvicorn
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
