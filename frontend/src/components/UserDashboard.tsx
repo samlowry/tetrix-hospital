@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useTonAddress } from '@tonconnect/ui-react';
 
@@ -20,19 +20,34 @@ const Text = styled.p`
   margin: 5px 0;
 `;
 
+const Button = styled.button`
+  margin-top: 15px;
+  width: 100%;
+`;
+
 export function UserDashboard() {
   const userAddress = useTonAddress();
+  const [countdown, setCountdown] = useState(6);
+  const [showCloseButton, setShowCloseButton] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     async function handleValidation() {
       if (!userAddress) return;
 
       try {
-        console.log('Validation successful, closing WebApp...');
-        setTimeout(() => {
-          console.log('Closing WebApp...');
-          window.Telegram.WebApp.close();
-        }, 6000);
+        console.log('Validation successful, starting countdown...');
+        const timer = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              setShowCloseButton(true);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        return () => clearInterval(timer);
       } catch (error) {
         console.error('Error:', error);
       }
@@ -41,11 +56,19 @@ export function UserDashboard() {
     handleValidation();
   }, [userAddress]);
 
+  const handleClose = () => {
+    window.Telegram.WebApp.close();
+  };
+
   return (
     <Card>
       <Title>Статус проверки</Title>
       <Text>Кошелёк успешно подтверждён</Text>
-      <Text>Возвращаемся к боту...</Text>
+      {countdown > 0 ? (
+        <Text>Возвращаемся к боту через {countdown} сек...</Text>
+      ) : showCloseButton ? (
+        <Button onClick={handleClose}>Закрыть</Button>
+      ) : null}
     </Card>
   );
 } 
