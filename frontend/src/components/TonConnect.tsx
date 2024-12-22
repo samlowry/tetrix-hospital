@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
-import { useInterval } from '../hooks/useInterval';
 import { api, TonProofPayload } from '../api';
 
 export function TonConnect() {
     const firstProofLoading = useRef<boolean>(true);
     const [tonConnectUI] = useTonConnectUI();
     const wallet = useTonWallet();
-    const [isConnected, setIsConnected] = useState(() => {
-        return !!api.accessToken;
-    });
+    const [isConnected, setIsConnected] = useState(false);
     const [isValidated, setIsValidated] = useState(false);
 
     useEffect(() => {
@@ -53,12 +50,11 @@ export function TonConnect() {
     }, [tonConnectUI, generatePayload, isConnected]);
 
     useEffect(() => {
-        if (wallet && api.accessToken) {
+        if (wallet && isConnected) {
             console.log('Found existing connection');
-            setIsConnected(true);
             firstProofLoading.current = false;
         }
-    }, [wallet]);
+    }, [wallet, isConnected]);
 
     useEffect(() => {
         if (firstProofLoading.current && !isConnected) {
@@ -67,7 +63,13 @@ export function TonConnect() {
         }
     }, [recreateProofPayload, isConnected]);
 
-    useInterval(recreateProofPayload, isConnected ? null : api.refreshIntervalMs);
+    // Запрашиваем новый пейлоад каждые 9 минут
+    useEffect(() => {
+        if (isConnected) return;
+        
+        const interval = setInterval(recreateProofPayload, 9 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, [recreateProofPayload, isConnected]);
 
     useEffect(() => {
         return tonConnectUI.onStatusChange(async (w) => {
@@ -78,9 +80,8 @@ export function TonConnect() {
                 return;
             }
 
-            if (wallet && api.accessToken && !w.connectItems?.tonProof) {
+            if (wallet && isConnected && !w.connectItems?.tonProof) {
                 console.log('Restored connection with existing token');
-                setIsConnected(true);
                 return;
             }
 
