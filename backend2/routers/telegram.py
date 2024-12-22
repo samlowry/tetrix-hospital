@@ -194,7 +194,27 @@ async def handle_callback_query(
                     }],
                     [{
                         "text": BUTTONS["back"],
-                        "callback_data": "start"
+                        "callback_data": "back_to_start"
+                    }]
+                ]
+            }
+        )
+    
+    elif callback_data == "back_to_start":
+        # Возвращаемся к начальному меню
+        return await send_telegram_message(
+            telegram_id,
+            text=WELCOME_NEW_USER,
+            parse_mode="Markdown",
+            reply_markup={
+                "inline_keyboard": [
+                    [{
+                        "text": BUTTONS["connect_wallet"],
+                        "web_app": {"url": settings.FRONTEND_URL}
+                    }],
+                    [{
+                        "text": BUTTONS["create_wallet"],
+                        "callback_data": "create_wallet"
                     }]
                 ]
             }
