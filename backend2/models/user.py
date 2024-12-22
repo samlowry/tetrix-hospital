@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, BigInteger, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, BigInteger, Boolean, DateTime, func, CheckConstraint
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -14,6 +14,12 @@ class User(Base):
     ignore_slot_reset = Column(Boolean, default=False)
     is_early_backer = Column(Boolean, default=False)
     is_fully_registered = Column(Boolean, default=False)
+
+    # Валидация
+    __table_args__ = (
+        CheckConstraint("wallet_address ~ '^0:[a-fA-F0-9]{64}$'", name='check_wallet_address'),
+        CheckConstraint("telegram_id > 0", name='check_telegram_id'),
+    )
 
     # Relationships
     created_codes = relationship("InviteCode", foreign_keys="InviteCode.creator_id", back_populates="creator")
