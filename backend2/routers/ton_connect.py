@@ -34,17 +34,17 @@ async def verify_proof(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Проверка TON Connect подписи и создание/обновление пользователя
+    Verify TON Connect signature and create/update user
     """
     try:
         user_service = UserService(session)
         
-        # Проверяем, существует ли пользователь с таким telegram_id
+        # Check if user exists with this telegram_id
         user = await user_service.get_user_by_telegram_id(request.telegram_id)
         if user:
             return {"success": True}
 
-        # Проверяем, существует ли пользователь с таким кошельком
+        # Check if user exists with this wallet
         user = await user_service.get_user_by_wallet_address(request.wallet_address)
         if user:
             logger.error(f"Wallet {request.wallet_address} already registered to telegram_id {user.telegram_id}")
@@ -53,7 +53,7 @@ async def verify_proof(
                 detail="This wallet is already registered to another user"
             )
 
-        # Создаем пользователя
+        # Create user
         try:
             user = await user_service.create_user(
                 telegram_id=request.telegram_id,
