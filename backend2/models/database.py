@@ -1,20 +1,23 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from typing import AsyncGenerator
+from core.config import get_settings
 
-DATABASE_URL = "postgresql+asyncpg://tetrix@postgres:5432/tetrix"
+settings = get_settings()
 
-engine = create_async_engine(DATABASE_URL, echo=True)
-async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+engine = create_async_engine(settings.DATABASE_URL)
+async_session = sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 Base = declarative_base()
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_session() -> AsyncSession:
     async with async_session() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+        yield session
+
+async def get_session_local() -> AsyncSession:
+    """Создает сессию для локального использования (не через FastAPI)"""
+    return async_session()
 
 async def init_db():
     """

@@ -328,6 +328,41 @@ async def telegram_webhook(
             # Отвечаем на callback query сразу
             await answer_callback_query(callback_query_id)
             
+            # Проверяем, не зарегистрировался ли пользователь только что
+            user = await user_service.get_user_by_telegram_id(telegram_id)
+            if user and not user.is_fully_registered:
+                logger.info(f"User {telegram_id} registered with early_backer={user.is_early_backer}")
+                if user.is_early_backer:
+                    # Early backer - показываем специальное приветствие и статистику
+                    await redis_service.set_status_registered(telegram_id)
+                    stats = await user_service.get_user_stats(user)
+                    await send_telegram_message(
+                        telegram_id,
+                        text=WELCOME_EARLY_BACKER,
+                        parse_mode="Markdown",
+                        reply_markup={
+                            "inline_keyboard": [
+                                [{"text": BUTTONS["stats"], "callback_data": "check_stats"}],
+                                [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
+                            ]
+                        }
+                    )
+                else:
+                    # Обычный пользователь - запрашиваем инвайт-код
+                    await redis_service.set_status_waiting_invite(telegram_id)
+                    await send_telegram_message(
+                        telegram_id,
+                        text=WELCOME_NEED_INVITE,
+                        parse_mode="Markdown",
+                        reply_markup={
+                            "inline_keyboard": [[{
+                                "text": BUTTONS["have_invite"],
+                                "callback_data": "enter_invite_code"
+                            }]]
+                        }
+                    )
+                return {"ok": True}
+            
             # Обработка callback-запросов
             success = await handle_callback_query(
                 telegram_id,

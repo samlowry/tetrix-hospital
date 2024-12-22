@@ -34,23 +34,39 @@ async def verify_proof(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Проверка TON Connect подписи и создание/обновление пользователя
+    Проверка TON Connect подписи и создание/обно��ление пользователя
     """
     try:
         user_service = UserService(session)
         
-        # Проверяем, существует ли пользователь
+        # Проверяем, существует ли пользователь с таким telegram_id
         user = await user_service.get_user_by_telegram_id(request.telegram_id)
         if user:
             return {"success": True}
 
-        # Создаем пользователя независимо от результата проверки
-        user = await user_service.create_user(
-            telegram_id=request.telegram_id,
-            wallet_address=request.wallet_address
-        )
-        
-        return {"success": True}
+        # Проверяем, существует ли пользователь с таким кошельком
+        user = await user_service.get_user_by_wallet_address(request.wallet_address)
+        if user:
+            logger.error(f"Wallet {request.wallet_address} already registered to telegram_id {user.telegram_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="This wallet is already registered to another user"
+            )
+
+        # Создаем пользователя
+        try:
+            user = await user_service.create_user(
+                telegram_id=request.telegram_id,
+                wallet_address=request.wallet_address
+            )
+            logger.info(f"Created user with telegram_id={request.telegram_id}, wallet={request.wallet_address}, early_backer={user.is_early_backer}")
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error creating user: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error verifying proof: {e}")
         raise HTTPException(status_code=500, detail=str(e)) 

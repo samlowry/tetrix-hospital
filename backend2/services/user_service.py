@@ -1,9 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import logging
+import os
 
 from models.user import User
 from models.invite_code import InviteCode
@@ -11,26 +12,53 @@ from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
+def utc_now() -> datetime:
+    """Возвращает текущее время в UTC"""
+    return datetime.utcnow()
+
 class UserService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_user(self, telegram_id: int, wallet_address: str, is_early_backer: bool = False) -> User:
+    async def create_user(
+        self,
+        telegram_id: int,
+        wallet_address: str
+    ) -> User:
         """Создание нового пользователя"""
+        # Проверяем early_backer статус
+        is_early_backer = False
+        try:
+            logger.info(f"Checking early backer status for wallet: {wallet_address}")
+            # Используем относительный путь от app.py
+            file_path = 'first_backers.txt'
+            logger.info(f"Looking for first_backers.txt at: {file_path}")
+            
+            with open(file_path, 'r') as f:
+                early_backers = f.read().splitlines()
+                logger.info(f"Loaded {len(early_backers)} early backers")
+                logger.info(f"First few backers: {early_backers[:5]}")
+                # Нормализуем адрес кошелька для сравнения
+                wallet_address = wallet_address.strip().lower()
+                early_backers = [addr.strip().lower() for addr in early_backers]
+                is_early_backer = wallet_address in early_backers
+                logger.info(f"Is early backer: {is_early_backer}")
+        except Exception as e:
+            logger.error(f"Error checking early backer status: {e}")
+
         user = User(
             telegram_id=telegram_id,
             wallet_address=wallet_address,
+            max_invite_slots=5,
+            ignore_slot_reset=False,
             is_early_backer=is_early_backer,
             is_fully_registered=is_early_backer  # Early backers автоматически fully registered
         )
+        
         self.session.add(user)
-        try:
-            await self.session.commit()
-            await self.session.refresh(user)
-            return user
-        except IntegrityError:
-            await self.session.rollback()
-            raise
+        await self.session.commit()
+        await self.session.refresh(user)
+        return user
 
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
         """Получение пользователя по telegram_id"""
@@ -67,9 +95,9 @@ class UserService:
         if user.ignore_slot_reset:
             return user.max_invite_slots
 
-        now = datetime.utcnow()
+        now = utc_now()
         # Проверяем, нужно ли сбросить слоты
-        if now - user.last_slot_reset > timedelta(days=1):
+        if user.last_slot_reset and (now - user.last_slot_reset > timedelta(days=1)):
             user.last_slot_reset = now
             await self.session.commit()
             return user.max_invite_slots
@@ -88,7 +116,7 @@ class UserService:
         if not user.is_fully_registered:
             return []
 
-        now = datetime.utcnow()
+        now = utc_now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Получаем все неиспользованные коды (без учета даты создания)
@@ -148,7 +176,7 @@ class UserService:
         return [{
             'code': code.code,
             'status': 'used' if code.used_by_id else 'active',
-            'used_at': code.used_at
+            'used_at': code.used_at.isoformat() if code.used_at else None
         } for code in all_codes]
 
     async def verify_invite_code(self, code: str) -> Optional[InviteCode]:
@@ -167,7 +195,7 @@ class UserService:
             return False
 
         invite.used_by_id = user.id
-        invite.used_at = datetime.utcnow()
+        invite.used_at = utc_now()
         user.is_fully_registered = True
 
         try:
