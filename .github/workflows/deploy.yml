@@ -52,6 +52,7 @@ jobs:
           cat > /opt/tetrix-hospital/.env << EOL
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+          API_KEY=${{ secrets.API_KEY }}
           BACKEND_URL=${{ vars.BACKEND_URL }}
           FRONTEND_URL=${{ vars.FRONTEND_URL }}
           EOL
@@ -125,6 +126,7 @@ jobs:
     # - PROD_SSH_KEY: SSH private key for production server
     # - JWT_SECRET_KEY: JWT secret key for backend auth
     # - TELEGRAM_BOT_TOKEN: Telegram bot token from @BotFather
+    # - API_KEY: API key for protected endpoints
     #
     # Action Variables (non-sensitive):
     # - PROD_HOST: Production server IP

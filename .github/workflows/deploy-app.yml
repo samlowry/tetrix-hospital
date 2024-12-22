@@ -29,6 +29,18 @@ jobs:
               systemctl start docker
             fi
             
+            # Save environment variables with proper formatting
+            cat > /opt/tetrix-hospital/.env << EOL
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            API_KEY=${{ secrets.API_KEY }}
+            BACKEND_URL=${{ vars.BACKEND_URL }}
+            FRONTEND_URL=${{ vars.FRONTEND_URL }}
+            EOL
+            
+            # Ensure proper permissions
+            chmod 600 /opt/tetrix-hospital/.env
+            
             cd /opt/tetrix-hospital && \
             git pull && \
             docker compose build app && \
