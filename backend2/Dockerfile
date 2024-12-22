@@ -34,7 +34,6 @@ COPY backend2/models ./models
 COPY backend2/routers ./routers
 COPY backend2/services ./services
 COPY backend2/locales ./locales
-COPY backend2/gunicorn_config.py .
 
-# Run with gunicorn
-CMD ["gunicorn", "--config", "gunicorn_config.py", "--certfile", "/app/ssl/cert.pem", "--keyfile", "/app/ssl/key.pem", "app:app"]
+# Run with uvicorn
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "443", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
