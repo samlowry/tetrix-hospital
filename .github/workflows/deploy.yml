@@ -25,6 +25,11 @@ jobs:
         username: root
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
+          # Install Docker if not exists
+          if ! command -v docker &> /dev/null; then
+            curl -fsSL https://get.docker.com | sh
+          fi
+          
           # Create required directories
           mkdir -p /opt/tetrix-hospital/nginx/ssl
           mkdir -p /opt/tetrix-hospital/logs/redis
@@ -63,20 +68,20 @@ jobs:
           git reset --hard origin/production
           
           # Stop all services first
-          docker-compose down
+          docker compose down
           
           # Save current images for cleanup
           OLD_IMAGES=$(docker images -q tetrix-hospital_app)
           
           # Build and start services
-          DOCKER_BUILDKIT=0 docker-compose build --no-cache
-          docker-compose up -d
+          DOCKER_BUILDKIT=0 docker compose build --no-cache
+          docker compose up -d
           
           # Show logs for debugging
           echo "App logs:"
-          docker-compose logs app
+          docker compose logs app
           echo "Nginx logs:"
-          docker-compose logs nginx
+          docker compose logs nginx
           
           # Show running containers and their status
           docker ps -a
@@ -102,8 +107,8 @@ jobs:
               exit 0
             fi
             echo "Waiting for services to be healthy... ($i/10)"
-            docker-compose ps
-            docker-compose logs --tail=50 app
+            docker compose ps
+            docker compose logs --tail=50 app
             sleep 10
           done
           echo "Services failed to become healthy"
