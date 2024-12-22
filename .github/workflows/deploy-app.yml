@@ -24,6 +24,11 @@ jobs:
               curl -fsSL https://get.docker.com | sh
             fi
             
+            # Ensure Docker daemon is running
+            if ! systemctl is-active --quiet docker; then
+              systemctl start docker
+            fi
+            
             cd /opt/tetrix-hospital && \
             git pull && \
             docker compose build app && \

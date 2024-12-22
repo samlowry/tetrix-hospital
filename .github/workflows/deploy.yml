@@ -30,6 +30,11 @@ jobs:
             curl -fsSL https://get.docker.com | sh
           fi
           
+          # Ensure Docker daemon is running
+          if ! systemctl is-active --quiet docker; then
+            systemctl start docker
+          fi
+          
           # Create required directories
           mkdir -p /opt/tetrix-hospital/nginx/ssl
           mkdir -p /opt/tetrix-hospital/logs/redis
