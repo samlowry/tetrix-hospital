@@ -4,7 +4,7 @@
 BACKUP_DIR="/var/backups/postgres"
 
 # Docker container name
-CONTAINER_NAME="tetrix-hospital_postgres_1"
+CONTAINER_NAME="tetrix-hospital-postgres-1"
 
 # Database credentials
 DB_USER="tetrix"
