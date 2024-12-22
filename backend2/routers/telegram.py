@@ -45,7 +45,10 @@ async def setup_webhook() -> bool:
         # Set new webhook
         async with session.post(
             f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/setWebhook",
-            json={"url": webhook_url}
+            json={
+                "url": webhook_url,
+                "drop_pending_updates": True
+            }
         ) as response:
             result = await response.json()
             if not result.get("ok"):
@@ -124,15 +127,17 @@ async def handle_start_command(
     # Fully registered user
     await redis_service.set_status_registered(telegram_id)
     stats = await user_service.get_user_stats(user)
-    available_slots = await user_service.get_available_invite_slots(user)
+    available_invites = await user_service.get_available_invites(user)
     
     return await send_telegram_message(
         telegram_id,
         text=WELCOME_BACK.format(
+            progress_bar="[" + "█" + "░" * 19 + "] 1.0%",
             points=stats['points'],
             total_invites=stats['total_invites'],
-            available_slots=available_slots
+            available_slots=available_invites
         ),
+        parse_mode="Markdown",
         reply_markup={
             "inline_keyboard": [
                 [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}],
@@ -256,7 +261,7 @@ async def handle_callback_query(
             )
         else:
             stats = await user_service.get_user_stats(user)
-            available_slots = await user_service.get_available_invite_slots(user)
+            available_invites = await user_service.get_available_invites(user)
             
             return await send_telegram_message(
                 telegram_id,

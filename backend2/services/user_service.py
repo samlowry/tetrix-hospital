@@ -112,29 +112,18 @@ class UserService:
             await self.session.rollback()
             raise
 
-    async def get_available_invite_slots(self, user: User) -> int:
-        """Returns the number of available invite slots"""
+    async def get_available_invites(self, user: User) -> int:
+        """Returns the number of available (unused) invite codes"""
         if not user.is_fully_registered:
             return 0
 
-        if user.ignore_slot_reset:
-            return user.max_invite_slots
-
-        now = utc_now()
-        # Check if slots need to be reset
-        if user.last_slot_reset and (now - user.last_slot_reset > timedelta(days=1)):
-            user.last_slot_reset = now
-            await self.session.commit()
-            return user.max_invite_slots
-
-        # Count used slots in the last 24 hours
+        # Get all unused codes
         result = await self.session.execute(
             select(func.count(InviteCode.id))
             .where(InviteCode.creator_id == user.id)
-            .where(InviteCode.created_at >= now - timedelta(days=1))
+            .where(InviteCode.used_by_id.is_(None))
         )
-        used_slots = result.scalar_one()
-        return max(0, user.max_invite_slots - used_slots)
+        return result.scalar_one()
 
     async def generate_invite_codes(self, user: User) -> List[Dict]:
         """Generate invite codes for user"""
@@ -242,6 +231,7 @@ class UserService:
 
         # Get current codes
         codes = await self.generate_invite_codes(user)
+        available_invites = await self.get_available_invites(user)
 
         # Calculate points
         holding_points = 420  # Placeholder
@@ -254,6 +244,7 @@ class UserService:
         return {
             'points': total_points,
             'total_invites': total_invites,
+            'available_invites': available_invites,
             'registration_date': user.registration_date.isoformat(),
             'points_breakdown': {
                 'holding': holding_points,
