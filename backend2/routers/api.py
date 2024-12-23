@@ -45,6 +45,13 @@ async def get_user(
     user = await user_service.get_user_by_telegram_id(request.telegram_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.is_fully_registered:
+        return {
+            "status": "need_invite",
+            "message": "User needs to enter an invite code to complete registration"
+        }
+        
     return await user_service.get_user_stats(user)
 
 @router.get("/leaderboard", response_model=List[Dict])
@@ -87,6 +94,13 @@ async def get_combined_stats(
     user = await user_service.get_user_by_telegram_id(request.telegram_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    if not user.is_fully_registered:
+        return {
+            "status": "need_invite",
+            "message": "User needs to enter an invite code to complete registration"
+        }
+        
     user_stats = await user_service.get_user_stats(user)
     
     # Get user's rank from leaderboard
