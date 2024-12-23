@@ -6,6 +6,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 from models.metrics import TetrixMetrics
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -166,28 +167,15 @@ class TetrixService:
                     return {"volume": 0, "max_volume": await self._ensure_max_volume_exists()}
 
     async def get_metrics(self):
-        """Get all TETRIX metrics"""
+        """Get all TETRIX metrics from cache"""
         try:
-            # Get price and market cap
-            price_data = await self._get_cached_or_fetch(
-                "tetrix:price",
-                self._fetch_price_and_cap,
-                CACHE_TIME
-            )
+            # Get cached values
+            price_data = await self._get_cached_value("tetrix:price")
+            holders_data = await self._get_cached_value("tetrix:holders")
+            volume_data = await self._get_cached_value("tetrix:volume")
             
-            # Get holders count
-            holders_data = await self._get_cached_or_fetch(
-                "tetrix:holders",
-                self._fetch_holders,
-                CACHE_TIME
-            )
-            
-            # Get volume
-            volume_data = await self._get_cached_or_fetch(
-                "tetrix:volume",
-                self._fetch_volume,
-                VOLUME_CACHE_TIME
-            )
+            if not all([price_data, holders_data, volume_data]):
+                raise ValueError("Some metrics are not available in cache")
             
             # Calculate percentages
             health_percent = min(100, (holders_data["holders_count"] / MAX_HOLDERS) * 100)
@@ -220,4 +208,14 @@ class TetrixService:
             }
         except Exception as e:
             logger.error(f"Error getting metrics: {e}", exc_info=True)
-            raise 
+            raise
+
+    async def _get_cached_value(self, key: str) -> Optional[dict]:
+        """Get cached value from Redis"""
+        cached = await self.redis.get(key)
+        if cached:
+            try:
+                return json.loads(cached)
+            except json.JSONDecodeError:
+                logger.error(f"Failed to decode cached value for {key}")
+        return None
