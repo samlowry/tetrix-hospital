@@ -103,6 +103,7 @@ async def get_leaderboard(
     for idx, (user, stats, telegram_name) in enumerate(user_stats_list[:limit]):
         leaderboard.append({
             'telegram_name': telegram_name,
+            'telegram_id': user.telegram_id,
             'points': stats['points'],
             'total_invites': stats['total_invites'],
             'rank': idx + 1
@@ -164,6 +165,7 @@ async def get_combined_stats(
         telegram_name = await get_telegram_name(u.telegram_id)
         leaderboard.append({
             'telegram_name': telegram_name,
+            'telegram_id': u.telegram_id,
             'points': stats['points'],
             'total_invites': stats['total_invites'],
             'rank': idx + 1
