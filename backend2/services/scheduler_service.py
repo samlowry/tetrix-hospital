@@ -72,12 +72,15 @@ class SchedulerService:
             asyncio.create_task(self._schedule_task(task_name))
 
     async def stop(self):
-        """Stop the scheduler"""
-        self._running = False
-        for task in self.tasks.values():
-            task.cancel()
+        """Stop all scheduled tasks"""
+        logger.info("Stopping scheduler service...")
+        for task_name, task_info in self.tasks.items():
+            if isinstance(task_info, dict) and 'task' in task_info:
+                task_info['task'].cancel()
+            elif hasattr(task_info, 'cancel'):
+                task_info.cancel()
+            logger.info(f"Task {task_name} stopped")
         self.tasks.clear()
-        logger.info("Scheduler service stopped")
 
     async def _schedule_task(self, task_name: str):
         """Schedule a task to run periodically"""

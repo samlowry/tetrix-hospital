@@ -12,7 +12,7 @@ from services.user_service import UserService
 from services.redis_service import RedisService, UserStatus
 from core.deps import get_redis
 from core.config import get_settings
-from locales.ru import *  # Import all messages
+from locales.ru import *  # Import all messages including BUTTONS
 from services.tetrix_service import TetrixService
 
 settings = get_settings()
@@ -193,105 +193,114 @@ async def handle_callback_query(
     session: AsyncSession
 ) -> bool:
     """Handle callback requests from buttons"""
-    if callback_data == "create_wallet":
-        return await send_telegram_message(
-            telegram_id,
-            text=WALLET_CREATION_GUIDE,
-            reply_markup={
-                "inline_keyboard": [
-                    [{
-                        "text": BUTTONS["connect_wallet"],
-                        "web_app": {"url": settings.FRONTEND_URL}
-                    }],
-                    [{
-                        "text": BUTTONS["back"],
-                        "callback_data": "back_to_start"
-                    }]
-                ]
-            }
-        )
-    
-    elif callback_data == "back_to_start":
-        # Return to initial menu
-        return await send_telegram_message(
-            telegram_id,
-            text=WELCOME_NEW_USER,
-            parse_mode="Markdown",
-            reply_markup={
-                "inline_keyboard": [
-                    [{
-                        "text": BUTTONS["connect_wallet"],
-                        "web_app": {"url": settings.FRONTEND_URL}
-                    }],
-                    [{
-                        "text": BUTTONS["create_wallet"],
-                        "callback_data": "create_wallet"
-                    }]
-                ]
-            }
-        )
-    
-    elif callback_data in ["check_stats", "show_invites"]:
-        user = await user_service.get_user_by_telegram_id(telegram_id)
-        if not user or not user.is_fully_registered:
-            return False
-            
-        if callback_data == "show_invites":
-            codes = await user_service.generate_invite_codes(user)
-            code_lines = []
-            for code_info in codes:
-                # Escape special characters for Markdown V2
-                code = code_info['code'].replace('-', '\\-')
-                if code_info['status'] == 'used':
-                    code_lines.append(f"~{code}~\n")
-                else:
-                    code_lines.append(f"```\n{code}\n```")
-            
-            while len(code_lines) < user.max_invite_slots:
-                code_lines.append(INVITE_CODES_EMPTY)
-            
+    try:
+        logger.debug("Processing callback_data: %s for user %d", callback_data, telegram_id)
+        
+        if callback_data == "create_wallet":
             return await send_telegram_message(
                 telegram_id,
-                text=(
-                    f"{INVITE_CODES_TITLE}\n\n" +
-                    "\n".join(code_lines) +
-                    f"\n\n{INVITE_CODES_REWARD}"
-                ),
-                parse_mode="MarkdownV2",
+                text=WALLET_CREATION_GUIDE,
                 reply_markup={
                     "inline_keyboard": [
-                        [{"text": BUTTONS["refresh_invites"], "callback_data": "show_invites"}],
-                        [{"text": BUTTONS["back_to_stats"], "callback_data": "check_stats"}]
+                        [{
+                            "text": BUTTONS["connect_wallet"],
+                            "web_app": {"url": settings.FRONTEND_URL}
+                        }],
+                        [{
+                            "text": BUTTONS["back"],
+                            "callback_data": "back_to_start"
+                        }]
                     ]
                 }
             )
-        else:
-            stats = await user_service.get_user_stats(user)
-            available_invites = await user_service.get_available_invites(user)
-            tetrix_service = TetrixService(redis, session)
-            tetrix_metrics = await tetrix_service.get_metrics()
-            
+        
+        elif callback_data == "back_to_start":
+            # Return to initial menu
             return await send_telegram_message(
                 telegram_id,
-                text=STATS_TEMPLATE.format(
-                    points=stats['points'],
-                    health_bar=tetrix_metrics['health']['bar'],
-                    strength_bar=tetrix_metrics['strength']['bar'],
-                    mood_bar=tetrix_metrics['mood']['bar'],
-                    holding_points=stats['points_breakdown']['holding'],
-                    invite_points=stats['points_breakdown']['invites'],
-                    early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
-                ),
+                text=WELCOME_NEW_USER,
                 parse_mode="Markdown",
                 reply_markup={
                     "inline_keyboard": [
-                        [{"text": BUTTONS["refresh_stats"], "callback_data": "check_stats"}],
-                        [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
+                        [{
+                            "text": BUTTONS["connect_wallet"],
+                            "web_app": {"url": settings.FRONTEND_URL}
+                        }],
+                        [{
+                            "text": BUTTONS["create_wallet"],
+                            "callback_data": "create_wallet"
+                        }]
                     ]
                 }
             )
-    
-    return False
+        
+        elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites"]:
+            user = await user_service.get_user_by_telegram_id(telegram_id)
+            if not user or not user.is_fully_registered:
+                logger.warning("User %d not found or not fully registered", telegram_id)
+                return False
+                
+            if callback_data in ["show_invites", "refresh_invites"]:
+                codes = await user_service.generate_invite_codes(user)
+                code_lines = []
+                for code_info in codes:
+                    # Escape special characters for Markdown V2
+                    code = code_info['code'].replace('-', '\\-')
+                    if code_info['status'] == 'used':
+                        code_lines.append(f"~{code}~\n")
+                    else:
+                        code_lines.append(f"```\n{code}\n```")
+                
+                while len(code_lines) < user.max_invite_slots:
+                    code_lines.append(INVITE_CODES_EMPTY)
+                
+                return await send_telegram_message(
+                    telegram_id,
+                    text=(
+                        f"{INVITE_CODES_TITLE}\n\n" +
+                        "\n".join(code_lines) +
+                        f"\n\n{INVITE_CODES_REWARD}"
+                    ),
+                    parse_mode="MarkdownV2",
+                    reply_markup={
+                        "inline_keyboard": [
+                            [{"text": BUTTONS["refresh_invites"], "callback_data": "refresh_invites"}],
+                            [{"text": BUTTONS["back_to_stats"], "callback_data": "check_stats"}]
+                        ]
+                    }
+                )
+            else:
+                stats = await user_service.get_user_stats(user)
+                tetrix_service = TetrixService(redis, session)
+                tetrix_metrics = await tetrix_service.get_metrics()
+                
+                return await send_telegram_message(
+                    telegram_id,
+                    text=STATS_TEMPLATE.format(
+                        points=stats['points'],
+                        health_bar=tetrix_metrics['health']['bar'],
+                        strength_bar=tetrix_metrics['strength']['bar'],
+                        mood_bar=tetrix_metrics['mood']['bar'],
+                        emotion=tetrix_metrics['emotion'],
+                        holding_points=stats['points_breakdown']['holding'],
+                        invite_points=stats['points_breakdown']['invites'],
+                        early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
+                    ),
+                    parse_mode="Markdown",
+                    reply_markup={
+                        "inline_keyboard": [
+                            [{"text": BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
+                            [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
+                        ]
+                    }
+                )
+        
+        logger.warning("Unknown callback_data: %s", callback_data)
+        return False
+        
+    except Exception as e:
+        logger.error("Error in handle_callback_query: %s", str(e), exc_info=True)
+        return False
 
 @router.post(WEBHOOK_PATH)
 async def telegram_webhook(
@@ -301,6 +310,8 @@ async def telegram_webhook(
 ):
     """Handle incoming updates from Telegram"""
     try:
+        logger.debug("Received update: %s", update)
+        
         user_service = UserService(session)
         redis_service = RedisService(redis)
         
@@ -311,9 +322,11 @@ async def telegram_webhook(
         if message:
             telegram_id = message.get("from", {}).get("id")
             if not telegram_id:
+                logger.warning("No telegram_id in message update")
                 return {"ok": False}
             
             text = message.get("text", "")
+            logger.info("Received message from %d: %s", telegram_id, text)
             
             # Handle /start command
             if text == "/start":
@@ -322,6 +335,7 @@ async def telegram_webhook(
             
             # Check user status
             status = await redis_service.get_user_status_value(telegram_id)
+            logger.debug("User %d status: %s", telegram_id, status)
             
             # If waiting for invite code
             if status == UserStatus.WAITING_INVITE.value and text:
@@ -331,16 +345,25 @@ async def telegram_webhook(
         elif callback_query:
             telegram_id = callback_query.get("from", {}).get("id")
             callback_query_id = callback_query.get("id")
+            callback_data = callback_query.get("data", "")
+            
             if not telegram_id or not callback_query_id:
+                logger.warning("Missing telegram_id or callback_query_id in callback_query")
                 return {"ok": False}
             
+            logger.info("Received callback_query from %d: %s", telegram_id, callback_data)
+            
             # Answer callback query immediately
-            await answer_callback_query(callback_query_id)
+            try:
+                await answer_callback_query(callback_query_id)
+            except Exception as e:
+                logger.error("Error answering callback query: %s", str(e))
+                # Continue processing even if answering fails
             
             # Check if user just registered
             user = await user_service.get_user_by_telegram_id(telegram_id)
             if user and not user.is_fully_registered:
-                logger.info(f"User {telegram_id} registered with early_backer={user.is_early_backer}")
+                logger.info("User %d registered with early_backer=%s", telegram_id, user.is_early_backer)
                 if user.is_early_backer:
                     # Early backer - already welcomed in /proof endpoint
                     await redis_service.set_status_registered(telegram_id)
@@ -358,7 +381,7 @@ async def telegram_webhook(
             # Handle callback requests
             success = await handle_callback_query(
                 telegram_id,
-                callback_query.get("data", ""),
+                callback_data,
                 user_service,
                 redis_service,
                 redis,
@@ -369,7 +392,7 @@ async def telegram_webhook(
         return {"ok": True}
         
     except Exception as e:
-        logger.error(f"Error processing update: {e}")
+        logger.error("Error processing update: %s", str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await session.close()

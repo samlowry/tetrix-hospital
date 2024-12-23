@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timedelta
 from models.metrics import TetrixMetrics
 from typing import Optional
+from locales.emotions import get_emotion_by_percentage
 
 logger = logging.getLogger(__name__)
 
@@ -170,17 +171,26 @@ class TetrixService:
         """Get all TETRIX metrics from cache"""
         try:
             # Get cached values
-            price_data = await self._get_cached_value("tetrix:price")
-            holders_data = await self._get_cached_value("tetrix:holders")
-            volume_data = await self._get_cached_value("tetrix:volume")
+            price_data = await self._get_cached_or_fetch("tetrix:price", self._fetch_price_and_cap, CACHE_TIME)
+            holders_data = await self._get_cached_or_fetch("tetrix:holders", self._fetch_holders, CACHE_TIME)
+            volume_data = await self._get_cached_or_fetch("tetrix:volume", self._fetch_volume, VOLUME_CACHE_TIME)
             
             if not all([price_data, holders_data, volume_data]):
+                logger.error("Some metrics are not available: price=%s, holders=%s, volume=%s", 
+                           bool(price_data), bool(holders_data), bool(volume_data))
                 raise ValueError("Some metrics are not available in cache")
             
             # Calculate percentages
             health_percent = min(100, (holders_data["holders_count"] / MAX_HOLDERS) * 100)
             strength_percent = min(100, (price_data["cap"] / MAX_CAP) * 100)
             mood_percent = min(100, (volume_data["volume"] / volume_data["max_volume"]) * 100) if volume_data["max_volume"] > 0 else 0
+            
+            # Get average percentage for emotion
+            avg_percent = (health_percent + strength_percent + mood_percent) / 3
+            emotion = get_emotion_by_percentage(avg_percent)
+            
+            logger.debug("Calculated metrics: health=%.2f%%, strength=%.2f%%, mood=%.2f%%, avg=%.2f%%",
+                      health_percent, strength_percent, mood_percent, avg_percent)
             
             return {
                 "health": {
@@ -198,6 +208,7 @@ class TetrixService:
                     "percent": mood_percent,
                     "bar": self._generate_bar(mood_percent)
                 },
+                "emotion": emotion,
                 "raw": {
                     "price": price_data["price"],
                     "market_cap": price_data["cap"],
@@ -207,7 +218,7 @@ class TetrixService:
                 }
             }
         except Exception as e:
-            logger.error(f"Error getting metrics: {e}", exc_info=True)
+            logger.error("Error getting metrics: %s", str(e), exc_info=True)
             raise
 
     async def _get_cached_value(self, key: str) -> Optional[dict]:
