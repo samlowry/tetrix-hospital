@@ -28,7 +28,7 @@ RUN mkdir -p /app/logs
 ENV PYTHONUNBUFFERED=1
 
 # Copy the entire backend2 folder
-COPY backend2/ .
+COPY backend2/* .
 
 # Run with uvicorn
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
