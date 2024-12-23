@@ -15,43 +15,61 @@ class SchedulerService:
         self.tasks: Dict[str, asyncio.Task] = {}
         self._running = False
         self._last_execution: Dict[str, datetime] = {}
+        from .leaderboard_service import LeaderboardService
+        self.leaderboard_service = LeaderboardService(session)
+
+    async def _ensure_metrics_populated(self):
+        """Check if metrics exist in Redis and populate if missing"""
+        # Check price and cap
+        price = await self.redis.get("tetrix:price")
+        cap = await self.redis.get("tetrix:cap")
+        if not price or not cap:
+            logger.info("Price or cap missing in Redis, fetching...")
+            await self._fetch_price_and_cap()
+        else:
+            logger.info("Price and cap exist in Redis, skipping initial fetch")
+
+        # Check holders
+        holders = await self.redis.get("tetrix:holders")
+        if not holders:
+            logger.info("Holders count missing in Redis, fetching...")
+            await self._fetch_holders()
+        else:
+            logger.info("Holders count exists in Redis, skipping initial fetch")
+
+        # Check volume
+        volume = await self.redis.get("tetrix:volume")
+        if not volume:
+            logger.info("Volume missing in Redis, fetching...")
+            await self._fetch_volume()
+        else:
+            logger.info("Volume exists in Redis, skipping initial fetch")
 
     async def start(self):
         """Start the scheduler"""
-        if self._running:
-            return
-        self._running = True
         logger.info("Starting scheduler service...")
-        
-        # Initial sequential execution of all tasks
         logger.info("Executing initial tasks sequentially...")
-        tasks_to_init = [
-            ("leaderboard", self._update_leaderboard),  # Move leaderboard first
-            ("price_and_cap", self._fetch_price_and_cap),
-            ("holders", self._fetch_holders),
-            ("volume", self._fetch_volume)
-        ]
-        
-        for name, func in tasks_to_init:
-            logger.info(f"Initial execution of {name}")
-            await self._execute_task(name, func)
-            logger.info(f"Initial {name} task completed")
-        
+
+        # First update leaderboard
+        logger.info("Initial execution of leaderboard")
+        await self._execute_task("leaderboard")
+        logger.info("Initial leaderboard task completed")
+
+        # Then ensure metrics are populated
+        await self._ensure_metrics_populated()
+
         logger.info("All initial tasks completed, starting periodic scheduling...")
-        
-        # Start periodic tasks
-        self.tasks["price_and_cap"] = asyncio.create_task(self._schedule_task(
-            "price_and_cap", self._fetch_price_and_cap, timedelta(minutes=1)
-        ))
-        self.tasks["holders"] = asyncio.create_task(self._schedule_task(
-            "holders", self._fetch_holders, timedelta(minutes=1)
-        ))
-        self.tasks["volume"] = asyncio.create_task(self._schedule_task(
-            "volume", self._fetch_volume, timedelta(minutes=10)
-        ))
-        self.tasks["leaderboard"] = asyncio.create_task(self._schedule_task(
-            "leaderboard", self._update_leaderboard, timedelta(hours=1)
-        ))
+
+        # Schedule periodic tasks
+        self.tasks = {
+            "leaderboard": {"interval": 3600, "last_execution": None},  # Every hour
+            "price_and_cap": {"interval": 60, "last_execution": None},  # Every minute
+            "holders": {"interval": 60, "last_execution": None},        # Every minute
+            "volume": {"interval": 600, "last_execution": None}         # Every 10 minutes
+        }
+
+        for task_name in self.tasks:
+            asyncio.create_task(self._schedule_task(task_name))
 
     async def stop(self):
         """Stop the scheduler"""
@@ -61,53 +79,34 @@ class SchedulerService:
         self.tasks.clear()
         logger.info("Scheduler service stopped")
 
-    async def _schedule_task(self, name: str, func: Callable, interval: timedelta):
-        """Schedule a periodic task"""
-        while self._running:
+    async def _schedule_task(self, task_name: str):
+        """Schedule a task to run periodically"""
+        while True:
             try:
-                last_run = self._last_execution.get(name)
-                now = datetime.utcnow()
-                
-                if last_run:
-                    # Calculate number of missed intervals
-                    time_since_last = now - last_run
-                    missed_intervals = time_since_last.total_seconds() / interval.total_seconds()
-                    
-                    if missed_intervals > 1:
-                        # If multiple intervals missed, log it and execute only once
-                        logger.info(f"Task {name} missed {int(missed_intervals)} intervals, executing latest")
-                        await self._execute_task(name, func)
-                    else:
-                        # Calculate time until next run
-                        next_run = last_run + interval
-                        if next_run > now:
-                            delay = (next_run - now).total_seconds()
-                            if delay > 0:
-                                await asyncio.sleep(delay)
-                        await self._execute_task(name, func)
-                else:
-                    # First run
-                    await self._execute_task(name, func)
-                
-                # Sleep for the interval
-                await asyncio.sleep(interval.total_seconds())
-                
+                await self._execute_task(task_name)
+                self.tasks[task_name]["last_execution"] = datetime.now()
+                await asyncio.sleep(self.tasks[task_name]["interval"])
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in scheduled task {name}: {e}", exc_info=True)
-                await asyncio.sleep(30)  # Wait before retry
+                logger.error(f"Error in task {task_name}: {e}", exc_info=True)
+                await asyncio.sleep(60)  # Wait a minute before retrying
 
-    async def _execute_task(self, name: str, func: Callable):
-        """Execute a task and update its last execution time"""
-        try:
-            start_time = datetime.utcnow()
-            logger.info(f"Executing task {name} at {start_time}")
-            await func()
-            self._last_execution[name] = start_time
-            logger.info(f"Task {name} completed successfully")
-        except Exception as e:
-            logger.error(f"Failed to execute task {name}: {e}", exc_info=True)
+    async def _execute_task(self, task_name: str):
+        """Execute a task and log its execution"""
+        logger.info(f"Executing task {task_name} at {datetime.now()}")
+        
+        if task_name == "leaderboard":
+            await self.leaderboard_service.ensure_populated()  # Check and populate if empty
+            await self.leaderboard_service.update_leaderboard()
+        elif task_name == "price_and_cap":
+            await self._fetch_price_and_cap()
+        elif task_name == "holders":
+            await self._fetch_holders()
+        elif task_name == "volume":
+            await self._fetch_volume()
+            
+        logger.info(f"Task {task_name} completed successfully")
 
     async def _fetch_price_and_cap(self):
         """Fetch price and market cap with extended cache time"""
