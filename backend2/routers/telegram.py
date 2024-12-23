@@ -250,7 +250,7 @@ async def handle_callback_query(
                     if code_info['status'] == 'used':
                         code_lines.append(f"~{code}~\n")
                     else:
-                        code_lines.append(f"```\n{code}\n```")
+                        code_lines.append(f"`{code}`\n")
                 
                 while len(code_lines) < user.max_invite_slots:
                     code_lines.append(INVITE_CODES_EMPTY)
