@@ -31,4 +31,5 @@ ENV PYTHONUNBUFFERED=1
 COPY backend2/ .
 
 # Run with uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
+# CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
+CMD ["sh", "-c", "sleep infinity"]
