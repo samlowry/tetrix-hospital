@@ -4,9 +4,9 @@ import uvicorn
 from contextlib import asynccontextmanager
 import logging
 import alembic.config
-from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+import os
 
 # Routers
 from routers import telegram, ton_connect, api
@@ -34,12 +34,11 @@ async def check_migrations_needed() -> bool:
     try:
         # Get current database version
         async with engine.connect() as connection:
-            context = MigrationContext.configure(connection)
-            current_rev = context.get_current_revision()
-        
+            result = await connection.execute(text("SELECT version_num FROM alembic_version"))
+            current_rev = result.scalar()
+
         # Get latest available version
-        config = alembic.config.Config("alembic.ini")
-        script = ScriptDirectory.from_config(config)
+        script = ScriptDirectory(os.path.join(os.path.dirname(__file__), 'migrations'))
         head_rev = script.get_current_head()
         
         # Compare versions
@@ -60,14 +59,23 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting application...")
     
+    # Initialize database first
+    logger.info("Initializing database...")
+    await init_db()  # Create tables if they don't exist
+    
     # Check and run migrations if needed
     if await check_migrations_needed():
         logger.info("Running database migrations...")
-        alembic.config.main(argv=['upgrade', 'head'])
-    
-    # Initialize database
-    logger.info("Initializing database...")
-    await init_db()  # Create tables if they don't exist
+        try:
+            alembic_cfg = alembic.config.Config()
+            alembic_cfg.set_main_option('script_location', os.path.join(os.path.dirname(__file__), 'migrations'))
+            alembic_cfg.set_main_option('sqlalchemy.url', str(engine.url))
+            logger.info("Starting Alembic migration...")
+            alembic.config.main(argv=['--raiseerr', 'upgrade', 'head'], config=alembic_cfg)
+            logger.info("Migration completed successfully")
+        except Exception as e:
+            logger.error(f"Migration failed: {e}", exc_info=True)
+            raise
     
     await telegram.setup_webhook()
     yield
