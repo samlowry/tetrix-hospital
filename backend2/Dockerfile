@@ -18,7 +18,7 @@ RUN mkdir -p /app/ssl && \
     -subj "/CN=tetrix.lol"
 
 # Install Python dependencies first to utilize Docker cache
-COPY backend2/requirements.txt requirements.txt
+COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create necessary directories
@@ -28,7 +28,7 @@ RUN mkdir -p /app/logs
 ENV PYTHONUNBUFFERED=1
 
 # Copy the entire backend2 folder
-COPY backend2/ .
+COPY . .
 
 # Run with uvicorn
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
