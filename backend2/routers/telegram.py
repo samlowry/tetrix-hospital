@@ -125,7 +125,6 @@ async def handle_start_command(
     # Fully registered user
     await redis_service.set_status_registered(telegram_id)
     stats = await user_service.get_user_stats(user)
-    available_invites = await user_service.get_available_invites(user)
     
     # Get TETRIX metrics
     tetrix_service = TetrixService(redis, session)
@@ -133,19 +132,21 @@ async def handle_start_command(
     
     return await send_telegram_message(
         telegram_id,
-        text=WELCOME_BACK.format(
+        text=WELCOME_BACK_SHORT + "\n\n" + STATS_TEMPLATE.format(
+            points=stats['points'],
             health_bar=tetrix_metrics['health']['bar'],
             strength_bar=tetrix_metrics['strength']['bar'],
             mood_bar=tetrix_metrics['mood']['bar'],
-            points=stats['points'],
-            total_invites=stats['total_invites'],
-            available_slots=available_invites
+            emotion=tetrix_metrics['emotion'],
+            holding_points=stats['points_breakdown']['holding'],
+            invite_points=stats['points_breakdown']['invites'],
+            early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
         ),
         parse_mode="Markdown",
         reply_markup={
             "inline_keyboard": [
-                [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}],
-                [{"text": BUTTONS["stats"], "callback_data": "check_stats"}]
+                [{"text": BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
+                [{"text": BUTTONS["show_invites"], "callback_data": "show_invites"}]
             ]
         }
     )
