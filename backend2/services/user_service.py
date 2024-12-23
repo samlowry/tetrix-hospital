@@ -5,12 +5,36 @@ from datetime import datetime, timedelta, timezone
 import secrets
 import logging
 import os
+import aiohttp
 
 from models.user import User
 from models.invite_code import InviteCode
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 logger = logging.getLogger(__name__)
+
+async def get_telegram_info(telegram_id: int) -> Tuple[Optional[str], Optional[str]]:
+    """Get user's display name and username via Bot API"""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        return None, None
+        
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/getChat"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params={'chat_id': telegram_id}) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get('ok'):
+                        result = data['result']
+                        first_name = result.get('first_name', '')
+                        last_name = result.get('last_name', '')
+                        display_name = f"{first_name} {last_name}".strip()
+                        username = result.get('username')
+                        return display_name or None, username
+    except Exception as e:
+        logger.error(f"Error getting Telegram info: {e}")
+    return None, None
 
 def utc_now() -> datetime:
     """Returns current UTC time"""
@@ -37,6 +61,10 @@ class UserService:
                 logger.info(f"[USER_SERVICE] User already exists with telegram_id={telegram_id}")
                 return existing_user
 
+            # Get Telegram info
+            display_name, username = await get_telegram_info(telegram_id)
+            logger.info(f"[USER_SERVICE] Got Telegram info: display_name={display_name}, username={username}")
+
             logger.info(f"[USER_SERVICE] Checking early backer status for wallet: {wallet_address}")
             # Use relative path from app.py
             file_path = 'first_backers.txt'
@@ -62,6 +90,8 @@ class UserService:
             logger.info(f"[USER_SERVICE] Creating new user object with telegram_id={telegram_id}, is_early_backer={is_early_backer}")
             user = User(
                 telegram_id=telegram_id,
+                telegram_display_name=display_name,
+                telegram_username=username,
                 wallet_address=wallet_address,
                 max_invite_slots=5,
                 ignore_slot_reset=False,
@@ -278,3 +308,20 @@ class UserService:
         except Exception:
             await self.session.rollback()
             raise 
+
+    async def update_telegram_info(self, user: User) -> bool:
+        """Update user's Telegram display name and username"""
+        try:
+            display_name, username = await get_telegram_info(user.telegram_id)
+            if display_name is not None or username is not None:
+                if display_name is not None:
+                    user.telegram_display_name = display_name
+                if username is not None:
+                    user.telegram_username = username
+                await self.session.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error updating Telegram info: {e}")
+            await self.session.rollback()
+            return False

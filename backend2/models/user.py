@@ -8,6 +8,8 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     wallet_address = Column(String, unique=True, nullable=False)
     telegram_id = Column(BigInteger, unique=True, nullable=False)
+    telegram_display_name = Column(String, nullable=True)
+    telegram_username = Column(String, nullable=True)
     registration_date = Column(DateTime, server_default=func.now())
     last_slot_reset = Column(DateTime, server_default=func.now())
     max_invite_slots = Column(Integer, default=5)
