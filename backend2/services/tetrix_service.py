@@ -21,8 +21,8 @@ TOTAL_SUPPLY = 1_000_000_000
 MAX_HOLDERS = 100_000  # 100K holders = 100% health
 MAX_CAP = 1_000_000  # $1M cap = 100% strength
 INITIAL_MAX_VOLUME = 100_000  # Initial max volume is 100K
-CACHE_TIME = 60  # 1 minute cache for most metrics
-VOLUME_CACHE_TIME = 600  # 10 minutes cache for volume
+CACHE_TIME = 120  # 2 minutes cache for most metrics (overhead)
+VOLUME_CACHE_TIME = 1200  # 20 minutes cache for volume (overhead)
 
 class TetrixService:
     def __init__(self, redis: Redis, session: AsyncSession = None):
@@ -168,26 +168,32 @@ class TetrixService:
     async def get_metrics(self):
         """Get all TETRIX metrics"""
         try:
-            # Get price and market cap
-            price_data = await self._get_cached_or_fetch(
-                "tetrix:price",
-                self._fetch_price_and_cap,
-                CACHE_TIME
-            )
+            # Get price and market cap from cache only
+            price_data = await self.redis.get("tetrix:price")
+            if not price_data:
+                logger.warning("Price data not in cache, fetching...")
+                price_data = await self._fetch_price_and_cap()
+                await self.redis.setex("tetrix:price", CACHE_TIME, json.dumps(price_data))
+            else:
+                price_data = json.loads(price_data)
             
-            # Get holders count
-            holders_data = await self._get_cached_or_fetch(
-                "tetrix:holders",
-                self._fetch_holders,
-                CACHE_TIME
-            )
+            # Get holders count from cache only
+            holders_data = await self.redis.get("tetrix:holders")
+            if not holders_data:
+                logger.warning("Holders data not in cache, fetching...")
+                holders_data = await self._fetch_holders()
+                await self.redis.setex("tetrix:holders", CACHE_TIME, json.dumps(holders_data))
+            else:
+                holders_data = json.loads(holders_data)
             
-            # Get volume
-            volume_data = await self._get_cached_or_fetch(
-                "tetrix:volume",
-                self._fetch_volume,
-                VOLUME_CACHE_TIME
-            )
+            # Get volume from cache only
+            volume_data = await self.redis.get("tetrix:volume")
+            if not volume_data:
+                logger.warning("Volume data not in cache, fetching...")
+                volume_data = await self._fetch_volume()
+                await self.redis.setex("tetrix:volume", VOLUME_CACHE_TIME, json.dumps(volume_data))
+            else:
+                volume_data = json.loads(volume_data)
             
             # Calculate percentages
             health_percent = min(100, (holders_data["holders_count"] / MAX_HOLDERS) * 100)
