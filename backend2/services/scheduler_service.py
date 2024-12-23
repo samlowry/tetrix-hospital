@@ -26,6 +26,7 @@ class SchedulerService:
         # Initial sequential execution of all tasks
         logger.info("Executing initial tasks sequentially...")
         tasks_to_init = [
+            ("leaderboard", self._update_leaderboard),  # Move leaderboard first
             ("price_and_cap", self._fetch_price_and_cap),
             ("holders", self._fetch_holders),
             ("volume", self._fetch_volume)
@@ -47,6 +48,9 @@ class SchedulerService:
         ))
         self.tasks["volume"] = asyncio.create_task(self._schedule_task(
             "volume", self._fetch_volume, timedelta(minutes=10)
+        ))
+        self.tasks["leaderboard"] = asyncio.create_task(self._schedule_task(
+            "leaderboard", self._update_leaderboard, timedelta(hours=1)
         ))
 
     async def stop(self):
@@ -125,3 +129,10 @@ class SchedulerService:
         tetrix = TetrixService(self.redis, self.session)
         data = await tetrix._fetch_volume()
         await self.redis.setex("tetrix:volume", 660, json.dumps(data))  # 11 minutes cache
+
+    async def _update_leaderboard(self):
+        """Update leaderboard snapshot"""
+        from .leaderboard_service import LeaderboardService
+        leaderboard_service = LeaderboardService(self.session)
+        await leaderboard_service.ensure_populated()  # Check and populate if empty
+        await leaderboard_service.update_leaderboard()

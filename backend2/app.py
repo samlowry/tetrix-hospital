@@ -13,6 +13,7 @@ from services.redis_service import RedisService
 from services.scheduler_service import SchedulerService
 from services.tetrix_service import TetrixService
 from core.config import Settings
+from models.database import init_db, engine, Base
 
 # Load settings
 settings = Settings()
@@ -74,6 +75,25 @@ async def lifespan(app: FastAPI):
     engine = create_async_engine(settings.DATABASE_URL)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     app.state.async_session = async_session
+
+    # Create tables and run migrations
+    logger.info("Initializing database...")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    # Check and run migrations if needed
+    if await check_migrations_needed():
+        logger.info("Running database migrations...")
+        try:
+            alembic_cfg = alembic.config.Config()
+            alembic_cfg.set_main_option('script_location', os.path.join(os.path.dirname(__file__), 'migrations'))
+            alembic_cfg.set_main_option('sqlalchemy.url', str(engine.url))
+            logger.info("Starting Alembic migration...")
+            alembic.config.main(argv=['--raiseerr', 'upgrade', 'head'], config=alembic_cfg)
+            logger.info("Migration completed successfully")
+        except Exception as e:
+            logger.error(f"Migration failed: {e}", exc_info=True)
+            raise
 
     # Initialize scheduler
     scheduler = SchedulerService(redis.redis, async_session())
