@@ -92,7 +92,7 @@ WALLET_CREATION_GUIDE = """Let's create a TON wallet:
 
 # Code formatting
 CODE_FORMATTING = {
-    "used": "~{}~\n",    # Used code
+    "used": "~~{}~~\n",    # Used code
     "active": "`{}`\n"   # Active code
 }
 
