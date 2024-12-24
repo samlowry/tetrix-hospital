@@ -287,7 +287,7 @@ class TelegramHandler:
                             "\n".join(code_lines) +
                             f"\n\n{strings.INVITE_CODES_REWARD}"
                         ),
-                        parse_mode="Markdown",
+                        parse_mode="HTML",
                         reply_markup={
                             "inline_keyboard": [
                                 [{"text": strings.BUTTONS["refresh_invites"], "callback_data": "refresh_invites"}],

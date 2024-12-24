@@ -39,7 +39,7 @@ You can get it from an active TETRIX friend."""
 WELCOME_BACK_SHORT = "Welcome back!"
 
 # Invite code messages
-INVITE_CODES_TITLE = "*Your invite codes:*"
+INVITE_CODES_TITLE = "<b>Your invite codes:</b>"
 INVITE_CODES_EMPTY = "*empty*"
 INVITE_CODES_REWARD = """+++ gratitude points for each new participant
 
@@ -92,8 +92,8 @@ WALLET_CREATION_GUIDE = """Let's create a TON wallet:
 
 # Code formatting
 CODE_FORMATTING = {
-    "used": "~~{}~~\n",    # Used code
-    "active": "`{}`\n"   # Active code
+    "used": "<s>{}</s>\n",    # Used code
+    "active": "<code>{}</code>\n"   # Active code
 }
 
 # Buttons

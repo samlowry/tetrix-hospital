@@ -39,7 +39,7 @@ WELCOME_NEED_INVITE = """✨ *Привет тебе, мой новый друг!
 WELCOME_BACK_SHORT = "С возвращением!"
 
 # Сообщения для инвайт-кодов
-INVITE_CODES_TITLE = "*Твои инвайт-коды:*" 
+INVITE_CODES_TITLE = "<b>Твои инвайт-коды:</b>" 
 INVITE_CODES_EMPTY = "*пусто*"
 INVITE_CODES_REWARD = """+++ поинты благодарности за каждого нового участника
 
@@ -92,8 +92,8 @@ WALLET_CREATION_GUIDE = """Создадим TON кошелек:
 
 # Форматирование кодов
 CODE_FORMATTING = {
-    "used": "~~{}~~\n",    # Использованный код
-    "active": "`{}`\n"   # Активный код
+    "used": "<s>{}</s>\n",    # Использованный код
+    "active": "<code>{}</code>\n"   # Активный код
 }
 
 # Кнопки
