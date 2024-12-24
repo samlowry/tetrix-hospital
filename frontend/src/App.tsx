@@ -4,6 +4,9 @@ import { WalletConnect } from './components/WalletConnect';
 import { UserDashboard } from './components/UserDashboard';
 import { useTonWallet } from '@tonconnect/ui-react';
 import { TonConnect } from './components/TonConnect';
+import { LanguageProvider } from './i18n/LanguageContext';
+import { LanguageSelector } from './components/LanguageSelector';
+import { useLanguage } from './i18n/LanguageContext';
 
 const Container = styled.div`
     padding: 20px;
@@ -23,23 +26,33 @@ const Card = styled.div`
     margin-bottom: 20px;
 `;
 
-const App: FC = () => {
+const AppContent: FC = () => {
     const wallet = useTonWallet();
+    const { t } = useLanguage();
 
     return (
         <Container>
             <TonConnect />
             <Header>
                 <h1>TETRIX</h1>
+                <LanguageSelector />
             </Header>
             <Card>
-                <h2>Подключить кошелёк</h2>
-                <p className="hint-text">Нажми кнопку ниже, чтобы подключить TON кошелёк:</p>
+                <h2>{t('connect_wallet.title')}</h2>
+                <p className="hint-text">{t('connect_wallet.hint')}</p>
                 <WalletConnect />
             </Card>
 
             {wallet && <UserDashboard />}
         </Container>
+    );
+};
+
+const App: FC = () => {
+    return (
+        <LanguageProvider>
+            <AppContent />
+        </LanguageProvider>
     );
 };
 

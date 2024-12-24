@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useTonAddress } from '@tonconnect/ui-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const Card = styled.div`
   padding: 20px;
@@ -23,12 +24,24 @@ const Text = styled.p`
 const Button = styled.button`
   margin-top: 15px;
   width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
 `;
 
 export function UserDashboard() {
   const userAddress = useTonAddress();
   const [countdown, setCountdown] = useState(6);
   const [showCloseButton, setShowCloseButton] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!userAddress) return;
@@ -54,12 +67,12 @@ export function UserDashboard() {
 
   return (
     <Card>
-      <Title>Статус проверки</Title>
-      <Text>Кошелёк успешно подтверждён</Text>
+      <Title>{t('dashboard.title')}</Title>
+      <Text>{t('dashboard.wallet_confirmed')}</Text>
       {countdown > 0 ? (
-        <Text>Возвращаемся к боту через {countdown} сек...</Text>
+        <Text>{t('dashboard.return_countdown').replace('{seconds}', countdown.toString())}</Text>
       ) : showCloseButton ? (
-        <Button onClick={handleClose}>Закрыть</Button>
+        <Button onClick={handleClose}>{t('dashboard.close')}</Button>
       ) : null}
     </Card>
   );

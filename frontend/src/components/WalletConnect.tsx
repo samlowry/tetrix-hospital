@@ -1,9 +1,7 @@
 import { TonConnectButton } from '@tonconnect/ui-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
-export const WalletConnect: React.FC = () => {
-    return (
-        <div className="wallet-connect">
-            <TonConnectButton />
-        </div>
-    );
-} 
+export const WalletConnect = () => {
+    const { t } = useLanguage();
+    return <TonConnectButton />;
+}; 
