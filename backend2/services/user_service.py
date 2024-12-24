@@ -43,6 +43,11 @@ def utc_now() -> datetime:
 class UserService:
     def __init__(self, session: AsyncSession):
         self.session = session
+        self.redis = None  # Will be set externally
+
+    async def set_redis(self, redis):
+        """Set Redis client instance"""
+        self.redis = redis
 
     async def create_user(
         self,
@@ -64,6 +69,10 @@ class UserService:
             # Get Telegram info
             display_name, username = await get_telegram_info(telegram_id)
             logger.info(f"[USER_SERVICE] Got Telegram info: display_name={display_name}, username={username}")
+
+            # Get user's current language preference
+            language = await self.get_user_locale(telegram_id)
+            logger.info(f"[USER_SERVICE] Got user language: {language}")
 
             logger.info(f"[USER_SERVICE] Checking early backer status for wallet: {wallet_address}")
             # Use relative path from app.py
@@ -96,7 +105,8 @@ class UserService:
                 max_invite_slots=5,
                 ignore_slot_reset=False,
                 is_early_backer=is_early_backer,
-                is_fully_registered=is_early_backer  # Early backers are automatically fully registered
+                is_fully_registered=is_early_backer,  # Early backers are automatically fully registered
+                language=language  # Save the language preference
             )
             
             logger.info("[USER_SERVICE] Adding user to session")
@@ -108,7 +118,7 @@ class UserService:
             logger.info("[USER_SERVICE] Refreshing user object")
             await self.session.refresh(user)
             
-            logger.info(f"[USER_SERVICE] User created successfully: telegram_id={telegram_id}, is_early_backer={is_early_backer}")
+            logger.info(f"[USER_SERVICE] User created successfully: telegram_id={telegram_id}, is_early_backer={is_early_backer}, language={language}")
             return user
             
         except Exception as e:
@@ -325,3 +335,43 @@ class UserService:
             logger.error(f"Error updating Telegram info: {e}")
             await self.session.rollback()
             return False
+
+    async def get_user_locale(self, telegram_id: int) -> str:
+        """
+        Get user's locale. Check Redis first for performance,
+        if not found - check DB and cache in Redis,
+        if nowhere - return 'ru'
+        """
+        # Try Redis first for performance
+        if self.redis:
+            redis_key = f"user:{telegram_id}:language"
+            lang = await self.redis.get(redis_key)
+            if lang:
+                return lang.decode('utf-8')
+
+        # If not in Redis, try DB and cache result
+        user = await self.get_user_by_telegram_id(telegram_id)
+        if user and user.language:
+            # Cache in Redis for future fast access
+            if self.redis:
+                redis_key = f"user:{telegram_id}:language"
+                await self.redis.set(redis_key, user.language)
+            return user.language
+
+        # Default to Russian
+        return 'ru'
+
+    async def set_user_locale(self, telegram_id: int, language: str) -> None:
+        """
+        Set user's locale. Always store in Redis for fast access,
+        and additionally update DB if user exists
+        """
+        # Always store in Redis if available
+        if self.redis:
+            redis_key = f"user:{telegram_id}:language"
+            await self.redis.set(redis_key, language)
+
+        # Additionally update in DB if user exists
+        user = await self.get_user_by_telegram_id(telegram_id)
+        if user:
+            await self.update_user(user, language=language)
