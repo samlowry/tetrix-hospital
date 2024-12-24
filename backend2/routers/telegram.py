@@ -101,6 +101,14 @@ class TelegramHandler:
     @with_locale
     async def handle_start_command(self, *, telegram_id: int, strings) -> bool:
         """Handle /start command"""
+        # First check if language is set in Redis
+        redis_key = f"user:{telegram_id}:language"
+        lang = await self.redis.get(redis_key)
+        
+        if not lang:
+            logger.debug(f"[WebApp] No language set for user {telegram_id}, showing language selection")
+            return await self.handle_language_selection(telegram_id=telegram_id, strings=strings)
+            
         # Check if user exists in DB
         user = await self.user_service.get_user_by_telegram_id(telegram_id)
         
