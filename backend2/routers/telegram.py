@@ -245,8 +245,7 @@ async def handle_callback_query(
                 codes = await user_service.generate_invite_codes(user)
                 code_lines = []
                 for code_info in codes:
-                    # Escape special characters for Markdown V2
-                    code = code_info['code'].replace('-', '\\-')
+                    code = code_info['code']
                     if code_info['status'] == 'used':
                         code_lines.append(f"~{code}~\n")
                     else:
@@ -262,7 +261,7 @@ async def handle_callback_query(
                         "\n".join(code_lines) +
                         f"\n\n{INVITE_CODES_REWARD}"
                     ),
-                    parse_mode="MarkdownV2",
+                    parse_mode="Markdown",
                     reply_markup={
                         "inline_keyboard": [
                             [{"text": BUTTONS["refresh_invites"], "callback_data": "refresh_invites"}],
