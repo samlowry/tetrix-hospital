@@ -22,7 +22,7 @@ TOTAL_SUPPLY = 1_000_000_000
 # Constants for 100% values
 MAX_HOLDERS = 100_000  # 100K holders = 100% health
 MAX_CAP = 1_000_000  # $1M cap = 100% strength
-INITIAL_MAX_VOLUME = 100_000  # Initial max volume is 100K
+INITIAL_MAX_VOLUME = 0  # Initial max volume is 0
 CACHE_TIME = 60  # 1 minute cache for most metrics
 VOLUME_CACHE_TIME = 600  # 10 minutes cache for volume
 
