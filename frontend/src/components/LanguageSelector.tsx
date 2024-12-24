@@ -28,7 +28,10 @@ export const LanguageSelector: React.FC = () => {
 
   const handleLanguageChange = (lang: 'en' | 'ru') => {
     setLanguage(lang);
-    window.location.hash = `lang=${lang}`;
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', lang);
+    window.history.replaceState({}, '', url.toString());
+    console.log('[WebApp] Language changed to:', lang);
   };
 
   return (

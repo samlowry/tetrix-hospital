@@ -107,6 +107,10 @@ class TelegramHandler:
         if not user:
             # New user - send to wallet connection
             await self.redis_service.set_status_waiting_wallet(telegram_id)
+            user_lang = await self.user_service.get_user_locale(telegram_id)
+            web_app_url = f"{settings.FRONTEND_URL}?lang={user_lang}"
+            logger.debug(f"[WebApp] Initial URL for user {telegram_id}: {web_app_url}, language: {user_lang}")
+            
             return await send_telegram_message(
                 chat_id=telegram_id,
                 text=strings.WELCOME_NEW_USER,
@@ -115,7 +119,7 @@ class TelegramHandler:
                     "inline_keyboard": [
                         [{
                             "text": strings.BUTTONS["connect_wallet"],
-                            "web_app": {"url": settings.FRONTEND_URL}
+                            "web_app": {"url": web_app_url}
                         }],
                         [{
                             "text": strings.BUTTONS["create_wallet"],
@@ -205,6 +209,10 @@ class TelegramHandler:
                 return await self.handle_language_change(telegram_id=telegram_id, lang=lang, strings=strings)
             
             if callback_data == "create_wallet":
+                user_lang = await self.user_service.get_user_locale(telegram_id)
+                web_app_url = f"{settings.FRONTEND_URL}?lang={user_lang}"
+                logger.debug(f"[WebApp] Generated URL from create_wallet for user {telegram_id}: {web_app_url}, language: {user_lang}")
+                
                 return await send_telegram_message(
                     chat_id=telegram_id,
                     text=strings.WALLET_CREATION_GUIDE,
@@ -212,7 +220,7 @@ class TelegramHandler:
                         "inline_keyboard": [
                             [{
                                 "text": strings.BUTTONS["connect_wallet"],
-                                "web_app": {"url": settings.FRONTEND_URL}
+                                "web_app": {"url": web_app_url}
                             }],
                             [{
                                 "text": strings.BUTTONS["back"],
@@ -223,7 +231,10 @@ class TelegramHandler:
                 )
             
             elif callback_data == "back_to_start":
-                # Return to initial menu
+                user_lang = await self.user_service.get_user_locale(telegram_id)
+                web_app_url = f"{settings.FRONTEND_URL}?lang={user_lang}"
+                logger.debug(f"[WebApp] Generated URL from back_to_start for user {telegram_id}: {web_app_url}, language: {user_lang}")
+                
                 return await send_telegram_message(
                     chat_id=telegram_id,
                     text=strings.WELCOME_NEW_USER,
@@ -232,7 +243,7 @@ class TelegramHandler:
                         "inline_keyboard": [
                             [{
                                 "text": strings.BUTTONS["connect_wallet"],
-                                "web_app": {"url": settings.FRONTEND_URL}
+                                "web_app": {"url": web_app_url}
                             }],
                             [{
                                 "text": strings.BUTTONS["create_wallet"],

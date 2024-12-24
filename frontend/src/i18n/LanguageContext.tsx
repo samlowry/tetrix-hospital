@@ -16,13 +16,16 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [language, setLanguage] = useState<Language>('ru');
 
   useEffect(() => {
-    // Get language from URL hash if present
-    const hash = window.location.hash;
-    if (hash.startsWith('#lang=')) {
-      const lang = hash.replace('#lang=', '') as Language;
-      if (lang === 'en' || lang === 'ru') {
-        setLanguage(lang);
-      }
+    // Get language from URL query parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const langParam = urlParams.get('lang');
+    console.log('[WebApp] Language from URL:', langParam);
+    
+    if (langParam === 'en' || langParam === 'ru') {
+      console.log('[WebApp] Setting language to:', langParam);
+      setLanguage(langParam);
+    } else {
+      console.log('[WebApp] Using default language: ru');
     }
   }, []);
 
