@@ -9,7 +9,7 @@ from models.database import get_session
 from services.user_service import UserService
 from services.redis_service import RedisService
 from core.deps import get_redis
-from locales.ru import WELCOME_EARLY_BACKER, WELCOME_NEED_INVITE, BUTTONS
+from locales.i18n import with_locale
 from routers.telegram import send_telegram_message
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,46 @@ class ProofRequest(BaseModel):
     telegram_id: int
     wallet_address: str
     payload: str
+
+class TonConnectHandler:
+    def __init__(self, user_service: UserService, redis_service: RedisService):
+        self.user_service = user_service
+        self.redis_service = redis_service
+
+    @with_locale
+    async def send_welcome_message(self, strings, telegram_id: int, is_early_backer: bool) -> bool:
+        """Send welcome message based on user type"""
+        if is_early_backer:
+            # Early backer - show special welcome message
+            logger.info(f"[TON_CONNECT] Setting status registered for early backer telegram_id={telegram_id}")
+            await self.redis_service.set_status_registered(telegram_id)
+            
+            logger.info(f"[TON_CONNECT] Sending WELCOME_EARLY_BACKER message to telegram_id={telegram_id}")
+            message_sent = await send_telegram_message(
+                telegram_id,
+                text=strings.WELCOME_EARLY_BACKER,
+                parse_mode="Markdown",
+                reply_markup={
+                    "inline_keyboard": [[{
+                        "text": strings.BUTTONS["stats"],
+                        "callback_data": "check_stats"
+                    }]]
+                }
+            )
+            logger.info(f"[TON_CONNECT] WELCOME_EARLY_BACKER message sent: {message_sent}")
+        else:
+            # Regular user - request invite code
+            logger.info(f"[TON_CONNECT] Setting status waiting_invite for regular user telegram_id={telegram_id}")
+            await self.redis_service.set_status_waiting_invite(telegram_id)
+            
+            logger.info(f"[TON_CONNECT] Sending WELCOME_NEED_INVITE message to telegram_id={telegram_id}")
+            message_sent = await send_telegram_message(
+                telegram_id,
+                text=strings.WELCOME_NEED_INVITE,
+                parse_mode="Markdown"
+            )
+            logger.info(f"[TON_CONNECT] WELCOME_NEED_INVITE message sent: {message_sent}")
+        return True
 
 @router.post("/get-message")
 async def get_message(request: MessageRequest):
@@ -51,6 +91,7 @@ async def verify_proof(
         logger.info(f"[TON_CONNECT] Starting verify_proof for telegram_id={request.telegram_id}, wallet={request.wallet_address}")
         user_service = UserService(session)
         redis_service = RedisService(redis)
+        handler = TonConnectHandler(user_service, redis_service)
         
         # Check if user exists with this telegram_id
         user = await user_service.get_user_by_telegram_id(request.telegram_id)
@@ -77,36 +118,7 @@ async def verify_proof(
             logger.info(f"[TON_CONNECT] User created successfully: telegram_id={request.telegram_id}, is_early_backer={user.is_early_backer}")
             
             # Send welcome message based on user type
-            if user.is_early_backer:
-                # Early backer - show special welcome message
-                logger.info(f"[TON_CONNECT] Setting status registered for early backer telegram_id={request.telegram_id}")
-                await redis_service.set_status_registered(request.telegram_id)
-                
-                logger.info(f"[TON_CONNECT] Sending WELCOME_EARLY_BACKER message to telegram_id={request.telegram_id}")
-                message_sent = await send_telegram_message(
-                    request.telegram_id,
-                    text=WELCOME_EARLY_BACKER,
-                    parse_mode="Markdown",
-                    reply_markup={
-                        "inline_keyboard": [[{
-                            "text": BUTTONS["stats"],
-                            "callback_data": "check_stats"
-                        }]]
-                    }
-                )
-                logger.info(f"[TON_CONNECT] WELCOME_EARLY_BACKER message sent: {message_sent}")
-            else:
-                # Regular user - request invite code
-                logger.info(f"[TON_CONNECT] Setting status waiting_invite for regular user telegram_id={request.telegram_id}")
-                await redis_service.set_status_waiting_invite(request.telegram_id)
-                
-                logger.info(f"[TON_CONNECT] Sending WELCOME_NEED_INVITE message to telegram_id={request.telegram_id}")
-                message_sent = await send_telegram_message(
-                    request.telegram_id,
-                    text=WELCOME_NEED_INVITE,
-                    parse_mode="Markdown"
-                )
-                logger.info(f"[TON_CONNECT] WELCOME_NEED_INVITE message sent: {message_sent}")
+            await handler.send_welcome_message(request.telegram_id, user.is_early_backer)
             
             return {"success": True}
         except Exception as e:

@@ -91,6 +91,12 @@ WALLET_CREATION_GUIDE = """Let's create a TON wallet:
 
 💡 Any other non-custodial TON wallet will also work"""
 
+# Code formatting
+CODE_FORMATTING = {
+    "used": "~{}~\n",    # Used code
+    "active": "`{}`\n"   # Active code
+}
+
 # Buttons
 BUTTONS = {
     "connect_wallet": "Connect wallet",
