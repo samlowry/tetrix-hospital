@@ -2,6 +2,10 @@
 Language file with English messages
 """
 
+# Language selection
+LANGUAGE_SELECT = "🌐 Choose language / Выберите язык:"
+LANGUAGE_CHANGED = "✅ Language changed to English"
+
 BOT_SIGNATURE = "_TETRIX (@T3TR1Xbot) - the first AI memecoin-tamagotchi on TON_"
 
 # Welcome messages
@@ -98,5 +102,7 @@ BUTTONS = {
     "show_invites": "Show invite codes",
     "refresh_invites": "Refresh list",
     "stats": "Show dashboard",
-    "refresh_stats": "Refresh stats"
+    "refresh_stats": "Refresh stats",
+    "lang_ru": "🇷🇺 Русский",
+    "lang_en": "🇬🇧 English"
 } 
