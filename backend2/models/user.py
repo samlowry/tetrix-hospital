@@ -16,11 +16,13 @@ class User(Base):
     ignore_slot_reset = Column(Boolean, default=False)
     is_early_backer = Column(Boolean, default=False)
     is_fully_registered = Column(Boolean, default=False)
+    language = Column(String(2), default='ru', nullable=False)
 
     # Валидация
     __table_args__ = (
         CheckConstraint("wallet_address ~ '^0:[a-fA-F0-9]{64}$'", name='check_wallet_address'),
         CheckConstraint("telegram_id > 0", name='check_telegram_id'),
+        CheckConstraint("language ~ '^[a-z]{2}$'", name='check_language_code'),
     )
 
     # Relationships
