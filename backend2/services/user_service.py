@@ -346,8 +346,9 @@ class UserService:
         if self.redis:
             redis_key = f"user:{telegram_id}:language"
             lang = await self.redis.get(redis_key)
+            logger.debug(f"Got language from Redis for {telegram_id}: {lang}")
             if lang:
-                return lang.decode('utf-8')
+                return lang  # Redis already returns decoded string
 
         # If not in Redis, try DB and cache result
         user = await self.get_user_by_telegram_id(telegram_id)
@@ -356,22 +357,26 @@ class UserService:
             if self.redis:
                 redis_key = f"user:{telegram_id}:language"
                 await self.redis.set(redis_key, user.language)
+                logger.debug(f"Cached language in Redis for {telegram_id}: {user.language}")
             return user.language
 
         # Default to Russian
+        logger.debug(f"Using default language for {telegram_id}")
         return 'ru'
 
     async def set_user_locale(self, telegram_id: int, language: str) -> None:
-        """
-        Set user's locale. Always store in Redis for fast access,
-        and additionally update DB if user exists
-        """
-        # Always store in Redis if available
+        """Set user's preferred language"""
+        logger.debug(f"Setting language for {telegram_id} to {language}")
         if self.redis:
             redis_key = f"user:{telegram_id}:language"
             await self.redis.set(redis_key, language)
+            logger.debug(f"Set language in Redis for {telegram_id}: {language}")
 
         # Additionally update in DB if user exists
         user = await self.get_user_by_telegram_id(telegram_id)
         if user:
-            await self.update_user(user, language=language)
+            user.language = language
+            await self.session.commit()
+            logger.debug(f"Updated language in DB for {telegram_id}: {language}")
+        else:
+            logger.debug(f"User {telegram_id} not found in DB")

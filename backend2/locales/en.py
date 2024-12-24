@@ -4,7 +4,6 @@ Language file with English messages
 
 # Language selection
 LANGUAGE_SELECT = "🌐 Choose language / Выберите язык:"
-LANGUAGE_CHANGED = "✅ Language changed to English"
 
 BOT_SIGNATURE = "_TETRIX (@T3TR1Xbot) - the first AI memecoin-tamagotchi on TON_"
 

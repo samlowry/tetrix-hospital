@@ -55,12 +55,14 @@ class TelegramHandler:
         self.redis_service = redis_service
         self.redis = redis
         self.session = session
+        # Set Redis client in user_service
+        self.user_service.redis = redis
 
     @with_locale
-    async def handle_language_selection(self, telegram_id: int, strings) -> bool:
+    async def handle_language_selection(self, *, telegram_id: int, strings) -> bool:
         """Show language selection menu"""
         return await send_telegram_message(
-            telegram_id,
+            chat_id=telegram_id,
             text=strings.LANGUAGE_SELECT,
             reply_markup={
                 "inline_keyboard": [
@@ -73,18 +75,31 @@ class TelegramHandler:
         )
 
     @with_locale
-    async def handle_language_change(self, telegram_id: int, strings, lang: str) -> bool:
+    async def handle_language_change(self, *, telegram_id: int, lang: str, strings) -> bool:
         """Handle language change"""
-        await self.user_service.set_user_locale(telegram_id, lang)
-        # Get new strings after language change
-        new_strings = await self.user_service.get_user_locale(telegram_id)
-        return await send_telegram_message(
-            telegram_id,
-            text=strings.LANGUAGE_CHANGED
-        )
+        # Always store in Redis for immediate effect
+        redis_key = f"user:{telegram_id}:language"
+        logger.debug(f"Setting language in Redis: key={redis_key}, value={lang}")
+        await self.redis.set(redis_key, lang)
+        
+        # Verify the value was set
+        saved_lang = await self.redis.get(redis_key)
+        logger.debug(f"Verified language in Redis: key={redis_key}, value={saved_lang}")
+        
+        # If user exists in DB, update there too
+        user = await self.user_service.get_user_by_telegram_id(telegram_id)
+        if user:
+            user.language = lang
+            await self.session.commit()
+            logger.debug(f"Updated language in DB for user {telegram_id}")
+        else:
+            logger.debug(f"User {telegram_id} not found in DB")
+            
+        # Show main menu with new locale
+        return await self.handle_start_command(telegram_id=telegram_id)
 
     @with_locale
-    async def handle_start_command(self, telegram_id: int, strings) -> bool:
+    async def handle_start_command(self, *, telegram_id: int, strings) -> bool:
         """Handle /start command"""
         # Check if user exists in DB
         user = await self.user_service.get_user_by_telegram_id(telegram_id)
@@ -93,7 +108,7 @@ class TelegramHandler:
             # New user - send to wallet connection
             await self.redis_service.set_status_waiting_wallet(telegram_id)
             return await send_telegram_message(
-                telegram_id,
+                chat_id=telegram_id,
                 text=strings.WELCOME_NEW_USER,
                 parse_mode="Markdown",
                 reply_markup={
@@ -115,7 +130,7 @@ class TelegramHandler:
             # User with wallet but without invite code
             await self.redis_service.set_status_waiting_invite(telegram_id)
             return await send_telegram_message(
-                telegram_id,
+                chat_id=telegram_id,
                 text=strings.WELCOME_NEED_INVITE,
                 parse_mode="Markdown"
             )
@@ -129,7 +144,7 @@ class TelegramHandler:
         tetrix_metrics = await tetrix_service.get_metrics()
         
         return await send_telegram_message(
-            telegram_id,
+            chat_id=telegram_id,
             text=strings.WELCOME_BACK_SHORT + "\n\n" + strings.STATS_TEMPLATE.format(
                 points=stats['points'],
                 health_bar=tetrix_metrics['health']['bar'],
@@ -150,7 +165,7 @@ class TelegramHandler:
         )
 
     @with_locale
-    async def handle_invite_code(self, telegram_id: int, strings, code: str) -> bool:
+    async def handle_invite_code(self, *, telegram_id: int, code: str, strings) -> bool:
         """Handle entered invite code"""
         user = await self.user_service.get_user_by_telegram_id(telegram_id)
         if not user:
@@ -161,7 +176,7 @@ class TelegramHandler:
             await self.redis_service.set_status_registered(telegram_id)
             
             return await send_telegram_message(
-                telegram_id,
+                chat_id=telegram_id,
                 text=strings.REGISTRATION_COMPLETE,
                 parse_mode="Markdown",
                 reply_markup={
@@ -174,24 +189,24 @@ class TelegramHandler:
             )
         else:
             return await send_telegram_message(
-                telegram_id,
+                chat_id=telegram_id,
                 text=strings.INVALID_INVITE_CODE
             )
 
     @with_locale
-    async def handle_callback_query(self, telegram_id: int, callback_data: str, strings) -> bool:
+    async def handle_callback_query(self, *, telegram_id: int, callback_data: str, strings) -> bool:
         """Handle callback requests from buttons"""
         try:
             logger.debug("Processing callback_data: %s for user %d", callback_data, telegram_id)
             
             # Handle language selection
             if callback_data.startswith("lang_"):
-                lang = callback_data.split("_")[1]
-                return await self.handle_language_change(telegram_id, strings, lang)
+                lang = callback_data[5:]  # Extract language code
+                return await self.handle_language_change(telegram_id=telegram_id, lang=lang, strings=strings)
             
             if callback_data == "create_wallet":
                 return await send_telegram_message(
-                    telegram_id,
+                    chat_id=telegram_id,
                     text=strings.WALLET_CREATION_GUIDE,
                     reply_markup={
                         "inline_keyboard": [
@@ -210,7 +225,7 @@ class TelegramHandler:
             elif callback_data == "back_to_start":
                 # Return to initial menu
                 return await send_telegram_message(
-                    telegram_id,
+                    chat_id=telegram_id,
                     text=strings.WELCOME_NEW_USER,
                     parse_mode="Markdown",
                     reply_markup={
@@ -247,7 +262,7 @@ class TelegramHandler:
                         code_lines.append(strings.INVITE_CODES_EMPTY)
                     
                     return await send_telegram_message(
-                        telegram_id,
+                        chat_id=telegram_id,
                         text=(
                             f"{strings.INVITE_CODES_TITLE}\n\n" +
                             "\n".join(code_lines) +
@@ -267,7 +282,7 @@ class TelegramHandler:
                     tetrix_metrics = await tetrix_service.get_metrics()
                     
                     return await send_telegram_message(
-                        telegram_id,
+                        chat_id=telegram_id,
                         text=strings.STATS_TEMPLATE.format(
                             points=stats['points'],
                             health_bar=tetrix_metrics['health']['bar'],
@@ -323,12 +338,12 @@ async def telegram_webhook(
             
             # Handle /start command
             if text == "/start":
-                success = await handler.handle_start_command(telegram_id)
+                success = await handler.handle_start_command(telegram_id=telegram_id)
                 return {"ok": success}
             
             # Handle /language command
             if text == "/language":
-                success = await handler.handle_language_selection(telegram_id)
+                success = await handler.handle_language_selection(telegram_id=telegram_id)
                 return {"ok": success}
             
             # Check user status
@@ -337,7 +352,7 @@ async def telegram_webhook(
             
             # If waiting for invite code
             if status == UserStatus.WAITING_INVITE.value and text:
-                success = await handler.handle_invite_code(telegram_id, text)
+                success = await handler.handle_invite_code(telegram_id=telegram_id, code=text)
                 return {"ok": success}
             
         elif callback_query:
@@ -369,11 +384,11 @@ async def telegram_webhook(
                 else:
                     # Regular user - request invite code
                     await redis_service.set_status_waiting_invite(telegram_id)
-                    await handler.handle_start_command(telegram_id)
+                    await handler.handle_start_command(telegram_id=telegram_id)
                 return {"ok": True}
             
             # Handle callback requests
-            success = await handler.handle_callback_query(telegram_id, callback_data)
+            success = await handler.handle_callback_query(telegram_id=telegram_id, callback_data=callback_data)
             return {"ok": success}
         
         return {"ok": True}

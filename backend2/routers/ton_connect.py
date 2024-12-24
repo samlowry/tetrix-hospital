@@ -91,6 +91,8 @@ async def verify_proof(
         logger.info(f"[TON_CONNECT] Starting verify_proof for telegram_id={request.telegram_id}, wallet={request.wallet_address}")
         user_service = UserService(session)
         redis_service = RedisService(redis)
+        # Set Redis client in user_service
+        user_service.redis = redis
         handler = TonConnectHandler(user_service, redis_service)
         
         # Check if user exists with this telegram_id
@@ -118,7 +120,10 @@ async def verify_proof(
             logger.info(f"[TON_CONNECT] User created successfully: telegram_id={request.telegram_id}, is_early_backer={user.is_early_backer}")
             
             # Send welcome message based on user type
-            await handler.send_welcome_message(request.telegram_id, user.is_early_backer)
+            try:
+                await handler.send_welcome_message(telegram_id=request.telegram_id, is_early_backer=user.is_early_backer)
+            except Exception as e:
+                logger.error(f"[TON_CONNECT] Error creating user: {e}")
             
             return {"success": True}
         except Exception as e:
