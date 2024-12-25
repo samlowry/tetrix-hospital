@@ -125,7 +125,8 @@ class TetrixService:
 
     async def _fetch_volume(self):
         """Fetch trading volume"""
-        today = datetime.utcnow()
+        now = datetime.utcnow()
+        twenty_four_hours_ago = now - timedelta(hours=24)
         
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -135,8 +136,8 @@ class TetrixService:
                     "accept": "application/json"
                 },
                 params={
-                    "since": today.strftime("%Y-%m-%dT00:00:00"),
-                    "until": today.strftime("%Y-%m-%dT23:59:59")
+                    "since": twenty_four_hours_ago.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "until": now.strftime("%Y-%m-%dT%H:%M:%S")
                 }
             ) as response:
                 try:
