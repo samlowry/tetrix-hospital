@@ -20,11 +20,11 @@ RUN mkdir -p /app/ssl && \
     -subj "/CN=tetrix.lol"
 
 # Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+COPY backend2/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY backend2/ .
 
 # Command to run the application
 CMD WORKERS=$(($(nproc) * 2 + 1)) && \
