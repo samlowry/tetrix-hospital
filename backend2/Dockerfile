@@ -31,11 +31,10 @@ RUN echo '#!/bin/sh\n\
 echo "Running database migrations..."\n\
 python -c "from migrations.migrate import run_migrations; run_migrations()"\n\
 echo "Starting application..."\n\
-WORKERS=$(($(nproc) * 2 + 1)) && \
 uvicorn app:app \
 --host 0.0.0.0 \
 --port 5000 \
---workers $WORKERS \
+--workers 1 \
 --ssl-keyfile /app/ssl/key.pem \
 --ssl-certfile /app/ssl/cert.pem' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
