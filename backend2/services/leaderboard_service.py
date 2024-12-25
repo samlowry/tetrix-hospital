@@ -48,6 +48,9 @@ class LeaderboardService:
 
         # Get all users and calculate their stats
         users = await self._get_users_with_stats()
+        
+        # Sort users by points in descending order
+        users.sort(key=lambda x: x[1]['points'], reverse=True)
         total_users = len(users)
 
         # Insert into temp table
