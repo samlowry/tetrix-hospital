@@ -1,13 +1,15 @@
-FROM python:3.9-slim
-
-WORKDIR /app
+FROM python:3.11-slim
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
     curl \
     openssl \
     && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
 
 # Generate self-signed certificate
 RUN mkdir -p /app/ssl && \
@@ -17,19 +19,18 @@ RUN mkdir -p /app/ssl && \
     -days 365 \
     -subj "/CN=tetrix.lol"
 
-# Install Python dependencies first to utilize Docker cache
-COPY backend2/requirements.txt requirements.txt
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create necessary directories
-RUN mkdir -p /app/logs
+# Copy application code
+COPY . .
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-
-# Copy the entire backend2 folder
-COPY backend2/ .
-
-# Run with uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
-# CMD ["sh", "-c", "sleep infinity"]
+# Command to run the application
+CMD WORKERS=$(($(nproc) * 2 + 1)) && \
+    uvicorn app:app \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --workers $WORKERS \
+    --ssl-keyfile /app/ssl/key.pem \
+    --ssl-certfile /app/ssl/cert.pem

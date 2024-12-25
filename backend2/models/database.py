@@ -4,7 +4,15 @@ from core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.DATABASE_URL)
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    pool_size=settings.WORKER_COUNT * settings.CONNECTIONS_PER_WORKER,
+    max_overflow=settings.WORKER_COUNT * settings.MAX_OVERFLOW_PER_WORKER,
+    pool_timeout=60,
+    pool_pre_ping=True,
+    echo=False
+)
+
 async_session = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import uvicorn
+import multiprocessing
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.database import get_session_local
 from services.user_service import UserService
@@ -22,5 +24,22 @@ async def test_create_user():
     finally:
         await session.close()
 
+def run_server():
+    """Запуск сервера с workers для тестирования"""
+    workers = (multiprocessing.cpu_count() * 2) + 1
+    print(f"Starting server with {workers} workers...")
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=5000,
+        workers=workers,
+        reload=True,
+        log_level="info"
+    )
+
 if __name__ == "__main__":
-    asyncio.run(test_create_user()) 
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "server":
+        run_server()
+    else:
+        asyncio.run(test_create_user()) 

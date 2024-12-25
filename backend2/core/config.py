@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "postgres"
     POSTGRES_PORT: int = 5432
     
+    # Workers and Connections
+    WORKER_COUNT: int = (os.cpu_count() or 1) * 2 + 1
+    CONNECTIONS_PER_WORKER: int = 5
+    MAX_OVERFLOW_PER_WORKER: int = 10
+    
     # Redis
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
