@@ -41,8 +41,44 @@ class LeaderboardSnapshot(Base):
         return None
 
     @classmethod
-    async def get_leaderboard(cls, session, limit: int = 100, offset: int = 0) -> List[Dict]:
-        """Получение лидерборда"""
+    async def get_combined_stats(cls, session) -> Dict:
+        """Get combined leaderboard statistics"""
+        query = text("""
+            SELECT 
+                COUNT(*) as total_users,
+                SUM(points) as total_points,
+                SUM(CASE WHEN is_early_backer THEN 1 ELSE 0 END) as total_early_backers,
+                SUM(total_invites) as total_invited_users
+            FROM leaderboard_snapshots
+            WHERE snapshot_time = (
+                SELECT MAX(snapshot_time)
+                FROM leaderboard_snapshots
+            )
+        """)
+        
+        result = await session.execute(query)
+        row = result.first()
+        return {
+            "total_users": row.total_users,
+            "total_points": row.total_points,
+            "total_early_backers": row.total_early_backers,
+            "total_invited_users": row.total_invited_users
+        }
+
+    @classmethod
+    async def get_leaderboard(cls, session, limit: int = 100, offset: int = 0) -> Dict:
+        """Get leaderboard with combined statistics"""
+        users = await cls._get_leaderboard_users(session, limit, offset)
+        stats = await cls.get_combined_stats(session)
+        
+        return {
+            "stats": stats,
+            "users": users
+        }
+
+    @classmethod
+    async def _get_leaderboard_users(cls, session, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """Get leaderboard users list"""
         query = text("""
             SELECT 
                 telegram_id,

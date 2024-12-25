@@ -54,14 +54,24 @@ async def get_user(
         
     return await user_service.get_user_stats(user)
 
-@router.get("/leaderboard", response_model=List[Dict])
+class LeaderboardStats(BaseModel):
+    total_users: int
+    total_points: int
+    total_early_backers: int
+    total_invited_users: int
+
+class LeaderboardResponse(BaseModel):
+    stats: LeaderboardStats
+    users: List[Dict]
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
     session: AsyncSession = Depends(get_session),
     limit: int = 10,
     api_key: str = Depends(get_api_key)
 ):
     """
-    Get leaderboard of top users by points from snapshots
+    Get leaderboard of top users by points from snapshots with combined statistics
     """
     return await LeaderboardSnapshot.get_leaderboard(session, limit=limit)
 
