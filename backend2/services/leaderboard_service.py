@@ -41,27 +41,43 @@ class LeaderboardService:
                 logger.info("Skipping leaderboard update - last update was less than an hour ago")
                 return
 
-        # Create temp table
-        await self.session.execute(
-            text("CREATE TEMP TABLE temp_leaderboard (LIKE leaderboard_snapshots INCLUDING ALL) ON COMMIT DROP")
-        )
-
         # Get all users and calculate their stats
         users = await self._get_users_with_stats()
         
-        # Sort users by points only
+        # Sort users by points in descending order
         users.sort(key=lambda x: x[1]['points'], reverse=True)
         total_users = len(users)
 
-        # Insert into temp table with ranks matching the sorted order
+        # Clear old snapshot
+        await self.session.execute(text("DELETE FROM leaderboard_snapshots"))
+        
+        # Track current rank and points for handling ties
+        current_rank = 1
+        current_points = None
+        rank_offset = 0
+
+        # Insert users with ranks matching their sorted position
         for idx, (user, stats, telegram_name) in enumerate(users, 1):
+            # If points changed, update rank (handling ties)
+            if current_points != stats['points']:
+                current_points = stats['points']
+                current_rank = idx
+                rank_offset = 0
+            else:
+                rank_offset += 1
+
             percentile = ((total_users - idx + 1) / total_users) * 100
-            logger.info(f"Assigning rank {idx} to {telegram_name} with {stats['points']} points")
+            logger.info(f"Assigning rank {current_rank} to {telegram_name} with {stats['points']} points")
+            
             await self.session.execute(
-                text("INSERT INTO temp_leaderboard (telegram_id, rank, points, total_invites, telegram_name, wallet_address, is_early_backer, percentile, total_users) VALUES (:telegram_id, :rank, :points, :total_invites, :telegram_name, :wallet_address, :is_early_backer, :percentile, :total_users)"),
+                text("""
+                    INSERT INTO leaderboard_snapshots 
+                    (telegram_id, rank, points, total_invites, telegram_name, wallet_address, is_early_backer, percentile, total_users) 
+                    VALUES (:telegram_id, :rank, :points, :total_invites, :telegram_name, :wallet_address, :is_early_backer, :percentile, :total_users)
+                """),
                 {
                     "telegram_id": user.telegram_id,
-                    "rank": idx,
+                    "rank": current_rank,  # Same rank for same points
                     "points": stats["points"],
                     "total_invites": stats["total_invites"],
                     "telegram_name": user.telegram_display_name or str(user.telegram_id),
@@ -71,10 +87,6 @@ class LeaderboardService:
                     "total_users": total_users
                 }
             )
-
-        # Replace main table contents
-        await self.session.execute(text("DELETE FROM leaderboard_snapshots"))
-        await self.session.execute(text("INSERT INTO leaderboard_snapshots SELECT * FROM temp_leaderboard"))
         
         logger.info("Leaderboard updated successfully")
 

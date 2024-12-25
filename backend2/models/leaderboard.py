@@ -46,11 +46,18 @@ class LeaderboardSnapshot(Base):
                 WITH latest_snapshot AS (
                     SELECT MAX(snapshot_time) as max_time 
                     FROM leaderboard_snapshots
-                ) 
-                SELECT telegram_id, telegram_name, points, total_invites, rank 
-                FROM leaderboard_snapshots ls 
-                WHERE snapshot_time = (SELECT max_time FROM latest_snapshot) 
-                ORDER BY points DESC, total_invites DESC 
+                ),
+                ranked_users AS (
+                    SELECT 
+                        telegram_id, 
+                        telegram_name, 
+                        points, 
+                        total_invites,
+                        DENSE_RANK() OVER (ORDER BY points DESC) as calculated_rank
+                    FROM leaderboard_snapshots ls 
+                    WHERE snapshot_time = (SELECT max_time FROM latest_snapshot)
+                )
+                SELECT * FROM ranked_users
                 LIMIT :limit OFFSET :offset
             """),
             {"limit": limit, "offset": offset}
@@ -61,7 +68,7 @@ class LeaderboardSnapshot(Base):
                 "telegram_name": row.telegram_name,
                 "points": row.points,
                 "total_invites": row.total_invites,
-                "rank": row.rank
+                "rank": row.calculated_rank
             }
             for row in result
         ] 
