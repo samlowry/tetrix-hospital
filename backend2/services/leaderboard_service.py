@@ -67,7 +67,7 @@ class LeaderboardService:
                 rank_offset += 1
 
             percentile = ((total_users - idx + 1) / total_users) * 100
-            logger.info(f"Assigning rank {current_rank} to {telegram_name} with {stats['points']} points")
+            logger.info(f"User data - telegram_id: {user.telegram_id}, username: {user.telegram_username}, display_name: {user.telegram_display_name}")
             
             await self.session.execute(
                 text("""
