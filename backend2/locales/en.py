@@ -5,7 +5,7 @@ Language file with English messages
 # Language selection
 LANGUAGE_SELECT = "🌐 Choose language / Выберите язык:"
 
-BOT_SIGNATURE = "_TETRIX (@T3TR1Xbot) - the first AI memecoin-tamagotchi on TON_"
+BOT_SIGNATURE = "_TETRIX (@T3TR1Xbot) - the first AI memecoin on TON. Cryptamagotchi_"
 
 # Welcome messages
 WELCOME_NEW_USER = """✨ *Hello!*

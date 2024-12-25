@@ -67,7 +67,19 @@ class LeaderboardService:
                 rank_offset += 1
 
             percentile = ((total_users - idx + 1) / total_users) * 100
-            logger.info(f"User data - telegram_id: {user.telegram_id}, username: {user.telegram_username}, display_name: {user.telegram_display_name}")
+            params = {
+                "telegram_id": user.telegram_id,
+                "rank": current_rank,  # Same rank for same points
+                "points": stats["points"],
+                "total_invites": stats["total_invites"],
+                "telegram_name": user.telegram_display_name or str(user.telegram_id),
+                "telegram_username": user.telegram_username,
+                "wallet_address": user.wallet_address,
+                "is_early_backer": user.is_early_backer,
+                "percentile": percentile,
+                "total_users": total_users
+            }
+            logger.info(f"SQL params: {params}")
             
             await self.session.execute(
                 text("""
@@ -75,21 +87,10 @@ class LeaderboardService:
                     (telegram_id, rank, points, total_invites, telegram_name, telegram_username, wallet_address, is_early_backer, percentile, total_users) 
                     VALUES (:telegram_id, :rank, :points, :total_invites, :telegram_name, :telegram_username, :wallet_address, :is_early_backer, :percentile, :total_users)
                 """),
-                {
-                    "telegram_id": user.telegram_id,
-                    "rank": current_rank,  # Same rank for same points
-                    "points": stats["points"],
-                    "total_invites": stats["total_invites"],
-                    "telegram_name": user.telegram_display_name or str(user.telegram_id),
-                    "telegram_username": user.telegram_username,
-                    "wallet_address": user.wallet_address,
-                    "is_early_backer": user.is_early_backer,
-                    "percentile": percentile,
-                    "total_users": total_users
-                }
+                params
             )
         
-        logger.info("Leaderboard updated successfully")
+        await self.session.commit()
 
     async def _get_users_with_stats(self):
         user_service = UserService(self.session)
