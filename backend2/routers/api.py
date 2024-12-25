@@ -135,9 +135,10 @@ async def rebuild_leaderboard(
     api_key: str = Depends(get_api_key)
 ):
     """
-    Force rebuild of the leaderboard
+    Force rebuild of the leaderboard, ignoring the hourly schedule.
+    Uses cached telegram names from the database.
     """
     from services.leaderboard_service import LeaderboardService
     leaderboard_service = LeaderboardService(session)
-    await leaderboard_service.update_leaderboard(force=True)
+    await leaderboard_service.update_leaderboard(force=True)  # Always force update when called via API
     return {"status": "success", "message": "Leaderboard rebuilt successfully"} 

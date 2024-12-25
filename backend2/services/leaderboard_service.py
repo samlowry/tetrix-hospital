@@ -41,17 +41,6 @@ class LeaderboardService:
                 logger.info("Skipping leaderboard update - last update was less than an hour ago")
                 return
 
-        # If force=True, update all telegram names
-        if force:
-            logger.info("Force update requested - updating all telegram names")
-            user_service = UserService(self.session)
-            result = await self.session.execute(select(User))
-            users = result.scalars().all()
-            for user in users:
-                name = await get_telegram_name(user.telegram_id)
-                user.telegram_display_name = name
-            await self.session.commit()
-
         # Create temp table
         await self.session.execute(
             text("CREATE TEMP TABLE temp_leaderboard (LIKE leaderboard_snapshots INCLUDING ALL) ON COMMIT DROP")
@@ -75,7 +64,7 @@ class LeaderboardService:
                     "rank": idx,
                     "points": stats["points"],
                     "total_invites": stats["total_invites"],
-                    "telegram_name": telegram_name,
+                    "telegram_name": user.telegram_display_name or str(user.telegram_id),
                     "wallet_address": user.wallet_address,
                     "is_early_backer": user.is_early_backer,
                     "percentile": percentile,
@@ -95,20 +84,7 @@ class LeaderboardService:
         users = result.scalars().all()
         stats = [await user_service.get_user_stats(user) for user in users]
         
-        # Use cached telegram names from database
-        telegram_names = []
-        for user in users:
-            if user.telegram_display_name:
-                telegram_names.append(user.telegram_display_name)
-            else:
-                # Only fetch from API if name is missing
-                name = await get_telegram_name(user.telegram_id)
-                # Update in database for future use
-                user.telegram_display_name = name
-                telegram_names.append(name)
-        
-        # Commit any name updates
-        if any(not user.telegram_display_name for user in users):
-            await self.session.commit()
+        # Just use whatever name is in the database, no API calls
+        telegram_names = [user.telegram_display_name or str(user.telegram_id) for user in users]
             
         return list(zip(users, stats, telegram_names))
