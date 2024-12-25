@@ -17,14 +17,24 @@ def get_db_connection():
 def ensure_migrations_table(conn):
     """Создаем таблицу для отслеживания миграций если её нет"""
     with conn.cursor() as cur:
+        # Проверяем существование таблицы
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS migrations (
-                id serial PRIMARY KEY,
-                name varchar(255) NOT NULL UNIQUE,
-                applied_at timestamp DEFAULT CURRENT_TIMESTAMP
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'migrations'
             );
         """)
-    conn.commit()
+        table_exists = cur.fetchone()[0]
+        
+        if not table_exists:
+            cur.execute("""
+                CREATE TABLE migrations (
+                    id serial PRIMARY KEY,
+                    name varchar(255) NOT NULL UNIQUE,
+                    applied_at timestamp DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.commit()
 
 def get_applied_migrations(conn):
     """Получаем список примененных миграций"""
