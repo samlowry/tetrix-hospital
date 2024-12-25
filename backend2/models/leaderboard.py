@@ -41,7 +41,7 @@ class LeaderboardSnapshot(Base):
         return None
 
     @classmethod
-    def get_leaderboard(cls, limit: int = 100, offset: int = 0) -> List[Dict]:
+    async def get_leaderboard(cls, session, limit: int = 100, offset: int = 0) -> List[Dict]:
         """Получение лидерборда"""
         query = text("""
             SELECT 
@@ -64,20 +64,20 @@ class LeaderboardSnapshot(Base):
             LIMIT :limit OFFSET :offset
         """)
 
-        with engine.connect() as conn:
-            result = conn.execute(query, {"limit": limit, "offset": offset})
-            return [
-                {
-                    "telegram_id": row.telegram_id,
-                    "rank": row.rank,
-                    "points": row.points,
-                    "total_invites": row.total_invites,
-                    "telegram_name": row.telegram_name,
-                    "telegram_username": row.telegram_username,
-                    "wallet_address": row.wallet_address,
-                    "is_early_backer": row.is_early_backer,
-                    "percentile": row.percentile,
-                    "total_users": row.total_users
-                }
-                for row in result
-            ] 
+        result = await session.execute(query, {"limit": limit, "offset": offset})
+        rows = result.fetchall()
+        return [
+            {
+                "telegram_id": row.telegram_id,
+                "rank": row.rank,
+                "points": row.points,
+                "total_invites": row.total_invites,
+                "telegram_name": row.telegram_name,
+                "telegram_username": row.telegram_username,
+                "wallet_address": row.wallet_address,
+                "is_early_backer": row.is_early_backer,
+                "percentile": row.percentile,
+                "total_users": row.total_users
+            }
+            for row in rows
+        ] 
