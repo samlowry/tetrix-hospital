@@ -5,8 +5,10 @@ import multiprocessing
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.database import get_session_local
 from services.user_service import UserService
+from migrations.migrate import run_migrations
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 async def test_create_user():
     """Тест функции create_user"""
@@ -27,7 +29,15 @@ async def test_create_user():
 def run_server():
     """Запуск сервера с workers для тестирования"""
     workers = (multiprocessing.cpu_count() * 2) + 1
-    print(f"Starting server with {workers} workers...")
+    logger.info("Running database migrations...")
+    try:
+        run_migrations()
+        logger.info("Database migrations completed successfully")
+    except Exception as e:
+        logger.error(f"Failed to run migrations: {e}")
+        raise
+
+    logger.info(f"Starting server with {workers} workers...")
     uvicorn.run(
         "app:app",
         host="0.0.0.0",

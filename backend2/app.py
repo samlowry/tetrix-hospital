@@ -50,19 +50,10 @@ async def lifespan(app: FastAPI):
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     app.state.async_session = async_session
 
-    # Create tables and run migrations
+    # Create tables
     logger.info("Initializing database...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    # Run SQL migrations
-    logger.info("Running SQL migrations...")
-    try:
-        run_migrations()
-        logger.info("SQL migrations completed successfully")
-    except Exception as e:
-        logger.error(f"Migration failed: {e}", exc_info=True)
-        raise
 
     # Initialize scheduler
     scheduler = SchedulerService(redis.redis, async_session)

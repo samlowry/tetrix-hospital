@@ -26,11 +26,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend2/ .
 
-# Command to run the application
-CMD WORKERS=$(($(nproc) * 2 + 1)) && \
-    uvicorn app:app \
-    --host 0.0.0.0 \
-    --port 5000 \
-    --workers $WORKERS \
-    --ssl-keyfile /app/ssl/key.pem \
-    --ssl-certfile /app/ssl/cert.pem
+# Create entrypoint script for migrations and app startup
+RUN echo '#!/bin/sh\n\
+echo "Running database migrations..."\n\
+python -c "from migrations.migrate import run_migrations; run_migrations()"\n\
+echo "Starting application..."\n\
+WORKERS=$(($(nproc) * 2 + 1)) && \
+uvicorn app:app \
+--host 0.0.0.0 \
+--port 5000 \
+--workers $WORKERS \
+--ssl-keyfile /app/ssl/key.pem \
+--ssl-certfile /app/ssl/cert.pem' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Command to run migrations and start the application
+CMD ["/app/entrypoint.sh"]
