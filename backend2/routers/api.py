@@ -128,3 +128,16 @@ async def get_combined_stats(
         'leaderboard': leaderboard,
         'tetrix': tetrix_metrics
     } 
+
+@router.post("/leaderboard/rebuild", response_model=Dict)
+async def rebuild_leaderboard(
+    session: AsyncSession = Depends(get_session),
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Force rebuild of the leaderboard
+    """
+    from services.leaderboard_service import LeaderboardService
+    leaderboard_service = LeaderboardService(session)
+    await leaderboard_service.update_leaderboard(force=True)
+    return {"status": "success", "message": "Leaderboard rebuilt successfully"} 
