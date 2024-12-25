@@ -72,8 +72,8 @@ class LeaderboardService:
             await self.session.execute(
                 text("""
                     INSERT INTO leaderboard_snapshots 
-                    (telegram_id, rank, points, total_invites, telegram_name, wallet_address, is_early_backer, percentile, total_users) 
-                    VALUES (:telegram_id, :rank, :points, :total_invites, :telegram_name, :wallet_address, :is_early_backer, :percentile, :total_users)
+                    (telegram_id, rank, points, total_invites, telegram_name, telegram_username, wallet_address, is_early_backer, percentile, total_users) 
+                    VALUES (:telegram_id, :rank, :points, :total_invites, :telegram_name, :telegram_username, :wallet_address, :is_early_backer, :percentile, :total_users)
                 """),
                 {
                     "telegram_id": user.telegram_id,
@@ -81,6 +81,7 @@ class LeaderboardService:
                     "points": stats["points"],
                     "total_invites": stats["total_invites"],
                     "telegram_name": user.telegram_display_name or str(user.telegram_id),
+                    "telegram_username": user.telegram_username,
                     "wallet_address": user.wallet_address,
                     "is_early_backer": user.is_early_backer,
                     "percentile": percentile,

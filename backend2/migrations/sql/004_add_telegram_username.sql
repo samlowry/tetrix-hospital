@@ -1,0 +1,1 @@
+ALTER TABLE leaderboard_snapshots ADD COLUMN telegram_username character varying(255); 

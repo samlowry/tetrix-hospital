@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, BigInteger, Boolean, Float, DateTime, func, text
 from .database import Base
+from typing import List, Dict
 
 class LeaderboardSnapshot(Base):
     __tablename__ = "leaderboard_snapshots"
@@ -10,6 +11,7 @@ class LeaderboardSnapshot(Base):
     points = Column(Integer, nullable=False)
     total_invites = Column(Integer, nullable=False)
     telegram_name = Column(String(255))
+    telegram_username = Column(String(255))
     wallet_address = Column(String(255))
     is_early_backer = Column(Boolean, nullable=False, default=False)
     percentile = Column(Float, nullable=False)
@@ -39,36 +41,43 @@ class LeaderboardSnapshot(Base):
         return None
 
     @classmethod
-    async def get_leaderboard(cls, session, limit: int = 10, offset: int = 0) -> list:
-        """Get latest leaderboard entries"""
-        result = await session.execute(
-            text("""
-                WITH latest_snapshot AS (
-                    SELECT MAX(snapshot_time) as max_time 
-                    FROM leaderboard_snapshots
-                ),
-                ranked_users AS (
-                    SELECT 
-                        telegram_id, 
-                        telegram_name, 
-                        points, 
-                        total_invites,
-                        DENSE_RANK() OVER (ORDER BY points DESC) as calculated_rank
-                    FROM leaderboard_snapshots ls 
-                    WHERE snapshot_time = (SELECT max_time FROM latest_snapshot)
-                )
-                SELECT * FROM ranked_users
-                LIMIT :limit OFFSET :offset
-            """),
-            {"limit": limit, "offset": offset}
-        )
-        return [
-            {
-                "telegram_id": row.telegram_id,
-                "telegram_name": row.telegram_name,
-                "points": row.points,
-                "total_invites": row.total_invites,
-                "rank": row.calculated_rank
-            }
-            for row in result
-        ] 
+    def get_leaderboard(cls, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """Получение лидерборда"""
+        query = text("""
+            SELECT 
+                telegram_id,
+                rank,
+                points,
+                total_invites,
+                telegram_name,
+                telegram_username,
+                wallet_address,
+                is_early_backer,
+                percentile,
+                total_users
+            FROM leaderboard_snapshots
+            WHERE snapshot_time = (
+                SELECT MAX(snapshot_time)
+                FROM leaderboard_snapshots
+            )
+            ORDER BY rank
+            LIMIT :limit OFFSET :offset
+        """)
+
+        with engine.connect() as conn:
+            result = conn.execute(query, {"limit": limit, "offset": offset})
+            return [
+                {
+                    "telegram_id": row.telegram_id,
+                    "rank": row.rank,
+                    "points": row.points,
+                    "total_invites": row.total_invites,
+                    "telegram_name": row.telegram_name,
+                    "telegram_username": row.telegram_username,
+                    "wallet_address": row.wallet_address,
+                    "is_early_backer": row.is_early_backer,
+                    "percentile": row.percentile,
+                    "total_users": row.total_users
+                }
+                for row in result
+            ] 
