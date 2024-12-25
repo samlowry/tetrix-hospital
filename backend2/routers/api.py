@@ -75,6 +75,20 @@ async def get_leaderboard(
     """
     return await LeaderboardSnapshot.get_leaderboard(session, limit=limit)
 
+@router.post("/leaderboard/rebuild", response_model=Dict)
+async def rebuild_leaderboard(
+    session: AsyncSession = Depends(get_session),
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Force rebuild of the leaderboard, ignoring the hourly schedule.
+    Uses cached telegram names from the database.
+    """
+    from services.leaderboard_service import LeaderboardService
+    leaderboard_service = LeaderboardService(session)
+    await leaderboard_service.update_leaderboard(force=True)  # Always force update when called via API
+    return {"status": "success", "message": "Leaderboard rebuilt successfully"}
+
 @router.get("/tetrix-state", response_model=Dict)
 async def get_tetrix_state(
     redis: Redis = Depends(get_redis),
@@ -138,17 +152,3 @@ async def get_combined_stats(
         'leaderboard': leaderboard,
         'tetrix': tetrix_metrics
     } 
-
-@router.post("/leaderboard/rebuild", response_model=Dict)
-async def rebuild_leaderboard(
-    session: AsyncSession = Depends(get_session),
-    api_key: str = Depends(get_api_key)
-):
-    """
-    Force rebuild of the leaderboard, ignoring the hourly schedule.
-    Uses cached telegram names from the database.
-    """
-    from services.leaderboard_service import LeaderboardService
-    leaderboard_service = LeaderboardService(session)
-    await leaderboard_service.update_leaderboard(force=True)  # Always force update when called via API
-    return {"status": "success", "message": "Leaderboard rebuilt successfully"} 
