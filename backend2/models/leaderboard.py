@@ -42,7 +42,17 @@ class LeaderboardSnapshot(Base):
     async def get_leaderboard(cls, session, limit: int = 10, offset: int = 0) -> list:
         """Get latest leaderboard entries"""
         result = await session.execute(
-            text("WITH latest_snapshot AS (SELECT MAX(snapshot_time) as max_time FROM leaderboard_snapshots) SELECT telegram_id, telegram_name, points, total_invites, rank FROM leaderboard_snapshots ls WHERE snapshot_time = (SELECT max_time FROM latest_snapshot) ORDER BY rank LIMIT :limit OFFSET :offset"),
+            text("""
+                WITH latest_snapshot AS (
+                    SELECT MAX(snapshot_time) as max_time 
+                    FROM leaderboard_snapshots
+                ) 
+                SELECT telegram_id, telegram_name, points, total_invites, rank 
+                FROM leaderboard_snapshots ls 
+                WHERE snapshot_time = (SELECT max_time FROM latest_snapshot) 
+                ORDER BY points DESC, total_invites DESC 
+                LIMIT :limit OFFSET :offset
+            """),
             {"limit": limit, "offset": offset}
         )
         return [

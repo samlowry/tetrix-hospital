@@ -49,13 +49,14 @@ class LeaderboardService:
         # Get all users and calculate their stats
         users = await self._get_users_with_stats()
         
-        # Sort users by points in descending order
+        # Sort users by points only
         users.sort(key=lambda x: x[1]['points'], reverse=True)
         total_users = len(users)
 
-        # Insert into temp table
+        # Insert into temp table with ranks matching the sorted order
         for idx, (user, stats, telegram_name) in enumerate(users, 1):
             percentile = ((total_users - idx + 1) / total_users) * 100
+            logger.info(f"Assigning rank {idx} to {telegram_name} with {stats['points']} points")
             await self.session.execute(
                 text("INSERT INTO temp_leaderboard (telegram_id, rank, points, total_invites, telegram_name, wallet_address, is_early_backer, percentile, total_users) VALUES (:telegram_id, :rank, :points, :total_invites, :telegram_name, :wallet_address, :is_early_backer, :percentile, :total_users)"),
                 {
