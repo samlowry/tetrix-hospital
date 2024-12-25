@@ -2,6 +2,10 @@
 
 Telegram bot system for TETRIX token holders with metrics tracking and user management.
 
+## TODO
+- Move message formatting to HTML
+- Make invites by link
+
 ## Local Development Setup
 
 ### Prerequisites

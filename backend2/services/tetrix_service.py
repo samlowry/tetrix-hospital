@@ -36,35 +36,47 @@ class TetrixService:
         if not self.session:
             return INITIAL_MAX_VOLUME
 
-        result = await self.session.execute(
-            select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
-        )
-        max_volume = result.scalar_one_or_none()
-        
-        if not max_volume:
-            max_volume = TetrixMetrics(
-                key="max_volume",
-                value=INITIAL_MAX_VOLUME
-            )
-            self.session.add(max_volume)
-            await self.session.commit()
-            return INITIAL_MAX_VOLUME
-        
-        return max_volume.value
+        try:
+            async with self.session.begin():
+                result = await self.session.execute(
+                    select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
+                )
+                max_volume = result.scalar_one_or_none()
+                
+                if not max_volume:
+                    max_volume = TetrixMetrics(
+                        key="max_volume",
+                        value=INITIAL_MAX_VOLUME
+                    )
+                    self.session.add(max_volume)
+                    await self.session.commit()
+                    return INITIAL_MAX_VOLUME
+                
+                return max_volume.value
+        except Exception as e:
+            logger.error(f"Error in ensure_max_volume: {e}")
+            await self.session.rollback()
+            raise
 
     async def _update_max_volume(self, new_volume: float):
         """Update max volume in database if needed"""
         if not self.session:
             return
 
-        result = await self.session.execute(
-            select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
-        )
-        max_volume = result.scalar_one_or_none()
-        
-        if max_volume and new_volume > max_volume.value:
-            max_volume.value = new_volume
-            await self.session.commit()
+        try:
+            async with self.session.begin():
+                result = await self.session.execute(
+                    select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
+                )
+                max_volume = result.scalar_one_or_none()
+                
+                if max_volume and new_volume > max_volume.value:
+                    max_volume.value = new_volume
+                    await self.session.commit()
+        except Exception as e:
+            logger.error(f"Error in update_max_volume: {e}")
+            await self.session.rollback()
+            raise
 
     def _generate_bar(self, percentage: float) -> str:
         """Generate ASCII progress bar"""

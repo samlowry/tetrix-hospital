@@ -15,15 +15,19 @@ class LeaderboardService:
 
     async def ensure_populated(self):
         """Check if leaderboard is populated and fill it if empty"""
-        result = await self.session.execute(text("SELECT COUNT(*) FROM leaderboard_snapshots"))
-        count = result.scalar()
-        
-        if count == 0:
-            logger.info("Leaderboard table is empty, performing initial population")
-            await self.update_leaderboard(force=True)
-            logger.info("Initial leaderboard population completed")
-        else:
-            logger.info(f"Leaderboard table already contains {count} records, skipping update")
+        try:
+            result = await self.session.execute(text("SELECT COUNT(*) FROM leaderboard_snapshots"))
+            count = result.scalar()
+            
+            if count == 0:
+                logger.info("Leaderboard table is empty, performing initial population")
+                await self.update_leaderboard(force=True)
+                logger.info("Initial leaderboard population completed")
+            else:
+                logger.info(f"Leaderboard table already contains {count} records, skipping update")
+        except Exception as e:
+            logger.error(f"Error in ensure_populated: {e}")
+            raise
 
     async def update_leaderboard(self, force: bool = False):
         """Update leaderboard snapshot"""
@@ -65,11 +69,9 @@ class LeaderboardService:
             )
 
         # Replace main table contents
-        async with self.session.begin_nested():
-            await self.session.execute(text("DELETE FROM leaderboard_snapshots"))
-            await self.session.execute(text("INSERT INTO leaderboard_snapshots SELECT * FROM temp_leaderboard"))
-
-        await self.session.commit()
+        await self.session.execute(text("DELETE FROM leaderboard_snapshots"))
+        await self.session.execute(text("INSERT INTO leaderboard_snapshots SELECT * FROM temp_leaderboard"))
+        
         logger.info("Leaderboard updated successfully")
 
     async def _get_users_with_stats(self):

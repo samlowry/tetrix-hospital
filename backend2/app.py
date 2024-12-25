@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
             raise
 
     # Initialize scheduler
-    scheduler = SchedulerService(redis.redis, async_session())
+    scheduler = SchedulerService(redis.redis, async_session)
     app.state.scheduler = scheduler
     await scheduler.start()
 
