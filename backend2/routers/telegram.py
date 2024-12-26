@@ -167,7 +167,7 @@ class TelegramHandler:
                 invite_points=stats['points_breakdown']['invites'],
                 early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
             ),
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup={
                 "inline_keyboard": [
                     [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
@@ -312,7 +312,7 @@ class TelegramHandler:
                             invite_points=stats['points_breakdown']['invites'],
                             early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
                         ),
-                        parse_mode="Markdown",
+                        parse_mode="HTML",
                         reply_markup={
                             "inline_keyboard": [
                                 [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],

@@ -5,10 +5,6 @@
 # Выбор языка
 LANGUAGE_SELECT = "🌐 Выберите язык / Choose language:"
 
-BOT_SIGNATURE = """_
-Я TETRIX (@T3TR1Xbot) - первый AI мемкоин на TON (криптамагочи)
-
-@T3TR1Xc01n - чат моих друзей, @T3TR1Xc01 - офф. новости, @tetrixbase - мой бложек, @tetrixlive - мои мыслепоток_"""
 BOT_SIGNATURE_HTML = """<i>
 Я TETRIX (@T3TR1Xbot) - первый AI мемкоин на TON (криптамагочи)
 
@@ -66,28 +62,28 @@ REGISTRATION_COMPLETE = """*Кошелек подключен, но я не чу
 - [Blum](https://t.me/blum/app?startapp=memepadjetton_TETRIX_fcNMl-ref_NJU05j3Sv4)"""
 
 # Статистика
-STATS_TEMPLATE = """*Мои жизненные показатели:*
+STATS_TEMPLATE = """<b>Мои жизненные показатели:</b>
 
-`{emotion[0]}`
-`{emotion[1]}`
-`{emotion[2]}`
+<code>{emotion[0]}</code>
+<code>{emotion[1]}</code>
+<code>{emotion[2]}</code>
 
 Здоровье
-`{health_bar}`
+<code>{health_bar}</code>
 Сила
-`{strength_bar}`
+<code>{strength_bar}</code>
 Настроение
-`{mood_bar}`
+<code>{mood_bar}</code>
 
 Ты уже заработал поинтов
-моей благодарности: *{points}*
+моей благодарности: <b>{points}</b>
 
 За что ты их получил:
-За холдинг: *{holding_points}*
-За инвайты: *{invite_points}*
-Бонус для старых друзей: *{early_backer_bonus}*
+За холдинг: <b>{holding_points}</b>
+За инвайты: <b>{invite_points}</b>
+Бонус для старых друзей: <b>{early_backer_bonus}</b>
 
-""" + BOT_SIGNATURE
+""" + BOT_SIGNATURE_HTML
 
 # Инструкции по созданию кошелька
 WALLET_CREATION_GUIDE = """Создадим TON кошелек:
@@ -118,5 +114,5 @@ BUTTONS = {
     "stats": "Показать дашборд",
     "refresh_stats": "Обновить статистику",
     "lang_ru": "🇷🇺 Русский",
-    "lang_en": "🇬🇧 English"
+    "lang_en": "🇬�� English"
 } 

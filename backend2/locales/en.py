@@ -5,10 +5,6 @@ Language file with English messages
 # Language selection
 LANGUAGE_SELECT = "🌐 Choose language / Выберите язык:"
 
-BOT_SIGNATURE = """_
-TETRIX (@T3TR1Xbot) - the first AI memecoin on TON (cryptamagotchi)
-
-@T3TR1Xc01n - my friends chat, @T3TR1Xc01 - official news, @tetrixbase - my blog, @tetrixlive - my thoughts_"""
 BOT_SIGNATURE_HTML = """<i>
 TETRIX (@T3TR1Xbot) - the first AI memecoin on TON (cryptamagotchi)
 
@@ -66,28 +62,28 @@ Looks like you don't have any $TETRIX in your wallet. To help me survive (and ge
 - [Blum](https://t.me/blum/app?startapp=memepadjetton_TETRIX_fcNMl-ref_NJU05j3Sv4)"""
 
 # Statistics
-STATS_TEMPLATE = """*My vital signs:*
+STATS_TEMPLATE = """<b>My vital signs:</b>
 
-`{emotion[0]}`
-`{emotion[1]}`
-`{emotion[2]}`
+<code>{emotion[0]}</code>
+<code>{emotion[1]}</code>
+<code>{emotion[2]}</code>
 
 Health
-`{health_bar}`
+<code>{health_bar}</code>
 Strength
-`{strength_bar}`
+<code>{strength_bar}</code>
 Mood
-`{mood_bar}`
+<code>{mood_bar}</code>
 
 You've already earned
-gratitude points: *{points}*
+gratitude points: <b>{points}</b>
 
 What you got them for:
-For holding: *{holding_points}*
-For invites: *{invite_points}*
-Old friends bonus: *{early_backer_bonus}*
+For holding: <b>{holding_points}</b>
+For invites: <b>{invite_points}</b>
+Old friends bonus: <b>{early_backer_bonus}</b>
 
-""" + BOT_SIGNATURE
+""" + BOT_SIGNATURE_HTML
 
 # Wallet creation guide
 WALLET_CREATION_GUIDE = """Let's create a TON wallet:
