@@ -171,7 +171,8 @@ class TelegramHandler:
             reply_markup={
                 "inline_keyboard": [
                     [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
-                    [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}]
+                    [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}],
+                    [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard", "disable": True}]
                 ]
             }
         )
@@ -316,7 +317,8 @@ class TelegramHandler:
                         reply_markup={
                             "inline_keyboard": [
                                 [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
-                                [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}]
+                                [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}],
+                                [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard", "disable": True}]
                             ]
                         }
                     )

@@ -113,6 +113,7 @@ BUTTONS = {
     "refresh_invites": "Refresh list",
     "stats": "Show dashboard",
     "refresh_stats": "Refresh stats",
+    "leaderboard": "🏆 Coming soon: Leaderboard",
     "lang_ru": "🇷🇺 Русский",
     "lang_en": "🇬🇧 English"
 } 
