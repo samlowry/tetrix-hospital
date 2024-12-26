@@ -6,6 +6,7 @@ Telegram bot system for TETRIX token holders with metrics tracking and user mana
 - Move message formatting to HTML
 - Make invites by link
 - Onreload - don't request all parameters, use them from redis cache
+- make text for all steps more understandable 
 
 ## Local Development Setup
 

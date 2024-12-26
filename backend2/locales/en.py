@@ -5,7 +5,8 @@ Language file with English messages
 # Language selection
 LANGUAGE_SELECT = "🌐 Choose language / Выберите язык:"
 
-BOT_SIGNATURE = "_TETRIX (@T3TR1Xbot) - the first AI memecoin on TON. Cryptamagotchi_"
+BOT_SIGNATURE = "_TETRIX (@T3TR1Xbot) - the first AI memecoin on TON (cryptamagotchi)_"
+BOT_SIGNATURE_HTML = "<i>TETRIX (@T3TR1Xbot) - the first AI memecoin on TON (cryptamagotchi)</i>"
 
 # Welcome messages
 WELCOME_NEW_USER = """✨ *Hello!*
@@ -41,9 +42,11 @@ WELCOME_BACK_SHORT = "Welcome back!"
 # Invite code messages
 INVITE_CODES_TITLE = "<b>Your invite codes:</b>"
 INVITE_CODES_EMPTY = "*empty*"
-INVITE_CODES_REWARD = """+++ gratitude points for each new participant
+INVITE_CODES_REWARD = """- click on each code - it will be copied to clipboard
+- used code slots are replenished once a day
+- you get gratitude points for each new participant
 
-""" + BOT_SIGNATURE
+""" + BOT_SIGNATURE_HTML
 ENTER_INVITE_CODE = "Please enter your invite code:"
 INVALID_INVITE_CODE = "❌ Invalid or already used invite code. Try another one."
 
