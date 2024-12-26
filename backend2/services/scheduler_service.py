@@ -27,12 +27,10 @@ class SchedulerService:
                     leaderboard_service = LeaderboardService(session)
                     await leaderboard_service.ensure_populated()
                     await leaderboard_service.update_leaderboard()
-                elif task_name == "price_and_cap":
-                    await self._fetch_price_and_cap(session)
+                elif task_name == "metrics":
+                    await self._fetch_metrics(session)
                 elif task_name == "holders":
                     await self._fetch_holders(session)
-                elif task_name == "volume":
-                    await self._fetch_volume(session)
                     
                 await session.commit()
                 logger.info(f"Task {task_name} completed successfully")
@@ -41,12 +39,12 @@ class SchedulerService:
                 await session.rollback()
                 raise
 
-    async def _fetch_price_and_cap(self, session: AsyncSession):
-        """Fetch price and market cap with extended cache time"""
+    async def _fetch_metrics(self, session: AsyncSession):
+        """Fetch price and volume data from DexScreener"""
         from .tetrix_service import TetrixService
         tetrix = TetrixService(self.redis, session)
-        data = await tetrix._fetch_price_and_cap()
-        await self.redis.setex("tetrix:price", 90, json.dumps(data))  # 90 seconds cache
+        data = await tetrix._fetch_dexscreener_data()
+        await self.redis.setex("tetrix:dexscreener", 90, json.dumps(data))  # 90 seconds cache
 
     async def _fetch_holders(self, session: AsyncSession):
         """Fetch holders count with extended cache time"""
@@ -54,13 +52,6 @@ class SchedulerService:
         tetrix = TetrixService(self.redis, session)
         data = await tetrix._fetch_holders()
         await self.redis.setex("tetrix:holders", 90, json.dumps(data))  # 90 seconds cache
-
-    async def _fetch_volume(self, session: AsyncSession):
-        """Fetch volume with extended cache time"""
-        from .tetrix_service import TetrixService
-        tetrix = TetrixService(self.redis, session)
-        data = await tetrix._fetch_volume()
-        await self.redis.setex("tetrix:volume", 660, json.dumps(data))  # 11 minutes cache
 
     async def start(self):
         """Start the scheduler"""
@@ -80,9 +71,8 @@ class SchedulerService:
         # Schedule periodic tasks
         self.tasks = {
             "leaderboard": {"interval": 3600, "last_execution": None},  # Every hour
-            "price_and_cap": {"interval": 60, "last_execution": None},  # Every minute
-            "holders": {"interval": 60, "last_execution": None},        # Every minute
-            "volume": {"interval": 600, "last_execution": None}         # Every 10 minutes
+            "metrics": {"interval": 60, "last_execution": None},        # Every minute
+            "holders": {"interval": 60, "last_execution": None}         # Every minute
         }
 
         for task_name in self.tasks:
@@ -91,14 +81,13 @@ class SchedulerService:
     async def _ensure_metrics_populated(self):
         """Check if metrics exist in Redis and populate if missing"""
         async with self.session_factory() as session:
-            # Check price and cap
-            price = await self.redis.get("tetrix:price")
-            cap = await self.redis.get("tetrix:cap")
-            if not price or not cap:
-                logger.info("Price or cap missing in Redis, fetching...")
-                await self._fetch_price_and_cap(session)
+            # Check DexScreener data
+            dex_data = await self.redis.get("tetrix:dexscreener")
+            if not dex_data:
+                logger.info("DexScreener data missing in Redis, fetching...")
+                await self._fetch_metrics(session)
             else:
-                logger.info("Price and cap exist in Redis, skipping initial fetch")
+                logger.info("DexScreener data exists in Redis, skipping initial fetch")
 
             # Check holders
             holders = await self.redis.get("tetrix:holders")
@@ -107,14 +96,6 @@ class SchedulerService:
                 await self._fetch_holders(session)
             else:
                 logger.info("Holders count exists in Redis, skipping initial fetch")
-
-            # Check volume
-            volume = await self.redis.get("tetrix:volume")
-            if not volume:
-                logger.info("Volume missing in Redis, fetching...")
-                await self._fetch_volume(session)
-            else:
-                logger.info("Volume exists in Redis, skipping initial fetch")
 
     async def _schedule_task(self, task_name: str):
         """Schedule a task to run periodically"""
