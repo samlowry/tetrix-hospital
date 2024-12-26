@@ -153,11 +153,13 @@ class TetrixService:
             strength_percent = min(100, (dex_data["cap"] / MAX_CAP) * 100)
             mood_percent = min(100, (dex_data["volume"] / dex_data["max_volume"]) * 100) if dex_data["max_volume"] > 0 else 0
             
-            # Get average percentage for emotion
-            avg_percent = (health_percent + strength_percent + mood_percent) / 3
+            # Get average percentage for emotion with weights
+            # Health and Strength have weight 2.5, Mood has weight 1
+            # Total denominator is 2.5 + 2.5 + 1 = 6
+            avg_percent = (2.5 * health_percent + 2.5 * strength_percent + mood_percent) / 6
             emotion = get_emotion_by_percentage(avg_percent)
             
-            logger.debug("Calculated metrics: health=%.2f%%, strength=%.2f%%, mood=%.2f%%, avg=%.2f%%",
+            logger.debug("Calculated metrics: health=%.2f%%, strength=%.2f%%, mood=%.2f%%, weighted_avg=%.2f%%",
                       health_percent, strength_percent, mood_percent, avg_percent)
             
             return {
