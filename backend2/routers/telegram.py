@@ -400,6 +400,9 @@ class TelegramHandler:
                     # Close the pre block
                     message += "</pre>"
                     
+                    # Add footer with signature
+                    message += strings.LEADERBOARD_FOOTER
+                    
                     # Calculate pagination buttons
                     page_info = strings.BUTTONS["leaderboard_page"].format(
                         start=start_idx + 1,
