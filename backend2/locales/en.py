@@ -95,11 +95,11 @@ Rank: <b>{rank}</b>
 
 # Ranks
 RANKS = {
-    "newbie": "Sympathizer",        # Just started helping
-    "experienced": "Caretaker",     # Actively supporting
-    "pro": "Guardian",              # Seriously involved
-    "master": "Savior",             # Key supporter
-    "legend": "Guardian Angel"      # Most devoted protector
+    "newbie": "💝 Sympathizer",        # Support ribbon heart
+    "experienced": "🤗 Caretaker",     # Hugging face - care
+    "pro": "🛡️ Guardian",             # Shield - protection
+    "master": "⭐ Savior",            # Star - salvation
+    "legend": "😇 Angel"              # Angel with halo - ultimate protection
 }
 
 # Wallet creation guide
