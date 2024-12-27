@@ -419,11 +419,22 @@ class UserService:
 
     async def get_user_rank(self, user) -> str:
         """Get user's rank from leaderboard snapshot"""
+        # First get total number of users and user's rank
         query = text("""
-            SELECT rank 
-            FROM leaderboard_snapshots 
-            WHERE telegram_id = :telegram_id
-            AND snapshot_time = (
+            WITH snapshot AS (
+                SELECT snapshot_time, COUNT(*) as total_users
+                FROM leaderboard_snapshots
+                WHERE snapshot_time = (
+                    SELECT MAX(snapshot_time)
+                    FROM leaderboard_snapshots
+                )
+                GROUP BY snapshot_time
+            )
+            SELECT ls.rank, s.total_users
+            FROM leaderboard_snapshots ls
+            JOIN snapshot s ON ls.snapshot_time = s.snapshot_time
+            WHERE ls.telegram_id = :telegram_id
+            AND ls.snapshot_time = (
                 SELECT MAX(snapshot_time)
                 FROM leaderboard_snapshots
             )
@@ -437,13 +448,19 @@ class UserService:
             return "newbie"
             
         rank = row.rank
-        if rank <= 10:
+        total_users = row.total_users
+        
+        # Calculate percentage position (0-100%)
+        percentage = (rank / total_users) * 100
+        
+        # Assign ranks based on percentages
+        if percentage <= 5:  # Top 5%
             return "legend"
-        elif rank <= 50:
+        elif percentage <= 15:  # Top 15%
             return "master"
-        elif rank <= 100:
+        elif percentage <= 30:  # Top 30%
             return "pro"
-        elif rank <= 500:
+        elif percentage <= 50:  # Top 50%
             return "experienced"
-        else:
+        else:  # Bottom 50%
             return "newbie"

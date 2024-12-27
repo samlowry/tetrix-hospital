@@ -290,7 +290,7 @@ class TelegramHandler:
                     }
                 )
                 
-            elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites"] or callback_data.startswith("leaderboard"):
+            elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites"] or callback_data.startswith("leaderboard") or callback_data == "noop":
                 user = await self.user_service.get_user_by_telegram_id(telegram_id)
                 if not user or not user.is_fully_registered:
                     logger.warning("User %d not found or not fully registered", telegram_id)
@@ -343,6 +343,9 @@ class TelegramHandler:
                         elif parts[1] == "page" and len(parts) > 2:
                             # Keep the same page for refresh
                             current_page = int(parts[2])
+                    elif callback_data == "noop":
+                        # For old messages, treat noop as refresh of current page
+                        current_page = 0
                     
                     # Get leaderboard data from cache
                     leaderboard = await self.user_service.get_leaderboard_snapshot()
@@ -372,7 +375,7 @@ class TelegramHandler:
                         rank=strings.RANKS[user_rank]
                     )
                     
-                    # Start pre block for the entire list
+                    # Single pre block for the entire list
                     message += "<pre>"
                     
                     # Add paginated lines
@@ -388,9 +391,9 @@ class TelegramHandler:
                         pointer = " 👈" if leader['telegram_id'] == telegram_id else ""
                         line = f"{i:2d}. {name}{' ' * visual_padding}{leader['points']:5d}{pointer}\n"
                         
+                        # Add line with or without bold formatting
                         if leader['telegram_id'] == telegram_id:
-                            # Close pre block, add bold line, and reopen pre block
-                            message += "</pre><b><pre>" + line + "</pre></b><pre>"
+                            message += f"<b>{line}</b>"
                         else:
                             message += line
                             
