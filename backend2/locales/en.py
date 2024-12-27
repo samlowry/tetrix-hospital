@@ -85,6 +85,23 @@ Old friends bonus: <b>{early_backer_bonus}</b>
 
 """ + BOT_SIGNATURE_HTML
 
+# Leaderboard
+LEADERBOARD_TITLE = """🏆 <b>Leaderboard</b>
+
+Your position: <b>#{position}</b> ({points} points)
+Rank: <b>{rank}</b>
+
+"""
+
+# Ranks
+RANKS = {
+    "newbie": "Newbie",
+    "experienced": "Experienced",
+    "pro": "Pro",
+    "master": "Master",
+    "legend": "Legend"
+}
+
 # Wallet creation guide
 WALLET_CREATION_GUIDE = """Let's create a TON wallet:
 
@@ -113,7 +130,8 @@ BUTTONS = {
     "refresh_invites": "Refresh list",
     "stats": "Show dashboard",
     "refresh_stats": "Refresh stats",
-    "leaderboard": "🏆 Coming soon: Leaderboard",
+    "leaderboard": "🏆 Leaderboard",
+    "refresh_leaderboard": "Refresh leaderboard",
     "lang_ru": "🇷🇺 Русский",
     "lang_en": "🇬🇧 English"
 } 

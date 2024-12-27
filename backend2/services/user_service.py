@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
 import secrets
@@ -380,3 +380,71 @@ class UserService:
             logger.debug(f"Updated language in DB for {telegram_id}: {language}")
         else:
             logger.debug(f"User {telegram_id} not found in DB")
+
+    async def get_leaderboard_snapshot(self) -> list:
+        """Get top users from leaderboard snapshot table"""
+        query = text("""
+            SELECT 
+                ls.rank,
+                ls.telegram_id,
+                ls.telegram_name as name,
+                ls.points
+            FROM leaderboard_snapshots ls
+            WHERE ls.snapshot_time = (
+                SELECT MAX(snapshot_time)
+                FROM leaderboard_snapshots
+            )
+            ORDER BY ls.rank ASC
+            LIMIT 10
+        """)
+        result = await self.session.execute(query)
+        return [dict(r._mapping) for r in result]
+
+    async def get_user_leaderboard_position(self, user) -> int:
+        """Get user's position from leaderboard snapshot"""
+        query = text("""
+            SELECT rank 
+            FROM leaderboard_snapshots 
+            WHERE telegram_id = :telegram_id
+            AND snapshot_time = (
+                SELECT MAX(snapshot_time)
+                FROM leaderboard_snapshots
+            )
+        """)
+        result = await self.session.execute(
+            query, 
+            {"telegram_id": user.telegram_id}
+        )
+        row = result.first()
+        return row.rank if row else 0
+
+    async def get_user_rank(self, user) -> str:
+        """Get user's rank from leaderboard snapshot"""
+        query = text("""
+            SELECT rank 
+            FROM leaderboard_snapshots 
+            WHERE telegram_id = :telegram_id
+            AND snapshot_time = (
+                SELECT MAX(snapshot_time)
+                FROM leaderboard_snapshots
+            )
+        """)
+        result = await self.session.execute(
+            query, 
+            {"telegram_id": user.telegram_id}
+        )
+        row = result.first()
+        if not row:
+            return "newbie"
+            
+        rank = row.rank
+        if rank <= 10:
+            return "legend"
+        elif rank <= 50:
+            return "master"
+        elif rank <= 100:
+            return "pro"
+        elif rank <= 500:
+            return "experienced"
+        else:
+            return "newbie"

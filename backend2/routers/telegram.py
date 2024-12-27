@@ -49,6 +49,34 @@ async def answer_callback_query(callback_query_id: str) -> bool:
             logger.error(f"Error answering callback query: {await response.text()}")
             return False
 
+def get_visual_width(s: str) -> int:
+    """Calculate visual width of string, counting wide chars as 2 positions"""
+    width = 0
+    for char in s:
+        # Count emoji, circled letters and other wide chars as 2 positions
+        if ord(char) > 0x1FFF:  # Beyond Basic Latin and Latin-1 Supplement
+            width += 2
+        else:
+            width += 1
+    return width
+
+def trim_to_visual_width(s: str, max_width: int) -> str:
+    """Trim string to specified visual width, adding ellipsis if needed"""
+    if get_visual_width(s) <= max_width:
+        return s
+        
+    result = ""
+    current_width = 0
+    
+    for char in s:
+        char_width = 2 if ord(char) > 0x1FFF else 1
+        if current_width + char_width + 1 > max_width:  # +1 for ellipsis
+            return result + "…"
+        current_width += char_width
+        result += char
+        
+    return result
+
 class TelegramHandler:
     def __init__(self, user_service: UserService, redis_service: RedisService, redis: Redis, session: AsyncSession):
         self.user_service = user_service
@@ -172,7 +200,7 @@ class TelegramHandler:
                 "inline_keyboard": [
                     [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
                     [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}],
-                    [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard", "disable": True}]
+                    [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard"}]
                 ]
             }
         )
@@ -262,7 +290,7 @@ class TelegramHandler:
                     }
                 )
                 
-            elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites"]:
+            elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites", "leaderboard"]:
                 user = await self.user_service.get_user_by_telegram_id(telegram_id)
                 if not user or not user.is_fully_registered:
                     logger.warning("User %d not found or not fully registered", telegram_id)
@@ -296,6 +324,56 @@ class TelegramHandler:
                             ]
                         }
                     )
+                elif callback_data == "leaderboard":
+                    # Get leaderboard data from cache
+                    leaderboard = await self.user_service.get_leaderboard_snapshot()
+                    user_position = await self.user_service.get_user_leaderboard_position(user)
+                    user_rank = await self.user_service.get_user_rank(user)
+                    user_stats = await self.user_service.get_user_stats(user)
+                    
+                    # Format title with user's position
+                    message = strings.LEADERBOARD_TITLE.format(
+                        position=user_position,
+                        points=user_stats['points'],
+                        rank=strings.RANKS[user_rank]
+                    )
+                    
+                    # Start pre block for the entire list
+                    message += "<pre>"
+                    
+                    # Add top 10 lines
+                    for i, leader in enumerate(leaderboard[:10], 1):
+                        name = leader['name']
+                        # Trim name considering visual width
+                        name = trim_to_visual_width(name, 16)
+                            
+                        # Format with exact spacing (16 visual positions)
+                        visual_padding = 16 - get_visual_width(name)
+                        
+                        # Add pointer emoji only to user's line
+                        pointer = " 👈" if leader['telegram_id'] == telegram_id else ""
+                        line = f"{i:2d}. {name}{' ' * visual_padding}{leader['points']:5d}{pointer}\n"
+                        
+                        if leader['telegram_id'] == telegram_id:
+                            # Close pre block, add bold line, and reopen pre block
+                            message += "</pre><b><pre>" + line + "</pre></b><pre>"
+                        else:
+                            message += line
+                            
+                    # Close the pre block
+                    message += "</pre>"
+                    
+                    return await send_telegram_message(
+                        chat_id=telegram_id,
+                        text=message,
+                        parse_mode="HTML",
+                        reply_markup={
+                            "inline_keyboard": [
+                                [{"text": strings.BUTTONS["refresh_leaderboard"], "callback_data": "leaderboard"}],
+                                [{"text": strings.BUTTONS["back_to_stats"], "callback_data": "check_stats"}]
+                            ]
+                        }
+                    )
                 else:
                     stats = await self.user_service.get_user_stats(user)
                     tetrix_service = TetrixService(self.redis, self.session)
@@ -318,7 +396,7 @@ class TelegramHandler:
                             "inline_keyboard": [
                                 [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
                                 [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}],
-                                [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard", "disable": True}]
+                                [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard"}]
                             ]
                         }
                     )
