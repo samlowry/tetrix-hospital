@@ -95,11 +95,11 @@ Rank: <b>{rank}</b>
 
 # Ranks
 RANKS = {
-    "newbie": "Newbie",
-    "experienced": "Experienced",
-    "pro": "Pro",
-    "master": "Master",
-    "legend": "Legend"
+    "newbie": "Sympathizer",        # Just started helping
+    "experienced": "Caretaker",     # Actively supporting
+    "pro": "Guardian",              # Seriously involved
+    "master": "Savior",             # Key supporter
+    "legend": "Guardian Angel"      # Most devoted protector
 }
 
 # Wallet creation guide
