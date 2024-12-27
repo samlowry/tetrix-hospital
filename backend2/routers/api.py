@@ -67,13 +67,18 @@ class LeaderboardResponse(BaseModel):
 @router.get("/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
     session: AsyncSession = Depends(get_session),
-    limit: int = 10,
+    number: int = 10,
+    offset: int = 0,
     api_key: str = Depends(get_api_key)
 ):
     """
-    Get leaderboard of top users by points from snapshots with combined statistics
+    Get leaderboard of top users by points from snapshots with combined statistics.
+    Maximum number of users returned is 1000.
     """
-    return await LeaderboardSnapshot.get_leaderboard(session, limit=limit)
+    # Enforce maximum limit of 1000
+    if number > 1000:
+        number = 1000
+    return await LeaderboardSnapshot.get_leaderboard(session, limit=number, offset=offset)
 
 @router.post("/leaderboard/rebuild", response_model=Dict)
 async def rebuild_leaderboard(
