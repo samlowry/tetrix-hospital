@@ -290,7 +290,7 @@ class TelegramHandler:
                     }
                 )
                 
-            elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites", "leaderboard"]:
+            elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites"] or callback_data.startswith("leaderboard"):
                 user = await self.user_service.get_user_by_telegram_id(telegram_id)
                 if not user or not user.is_fully_registered:
                     logger.warning("User %d not found or not fully registered", telegram_id)
@@ -324,12 +324,46 @@ class TelegramHandler:
                             ]
                         }
                     )
-                elif callback_data == "leaderboard":
+                elif callback_data.startswith("leaderboard"):
+                    # Parse page from callback data
+                    parts = callback_data.split(":")
+                    current_page = 0
+                    
+                    if len(parts) > 1:
+                        # Extract current page from the navigation command
+                        if parts[1] == "next":
+                            # Extract page number from the button text
+                            if len(parts) > 2:
+                                current_page = int(parts[2])
+                            current_page += 1
+                        elif parts[1] == "prev":
+                            if len(parts) > 2:
+                                current_page = int(parts[2])
+                            current_page -= 1
+                        elif parts[1] == "page" and len(parts) > 2:
+                            # Keep the same page for refresh
+                            current_page = int(parts[2])
+                    
                     # Get leaderboard data from cache
                     leaderboard = await self.user_service.get_leaderboard_snapshot()
                     user_position = await self.user_service.get_user_leaderboard_position(user)
                     user_rank = await self.user_service.get_user_rank(user)
                     user_stats = await self.user_service.get_user_stats(user)
+                    
+                    # Calculate start and end indices based on page
+                    total_users = len(leaderboard)
+                    logger.debug(f"Total users in leaderboard: {total_users}")
+                    
+                    start_idx = 10 * current_page
+                    end_idx = min(start_idx + 10, total_users)
+                    
+                    # Adjust indices if they're out of bounds
+                    if start_idx >= total_users:
+                        start_idx = max(0, total_users - 10)
+                        end_idx = total_users
+                        current_page = start_idx // 10
+                    
+                    logger.debug(f"Page {current_page}, indices: {start_idx}-{end_idx}")
                     
                     # Format title with user's position
                     message = strings.LEADERBOARD_TITLE.format(
@@ -341,8 +375,8 @@ class TelegramHandler:
                     # Start pre block for the entire list
                     message += "<pre>"
                     
-                    # Add top 10 lines
-                    for i, leader in enumerate(leaderboard[:10], 1):
+                    # Add paginated lines
+                    for i, leader in enumerate(leaderboard[start_idx:end_idx], start_idx + 1):
                         name = leader['name']
                         # Trim name considering visual width
                         name = trim_to_visual_width(name, 16)
@@ -363,15 +397,45 @@ class TelegramHandler:
                     # Close the pre block
                     message += "</pre>"
                     
+                    # Calculate pagination buttons
+                    page_info = strings.BUTTONS["leaderboard_page"].format(
+                        start=start_idx + 1,
+                        end=end_idx,
+                        total=total_users
+                    )
+                    logger.debug(f"Page info: {page_info}, start_idx: {start_idx}, end_idx: {end_idx}")
+                    
+                    # Create navigation buttons
+                    keyboard = []
+                    nav_row = []
+                    
+                    # Add Prev button if not on first page
+                    if start_idx > 0:
+                        logger.debug("Adding Prev button")
+                        nav_row.append({"text": strings.BUTTONS["leaderboard_prev"], 
+                                      "callback_data": f"leaderboard:prev:{current_page}"})
+                    
+                    # Add current page info (now as refresh button)
+                    nav_row.append({"text": page_info, 
+                                  "callback_data": f"leaderboard:page:{current_page}"})
+                    
+                    # Add Next button if there are more users
+                    if end_idx < total_users:
+                        logger.debug(f"Adding Next button (end_idx: {end_idx} < total_users: {total_users})")
+                        nav_row.append({"text": strings.BUTTONS["leaderboard_next"], 
+                                      "callback_data": f"leaderboard:next:{current_page}"})
+                    
+                    keyboard.append(nav_row)
+                    keyboard.append([{"text": strings.BUTTONS["back_to_stats"], "callback_data": "check_stats"}])
+                    
+                    logger.debug(f"Final keyboard: {keyboard}")
+                    
                     return await send_telegram_message(
                         chat_id=telegram_id,
                         text=message,
                         parse_mode="HTML",
                         reply_markup={
-                            "inline_keyboard": [
-                                [{"text": strings.BUTTONS["refresh_leaderboard"], "callback_data": "leaderboard"}],
-                                [{"text": strings.BUTTONS["back_to_stats"], "callback_data": "check_stats"}]
-                            ]
+                            "inline_keyboard": keyboard
                         }
                     )
                 else:

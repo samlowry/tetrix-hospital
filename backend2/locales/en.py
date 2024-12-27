@@ -132,6 +132,9 @@ BUTTONS = {
     "refresh_stats": "Refresh stats",
     "leaderboard": "🏆 Leaderboard",
     "refresh_leaderboard": "Refresh leaderboard",
+    "leaderboard_prev": "◀️ Prev 10",
+    "leaderboard_next": "Next 10 ▶️",
+    "leaderboard_page": "🏆 {start}-{end}/{total}",
     "lang_ru": "🇷🇺 Русский",
     "lang_en": "🇬🇧 English"
 } 

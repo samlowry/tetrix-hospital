@@ -395,7 +395,6 @@ class UserService:
                 FROM leaderboard_snapshots
             )
             ORDER BY ls.rank ASC
-            LIMIT 10
         """)
         result = await self.session.execute(query)
         return [dict(r._mapping) for r in result]
