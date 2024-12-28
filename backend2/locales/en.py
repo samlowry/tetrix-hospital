@@ -150,8 +150,8 @@ BUTTONS = {
     "refresh_stats": "🔄 Refresh stats",
     "leaderboard": "🏆 My Best Frens!",
     "refresh_leaderboard": "🔄 Refresh best frens",
-    "leaderboard_prev": "◀️ Prev 10",
-    "leaderboard_next": "Next 10 ▶️",
+    "leaderboard_prev": "◀️ 10",
+    "leaderboard_next": "10 ▶️",
     "leaderboard_page": "🏆 {start}-{end}/{total}",
     "lang_ru": "🇷🇺 Russian",
     "lang_en": "🇬🇧 English"
