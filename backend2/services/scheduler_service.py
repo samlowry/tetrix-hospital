@@ -9,15 +9,31 @@ import json
 logger = logging.getLogger(__name__)
 
 class SchedulerService:
+    """
+    Service responsible for scheduling and executing periodic tasks like 
+    updating leaderboards, fetching metrics, and holder information
+    """
     def __init__(self, redis: Redis, session_factory: async_sessionmaker):
-        self.redis = redis
-        self.session_factory = session_factory
-        self.tasks: Dict[str, asyncio.Task] = {}
-        self._running = False
-        self._last_execution: Dict[str, datetime] = {}
+        """
+        Initialize scheduler service with Redis connection and database session factory
+        
+        Args:
+            redis: Redis connection instance for caching
+            session_factory: SQLAlchemy async session maker for database operations
+        """
+        self.redis = redis  # Redis instance for caching
+        self.session_factory = session_factory  # Database session factory
+        self.tasks: Dict[str, asyncio.Task] = {}  # Dictionary to store running tasks
+        self._running = False  # Flag to track scheduler running state
+        self._last_execution: Dict[str, datetime] = {}  # Track last execution time of tasks
 
     async def _execute_task(self, task_name: str):
-        """Execute a task and log its execution"""
+        """
+        Execute a scheduled task and handle its lifecycle
+        
+        Args:
+            task_name: Name of the task to execute (leaderboard/metrics/holders)
+        """
         logger.info(f"Executing task {task_name} at {datetime.now()}")
         
         async with self.session_factory() as session:
@@ -40,14 +56,24 @@ class SchedulerService:
                 raise
 
     async def _fetch_metrics(self, session: AsyncSession):
-        """Fetch price and volume data from DexScreener"""
+        """
+        Fetch and cache price and volume data from DexScreener
+        
+        Args:
+            session: Active database session for the operation
+        """
         from .tetrix_service import TetrixService
         tetrix = TetrixService(self.redis, session)
         data = await tetrix._fetch_dexscreener_data()
-        await self.redis.setex("tetrix:dexscreener", 90, json.dumps(data))  # 90 seconds cache
+        await self.redis.setex("tetrix:dexscreener", 90, json.dumps(data))  # Cache for 90 seconds
 
     async def _fetch_holders(self, session: AsyncSession):
-        """Fetch holders count with extended cache time"""
+        """
+        Fetch and cache the current count of token holders
+        
+        Args:
+            session: Active database session for the operation
+        """
         from .tetrix_service import TetrixService
         tetrix = TetrixService(self.redis, session)
         data = await tetrix._fetch_holders()

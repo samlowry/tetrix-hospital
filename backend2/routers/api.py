@@ -1,13 +1,22 @@
+# Import necessary FastAPI components for routing and security
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
+
+# Database and ORM related imports
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.database import get_session
+
+# Service layer imports for business logic
 from services.user_service import UserService
 from services.tetrix_service import TetrixService
 from services.telegram_service import get_telegram_name
+
+# Data models
 from models.user import User
 from models.leaderboard import LeaderboardSnapshot
+
+# Utility imports
 from typing import List, Dict
 from pydantic import BaseModel
 from redis.asyncio import Redis
@@ -15,13 +24,16 @@ from core.deps import get_redis
 import os
 import logging
 
-API_KEY = os.getenv("API_KEY", "your-api-key")
-api_key_header = APIKeyHeader(name="X-API-Key")
-logger = logging.getLogger(__name__)
+# our app API security configuration
+API_KEY = os.getenv("API_KEY", "your-api-key")  # Environment variable for our app API authentication
+api_key_header = APIKeyHeader(name="X-API-Key")  # Header configuration for our app API key
+logger = logging.getLogger(__name__)  # Logger instance for this module
 
+# Request model for user-related operations
 class UserRequest(BaseModel):
-    telegram_id: int
+    telegram_id: int  # Telegram user identifier
 
+# Security middleware function to validate API key
 async def get_api_key(api_key: str = Security(api_key_header)):
     if api_key != API_KEY:
         raise HTTPException(
@@ -30,8 +42,10 @@ async def get_api_key(api_key: str = Security(api_key_header)):
         )
     return api_key
 
+# Main API router with prefix and tags for swagger documentation
 router = APIRouter(prefix="/api", tags=["api"])
 
+# Endpoint to retrieve user information
 @router.post("/users", response_model=Dict)
 async def get_user(
     request: UserRequest,
@@ -39,7 +53,8 @@ async def get_user(
     api_key: str = Depends(get_api_key)
 ):
     """
-    Get user information and statistics
+    Get user information and statistics from the database
+    Returns user profile and related data if user exists
     """
     user_service = UserService(session)
     user = await user_service.get_user_by_telegram_id(request.telegram_id)

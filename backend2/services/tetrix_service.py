@@ -1,3 +1,4 @@
+# Import necessary libraries for Redis, SQLAlchemy, HTTP requests, and other utilities
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,30 +10,44 @@ from models.metrics import TetrixMetrics
 from typing import Optional
 from locales.emotions import get_emotion_by_percentage
 
+# Initialize logger for this module
 logger = logging.getLogger(__name__)
 
-TON_API_URL = "https://tonapi.io/v2"
-TON_API_KEY = "AHK6ZFZUS4TIGHQAAAAH3XFVS5TRIQABRO6J2HZ6ST4N43ZQTXHAYBBQ2IETD54M4PSRYBQ"
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex"
+# API endpoints and authentication constants
+TON_API_URL = "https://tonapi.io/v2"  # Base URL for TON blockchain API
+#TODO: move into env vars (and github env secret)
+TON_API_KEY = "AHK6ZFZUS4TIGHQAAAAH3XFVS5TRIQABRO6J2HZ6ST4N43ZQTXHAYBBQ2IETD54M4PSRYBQ"  # Authentication key for TON API
+DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex"  # API for fetching DEX related data
 
-TETRIX_ADDRESS = "EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C"
-TETRIX_POOL = "EQDzf3WUJvNqlXnzggvxTDweWW7l7DaZ68qyvRVx1a2xm0Zy"
-TOTAL_SUPPLY = 1_000_000_000
+# Blockchain addresses for Tetrix token and pool
+TETRIX_ADDRESS = "EQC-OHxhI9r5ojKf6QMLFjhQrKoawN1thhHFCvImINhfK40C"  # Main token contract address
+TETRIX_POOL = "EQDzf3WUJvNqlXnzggvxTDweWW7l7DaZ68qyvRVx1a2xm0Zy"  # Liquidity pool address
+TOTAL_SUPPLY = 1_000_000_000  # Total supply of Tetrix tokens
 
-# Constants for 100% values
-MAX_HOLDERS = 100_000  # 100K holders = 100% health
-MAX_CAP = 1_000_000  # $1M cap = 100% strength
-INITIAL_MAX_VOLUME = 0  # Initial max volume is 0
-CACHE_TIME = 60  # 1 minute cache for all metrics
-VOLUME_CACHE_TIME = 600  # 10 minutes cache for volume
+# Threshold constants for metrics calculations
+MAX_HOLDERS = 100_000  # Maximum number of holders (100% health metric)
+MAX_CAP = 1_000_000  # Maximum market cap in USD (100% strength metric)
+INITIAL_MAX_VOLUME = 0  # Starting point for volume tracking
+CACHE_TIME = 60  # Fin values cache duration for general metrics (in seconds)
 
 class TetrixService:
+    """Service class for handling Tetrix token-related operations and metrics"""
+    
     def __init__(self, redis: Redis, session: AsyncSession = None):
+        """
+        Initialize TetrixService with Redis connection and optional database session
+        Args:
+            redis (Redis): Redis connection for caching
+            session (AsyncSession): SQLAlchemy session for database operations
+        """
         self.redis = redis
         self.session = session
 
     async def _ensure_max_volume_exists(self):
-        """Ensure max volume exists in database with initial value"""
+        """
+        Ensures that a maximum volume record exists in the database
+        Returns the initial max volume if no database session is available
+        """
         if not self.session:
             return INITIAL_MAX_VOLUME
 
