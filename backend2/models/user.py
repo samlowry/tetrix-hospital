@@ -32,12 +32,15 @@ class User(Base):
     is_fully_registered = Column(Boolean, default=False)
     # User's preferred language code
     language = Column(String(2), default='ru', nullable=False)
+    # User's registration phase
+    registration_phase = Column(String(20), nullable=False)
 
     # Database constraints for data validation
     __table_args__ = (
         CheckConstraint("wallet_address ~ '^0:[a-fA-F0-9]{64}$'", name='check_wallet_address'),
         CheckConstraint("telegram_id > 0", name='check_telegram_id'),
         CheckConstraint("language ~ '^[a-z]{2}$'", name='check_language_code'),
+        CheckConstraint("registration_phase IN ('preregistered', 'pending', 'active')", name='check_registration_phase'),
     )
 
     # Relationship definitions

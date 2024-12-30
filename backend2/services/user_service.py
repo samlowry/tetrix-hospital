@@ -106,7 +106,8 @@ class UserService:
                 ignore_slot_reset=False,
                 is_early_backer=is_early_backer,
                 is_fully_registered=is_early_backer,  # Early backers are automatically fully registered
-                language=language  # Save the language preference
+                language=language,  # Save the language preference
+                registration_phase='active' if is_early_backer else 'pending'  # Set registration phase based on early_backer status
             )
             
             logger.info("[USER_SERVICE] Adding user to session")
@@ -251,6 +252,7 @@ class UserService:
         invite.used_by_id = user.id
         invite.used_at = utc_now()
         user.is_fully_registered = True
+        user.registration_phase = 'active'  # Update registration phase when invite code is used
 
         try:
             await self.session.commit()
