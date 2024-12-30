@@ -64,10 +64,20 @@ async def get_user(
     if not user.is_fully_registered:
         return {
             "status": "need_invite",
-            "message": "User needs to enter an invite code to complete registration"
+            "message": "User needs to enter an invite code to complete registration",
+            "registration_phase": user.registration_phase
         }
         
-    return await user_service.get_user_stats(user)
+    user_stats = await user_service.get_user_stats(user)
+    return {
+        'telegram_id': user.telegram_id,
+        'wallet_address': user.wallet_address,
+        'registration_date': user.registration_date.isoformat(),
+        'is_early_backer': user.is_early_backer,
+        'is_fully_registered': user.is_fully_registered,
+        'registration_phase': user.registration_phase,
+        **user_stats
+    }
 
 class LeaderboardStats(BaseModel):
     total_users: int
@@ -142,7 +152,8 @@ async def get_combined_stats(
     if not user.is_fully_registered:
         return {
             "status": "need_invite",
-            "message": "User needs to enter an invite code to complete registration"
+            "message": "User needs to enter an invite code to complete registration",
+            "registration_phase": user.registration_phase
         }
         
     user_stats = await user_service.get_user_stats(user)
@@ -166,6 +177,7 @@ async def get_combined_stats(
             'registration_date': user.registration_date.isoformat(),
             'is_early_backer': user.is_early_backer,
             'is_fully_registered': user.is_fully_registered,
+            'registration_phase': user.registration_phase,
             **user_stats
         },
         'ranking': rank_info,
