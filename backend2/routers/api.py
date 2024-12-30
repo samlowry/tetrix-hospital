@@ -61,7 +61,7 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if not user.is_fully_registered or user.registration_phase != 'active':
+    if user.registration_phase != 'active':
         return {
             "status": "need_invite",
             "message": "User needs to enter an invite code to complete registration",
@@ -149,7 +149,7 @@ async def get_combined_stats(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    if not user.is_fully_registered or user.registration_phase != 'active':
+    if user.registration_phase != 'active':
         return {
             "status": "need_invite",
             "message": "User needs to enter an invite code to complete registration",

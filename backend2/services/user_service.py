@@ -155,7 +155,7 @@ class UserService:
 
     async def get_available_invites(self, user: User) -> int:
         """Returns the number of available (unused) invite codes"""
-        if not user.is_fully_registered:
+        if user.registration_phase != 'active':
             return 0
 
         # Get all unused codes
@@ -168,7 +168,7 @@ class UserService:
 
     async def generate_invite_codes(self, user: User) -> List[Dict]:
         """Generate invite codes for user"""
-        if not user.is_fully_registered:
+        if user.registration_phase != 'active':
             return []
 
         now = utc_now()
@@ -251,8 +251,8 @@ class UserService:
 
         invite.used_by_id = user.id
         invite.used_at = utc_now()
-        user.is_fully_registered = True
-        user.registration_phase = 'active'  # Update registration phase when invite code is used
+        user.is_fully_registered = True  # Keep this for backward compatibility
+        user.registration_phase = 'active'  # Set registration phase to active when invite code is used
 
         try:
             await self.session.commit()

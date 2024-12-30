@@ -166,7 +166,7 @@ class TelegramHandler:
             )
         
         # Check registration status
-        if not user.is_fully_registered and not user.is_early_backer:
+        if user.registration_phase == 'pending':
             # User with wallet but without invite code
             await self.redis_service.set_status_waiting_invite(telegram_id)
             return await send_telegram_message(
@@ -292,8 +292,8 @@ class TelegramHandler:
                 
             elif callback_data in ["check_stats", "show_invites", "refresh_stats", "refresh_invites"] or callback_data.startswith("leaderboard") or callback_data == "noop":
                 user = await self.user_service.get_user_by_telegram_id(telegram_id)
-                if not user or not user.is_fully_registered:
-                    logger.warning("User %d not found or not fully registered", telegram_id)
+                if not user or user.registration_phase != 'active':
+                    logger.warning("User %d not found or not active", telegram_id)
                     return False
                     
                 if callback_data in ["show_invites", "refresh_invites"]:
@@ -544,7 +544,7 @@ async def telegram_webhook(
             
             # Check if user just registered
             user = await user_service.get_user_by_telegram_id(telegram_id)
-            if user and not user.is_fully_registered:
+            if user and user.registration_phase == 'pending':
                 logger.info("User %d registered with early_backer=%s", telegram_id, user.is_early_backer)
                 if user.is_early_backer:
                     # Early backer - already welcomed in /proof endpoint
