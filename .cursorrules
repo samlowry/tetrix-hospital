@@ -1,0 +1,18 @@
+# Important things to follow
+
+- project works on server - ssh root@tetrix.hospital.backend.host but it's my laptop shortcut local domain 143.198.98.212 tetrix.hospital.backend.host
+- each service works in docker, folder of build is /opt/tetrix-hospital, services names tetrix-hospital-app-1 tetrix-hospital-redis-1 tetrix-hospital-postgres-1
+- locally I use just python app.py and local redis/postgres hostnames bound to 127.0.0.1
+- connect to postgres local is simple (example): psql tetrix -c "SELECT * FROM \"user\";" remote: psql -U tetrix tetrix -c "SELECT * FROM \"user\";"
+
+# Project context
+
+- the backend (is in backend2/) provide 3 things:
+-- work with TG bot api (main use)
+-- with frontend (short use to login TON wallet)
+-- app API to receive some data relaed to app logic to outside of app
+
+Main user flow is to register user as future TETRIX AI memecoin airdrop user and motivate him to do target actions through interacting with tamagotchi alike personality of AI agent - which have character parameters and emotions bound to its financial metrics
+
+Extra (implementing now) flow - is to begin a viral movement at Meta Threads with event when TETRIX claim it hire human to represent somehow TETRIX IRL with profiling a Threads user through analysing user's last 25 messages and giving him cool report. This flow is completely separate from the main flow and works trough GET variable. Only at the end this flow maybe will join the main flow user initial message.
+
