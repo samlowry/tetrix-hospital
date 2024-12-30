@@ -1,4 +1,12 @@
-# Important things to follow
+#Important common things to follow
+- Never touch any parts of code not related to he current task. If you found some critical error not related to current task - just infrom me befor doing something
+- Always use UTF-8 encoding!!!!!!
+- Always use English in code and code comments! For any Russian interface texts always use separate language files! (in chat you can use Russian)
+- Always write comments for any new function, new variable or rewrite if you change its functionality. Keep them such desciptable so you will understand the business logic at the next time
+- Prefer iteration and modularizaion over code duplication. Always explore code for existing related logic - maybe some blocks is already partially or fully implemented
+- Do not inroduce new dependencies before you not make sure we don't use already different library or framework
+
+# Important project related things to follow
 
 - project works on server - ssh root@tetrix.hospital.backend.host but it's my laptop shortcut local domain 143.198.98.212 tetrix.hospital.backend.host
 - each service works in docker, folder of build is /opt/tetrix-hospital, services names tetrix-hospital-app-1 tetrix-hospital-redis-1 tetrix-hospital-postgres-1
@@ -9,7 +17,7 @@
 
 - the backend (is in backend2/) provide 3 things:
 -- work with TG bot api (main use)
--- with frontend (short use to login TON wallet)
+-- with frontend (frontend/ - short use to login TON wallet)
 -- app API to receive some data relaed to app logic to outside of app
 
 Main user flow is to register user as future TETRIX AI memecoin airdrop user and motivate him to do target actions through interacting with tamagotchi alike personality of AI agent - which have character parameters and emotions bound to its financial metrics
