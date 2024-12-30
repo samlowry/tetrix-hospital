@@ -305,6 +305,7 @@ class UserService:
             select(User, func.count(InviteCode.id).label('invite_count'))
             .join(InviteCode, InviteCode.creator_id == User.id)
             .where(InviteCode.used_by_id.isnot(None))
+            .where(User.registration_phase == 'active')
             .group_by(User.id)
             .order_by(func.count(InviteCode.id).desc())
             .limit(limit)
@@ -392,10 +393,12 @@ class UserService:
                 ls.telegram_name as name,
                 ls.points
             FROM leaderboard_snapshots ls
+            JOIN "user" u ON u.telegram_id = ls.telegram_id
             WHERE ls.snapshot_time = (
                 SELECT MAX(snapshot_time)
                 FROM leaderboard_snapshots
             )
+            AND u.registration_phase = 'active'
             ORDER BY ls.rank ASC
         """)
         result = await self.session.execute(query)
@@ -405,9 +408,11 @@ class UserService:
         """Get user's position from leaderboard snapshot"""
         query = text("""
             SELECT rank 
-            FROM leaderboard_snapshots 
-            WHERE telegram_id = :telegram_id
-            AND snapshot_time = (
+            FROM leaderboard_snapshots ls
+            JOIN "user" u ON u.telegram_id = ls.telegram_id
+            WHERE ls.telegram_id = :telegram_id
+            AND u.registration_phase = 'active'
+            AND ls.snapshot_time = (
                 SELECT MAX(snapshot_time)
                 FROM leaderboard_snapshots
             )
@@ -425,17 +430,21 @@ class UserService:
         query = text("""
             WITH snapshot AS (
                 SELECT snapshot_time, COUNT(*) as total_users
-                FROM leaderboard_snapshots
-                WHERE snapshot_time = (
+                FROM leaderboard_snapshots ls
+                JOIN "user" u ON u.telegram_id = ls.telegram_id
+                WHERE ls.snapshot_time = (
                     SELECT MAX(snapshot_time)
                     FROM leaderboard_snapshots
                 )
+                AND u.registration_phase = 'active'
                 GROUP BY snapshot_time
             )
             SELECT ls.rank, s.total_users
             FROM leaderboard_snapshots ls
+            JOIN "user" u ON u.telegram_id = ls.telegram_id
             JOIN snapshot s ON ls.snapshot_time = s.snapshot_time
             WHERE ls.telegram_id = :telegram_id
+            AND u.registration_phase = 'active'
             AND ls.snapshot_time = (
                 SELECT MAX(snapshot_time)
                 FROM leaderboard_snapshots
