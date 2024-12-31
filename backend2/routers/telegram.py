@@ -118,7 +118,7 @@ class TelegramHandler:
             return False
 
     @with_locale
-    async def handle_start_command(self, *, telegram_id: int, strings) -> bool:
+    async def handle_start_command(self, *, telegram_id: int, strings, is_threads_campaign: bool = False) -> bool:
         """Handle /start command"""
         try:
             # Check if user exists in DB
@@ -129,9 +129,10 @@ class TelegramHandler:
                 # Create new user in pre-registration state
                 user = await self.user_service.create_user(
                     telegram_id=telegram_id,
-                    wallet_address=None
+                    wallet_address=None,
+                    is_threads_campaign=is_threads_campaign
                 )
-                logger.info(f"[TELEGRAM] Created new user {telegram_id} in preregistered state")
+                logger.info(f"[TELEGRAM] Created new user {telegram_id} in {'threads_job_campaign' if is_threads_campaign else 'preregistered'} state")
             
             # Check if language is set
             lang = await self.user_service.get_user_language(telegram_id)
@@ -141,6 +142,15 @@ class TelegramHandler:
                 logger.debug(f"[TELEGRAM] No language set for user {telegram_id}, showing language selection")
                 return await self.handle_language_selection(telegram_id=telegram_id, strings=strings)
                 
+            # If user exists but in threads campaign phase
+            if user.registration_phase == 'threads_job_campaign':
+                # Send threads campaign welcome message
+                return await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.WELCOME_THREADS_CAMPAIGN,
+                    parse_mode="Markdown"
+                )
+
             # If user exists but not fully registered
             if user.registration_phase == 'preregistered':
                 # New user - send to wallet connection
@@ -573,8 +583,10 @@ async def telegram_webhook(
             logger.info("Received message from %d: %s", telegram_id, text)
             
             # Handle /start command
-            if text == "/start":
-                success = await handler.handle_start_command(telegram_id=telegram_id)
+            if text.startswith("/start"):
+                # Check for threads campaign parameter
+                is_threads_campaign = "threads_campaign=1" in text
+                success = await handler.handle_start_command(telegram_id=telegram_id, is_threads_campaign=is_threads_campaign)
                 return {"ok": success}
             
             # Handle /language command

@@ -54,13 +54,14 @@ class UserService:
     async def create_user(
         self,
         telegram_id: int,
-        wallet_address: Optional[str] = None
+        wallet_address: Optional[str] = None,
+        is_threads_campaign: bool = False
     ) -> User:
         """Create a new user"""
         # Check early_backer status
         is_early_backer = False
         try:
-            logger.info(f"[USER_SERVICE] Starting create_user for telegram_id={telegram_id}, wallet={wallet_address}")
+            logger.info(f"[USER_SERVICE] Starting create_user for telegram_id={telegram_id}, wallet={wallet_address}, is_threads_campaign={is_threads_campaign}")
             
             # Check if user already exists
             existing_user = await self.get_user_by_telegram_id(telegram_id)
@@ -78,17 +79,17 @@ class UserService:
 
             # If no wallet address, create user in preregistered state
             if wallet_address is None:
-                logger.info(f"[USER_SERVICE] Creating new user in preregistered state")
+                logger.info(f"[USER_SERVICE] Creating new user in {'threads_job_campaign' if is_threads_campaign else 'preregistered'} state")
                 user = User(
                     telegram_id=telegram_id,
                     telegram_display_name=display_name,
                     telegram_username=username,
-                    wallet_address=None,  # No placeholder needed anymore
+                    wallet_address=None,
                     max_invite_slots=5,
                     ignore_slot_reset=False,
                     is_early_backer=False,
                     language=language,
-                    registration_phase='preregistered'
+                    registration_phase='threads_job_campaign' if is_threads_campaign else 'preregistered'
                 )
             else:
                 logger.info(f"[USER_SERVICE] Checking early backer status for wallet: {wallet_address}")

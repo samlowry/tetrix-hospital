@@ -43,6 +43,13 @@ To continue registration, enter an invite code.
 
 WELCOME_BACK_SHORT = "🎉 *Welcome back!* Glad to see you again!"
 
+# Threads campaign messages
+WELCOME_THREADS_CAMPAIGN = """✨ *Welcome to TETRIX AI Personality Analysis!*
+
+I'm excited to analyze your Threads profile and provide you with a unique personality report. Let's get started!
+
+First, please choose your preferred language."""
+
 # Invite code messages
 INVITE_CODES_TITLE = "🎉 <b>Your invite codes:</b>"
 INVITE_CODES_EMPTY = "*empty*"

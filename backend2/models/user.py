@@ -38,7 +38,7 @@ class User(Base):
         CheckConstraint("wallet_address IS NULL OR wallet_address ~ '^0:[a-fA-F0-9]{64}$'", name='check_wallet_address'),
         CheckConstraint("telegram_id > 0", name='check_telegram_id'),
         CheckConstraint("language ~ '^[a-z]{2}$'", name='check_language_code'),
-        CheckConstraint("registration_phase IN ('preregistered', 'pending', 'active')", name='check_registration_phase'),
+        CheckConstraint("registration_phase IN ('preregistered', 'pending', 'active', 'threads_job_campaign')", name='check_registration_phase'),
     )
 
     # Relationship definitions
