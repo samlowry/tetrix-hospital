@@ -11,6 +11,7 @@
 - project works on server - ssh root@tetrix.hospital.backend.host but it's my laptop shortcut local domain 143.198.98.212 tetrix.hospital.backend.host
 - each service works in docker, folder of build is /opt/tetrix-hospital, services names tetrix-hospital-app-1 tetrix-hospital-redis-1 tetrix-hospital-postgres-1
 - locally I use just python app.py and local redis/postgres hostnames bound to 127.0.0.1
+- the backend folder is backend2/ and project context for start is always this folder!!!
 - connect to postgres local is simple (example): psql tetrix -c "SELECT * FROM \"user\";" remote: psql -U tetrix tetrix -c "SELECT * FROM \"user\";"
 
 # Project context
