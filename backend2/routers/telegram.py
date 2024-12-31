@@ -134,15 +134,15 @@ class TelegramHandler:
                 )
                 logger.info(f"[TELEGRAM] Created new user {telegram_id} in {'threads_job_campaign' if is_threads_campaign else 'preregistered'} state")
             
-            # Check if language is set
+            # Check if language is set - ALWAYS DO THIS FIRST
             lang = await self.user_service.get_user_language(telegram_id)
             logger.info(f"[TELEGRAM] User {telegram_id} language: {lang}")
             
             if not lang:
                 logger.debug(f"[TELEGRAM] No language set for user {telegram_id}, showing language selection")
                 return await self.handle_language_selection(telegram_id=telegram_id, strings=strings)
-                
-            # If user exists but in threads campaign phase
+
+            # Now handle different registration phases
             if user.registration_phase == 'threads_job_campaign':
                 # Send threads campaign welcome message
                 return await send_telegram_message(
@@ -150,7 +150,7 @@ class TelegramHandler:
                     text=strings.WELCOME_THREADS_CAMPAIGN,
                     parse_mode="Markdown"
                 )
-
+                
             # If user exists but not fully registered
             if user.registration_phase == 'preregistered':
                 # New user - send to wallet connection

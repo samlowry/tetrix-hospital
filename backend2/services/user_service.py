@@ -73,10 +73,6 @@ class UserService:
             display_name, username = await get_telegram_info(telegram_id)
             logger.info(f"[USER_SERVICE] Got Telegram info: display_name={display_name}, username={username}")
 
-            # For new users, default to Russian
-            language = 'ru'
-            logger.info(f"[USER_SERVICE] Using default language: {language}")
-
             # If no wallet address, create user in preregistered state
             if wallet_address is None:
                 logger.info(f"[USER_SERVICE] Creating new user in {'threads_job_campaign' if is_threads_campaign else 'preregistered'} state")
@@ -88,7 +84,7 @@ class UserService:
                     max_invite_slots=5,
                     ignore_slot_reset=False,
                     is_early_backer=False,
-                    language=language,
+                    language=None,  # Don't set default language
                     registration_phase='threads_job_campaign' if is_threads_campaign else 'preregistered'
                 )
             else:
@@ -123,7 +119,7 @@ class UserService:
                     max_invite_slots=5,
                     ignore_slot_reset=False,
                     is_early_backer=is_early_backer,
-                    language=language,  # Save the language preference
+                    language=None,  # Don't set default language
                     registration_phase='active' if is_early_backer else 'pending'  # Set registration phase based on early_backer status
                 )
             
@@ -136,7 +132,7 @@ class UserService:
             logger.info("[USER_SERVICE] Refreshing user object")
             await self.session.refresh(user)
             
-            logger.info(f"[USER_SERVICE] User created successfully: telegram_id={telegram_id}, is_early_backer={is_early_backer}, language={language}")
+            logger.info(f"[USER_SERVICE] User created successfully: telegram_id={telegram_id}, is_early_backer={is_early_backer}, language={user.language}")
             return user
             
         except Exception as e:
