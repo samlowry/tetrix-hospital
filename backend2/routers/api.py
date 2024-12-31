@@ -1,5 +1,5 @@
 # Import necessary FastAPI components for routing and security
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, HTTPException, Security, Request
 from fastapi.security.api_key import APIKeyHeader
 
 # Database and ORM related imports
@@ -49,6 +49,7 @@ router = APIRouter(prefix="/api", tags=["api"])
 @router.post("/users", response_model=Dict)
 async def get_user(
     request: UserRequest,
+    request_obj: Request,
     session: AsyncSession = Depends(get_session),
     api_key: str = Depends(get_api_key)
 ):
@@ -56,7 +57,13 @@ async def get_user(
     Get user information and statistics from the database
     Returns user profile and related data if user exists
     """
+    # Get cache from app state
+    cache = request_obj.app.state.cache
+    
+    # Initialize service with cache
     user_service = UserService(session)
+    user_service.cache = cache  # Set cache instance
+    
     user = await user_service.get_user_by_telegram_id(request.telegram_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -107,6 +114,7 @@ async def get_leaderboard(
 
 @router.post("/leaderboard/rebuild", response_model=Dict)
 async def rebuild_leaderboard(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     api_key: str = Depends(get_api_key)
 ):
@@ -114,8 +122,11 @@ async def rebuild_leaderboard(
     Force rebuild of the leaderboard, ignoring the hourly schedule.
     Uses cached telegram names from the database.
     """
+    # Get cache from app state
+    cache = request.app.state.cache
+    
     from services.leaderboard_service import LeaderboardService
-    leaderboard_service = LeaderboardService(session)
+    leaderboard_service = LeaderboardService(session, cache)
     await leaderboard_service.update_leaderboard(force=True)  # Always force update when called via API
     return {"status": "success", "message": "Leaderboard rebuilt successfully"}
 
@@ -134,6 +145,7 @@ async def get_tetrix_state(
 @router.post("/combined", response_model=Dict)
 async def get_combined_stats(
     request: UserRequest,
+    request_obj: Request,
     session: AsyncSession = Depends(get_session),
     redis: Redis = Depends(get_redis),
     api_key: str = Depends(get_api_key)
@@ -141,7 +153,12 @@ async def get_combined_stats(
     """
     Get combined user statistics, leaderboard position and TETRIX metrics
     """
+    # Get cache from app state
+    cache = request_obj.app.state.cache
+    
+    # Initialize services with cache
     user_service = UserService(session)
+    user_service.cache = cache  # Set cache instance
     tetrix_service = TetrixService(redis, session)
     
     # Get user stats
@@ -184,3 +201,44 @@ async def get_combined_stats(
         'leaderboard': leaderboard,
         'tetrix': tetrix_metrics
     } 
+
+@router.post("/user/stats", dependencies=[Depends(get_api_key)])
+async def get_user_stats(
+    user_request: UserRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+) -> Dict:
+    """Get user statistics"""
+    try:
+        # Get cache from app state
+        cache = request.app.state.cache
+        
+        # Initialize service with cache
+        user_service = UserService(session)
+        user_service.cache = cache  # Set cache instance
+        
+        # Get user and their stats
+        user = await user_service.get_user_by_telegram_id(user_request.telegram_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if user.registration_phase != 'active':
+            return {
+                "status": "need_invite",
+                "message": "User needs to enter an invite code to complete registration",
+                "registration_phase": user.registration_phase
+            }
+        
+        user_stats = await user_service.get_user_stats(user)
+        return {
+            'telegram_id': user.telegram_id,
+            'wallet_address': user.wallet_address,
+            'registration_date': user.registration_date.isoformat(),
+            'is_early_backer': user.is_early_backer,
+            'is_fully_registered': user.is_fully_registered,
+            'registration_phase': user.registration_phase,
+            **user_stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting user stats: {e}")
+        raise HTTPException(status_code=500, detail="Error getting user stats") 

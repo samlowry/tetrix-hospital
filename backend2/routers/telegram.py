@@ -515,6 +515,7 @@ class TelegramHandler:
 @router.post(WEBHOOK_PATH)
 async def telegram_webhook(
     update: Dict[str, Any],
+    request: Request,
     session: AsyncSession = Depends(get_session),
     redis: Redis = Depends(get_redis)
 ):
@@ -522,8 +523,13 @@ async def telegram_webhook(
     try:
         logger.debug("Received update: %s", update)
         
+        # Get cache from app state
+        cache = request.app.state.cache
+        
+        # Initialize services with cache
         user_service = UserService(session)
-        redis_service = RedisService(redis)
+        user_service.cache = cache  # Set cache instance
+        redis_service = RedisService(redis, cache)  # Pass cache to RedisService
         handler = TelegramHandler(user_service, redis_service, redis, session)
         
         # Get data from update

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
 from pydantic import BaseModel
@@ -80,31 +80,34 @@ async def get_message(request: MessageRequest):
 
 @router.post("/proof")
 async def verify_proof(
-    request: ProofRequest,
+    proof_data: ProofRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     redis: Redis = Depends(get_redis)
 ):
-    """
-    Verify TON Connect signature and create/update user
-    """
+    """Handle TON Connect proof verification"""
     try:
-        logger.info(f"[TON_CONNECT] Starting verify_proof for telegram_id={request.telegram_id}, wallet={request.wallet_address}")
+        # Get cache from app state
+        cache = request.app.state.cache
+        
+        # Initialize services with cache
         user_service = UserService(session)
-        redis_service = RedisService(redis)
+        user_service.cache = cache  # Set cache instance
+        redis_service = RedisService(redis, cache)  # Pass cache to RedisService
         # Set Redis client in user_service
         user_service.redis = redis
         handler = TonConnectHandler(user_service, redis_service)
         
         # Check if user exists with this telegram_id
-        user = await user_service.get_user_by_telegram_id(request.telegram_id)
+        user = await user_service.get_user_by_telegram_id(proof_data.telegram_id)
         if user:
-            logger.info(f"[TON_CONNECT] User already exists with telegram_id={request.telegram_id}")
+            logger.info(f"[TON_CONNECT] User already exists with telegram_id={proof_data.telegram_id}")
             return {"success": True}
 
         # Check if user exists with this wallet
-        user = await user_service.get_user_by_wallet_address(request.wallet_address)
+        user = await user_service.get_user_by_wallet_address(proof_data.wallet_address)
         if user:
-            logger.error(f"[TON_CONNECT] Wallet {request.wallet_address} already registered to telegram_id={user.telegram_id}")
+            logger.error(f"[TON_CONNECT] Wallet {proof_data.wallet_address} already registered to telegram_id={user.telegram_id}")
             raise HTTPException(
                 status_code=400,
                 detail="This wallet is already registered to another user"
@@ -112,16 +115,16 @@ async def verify_proof(
 
         # Create user
         try:
-            logger.info(f"[TON_CONNECT] Creating new user with telegram_id={request.telegram_id}, wallet={request.wallet_address}")
+            logger.info(f"[TON_CONNECT] Creating new user with telegram_id={proof_data.telegram_id}, wallet={proof_data.wallet_address}")
             user = await user_service.create_user(
-                telegram_id=request.telegram_id,
-                wallet_address=request.wallet_address
+                telegram_id=proof_data.telegram_id,
+                wallet_address=proof_data.wallet_address
             )
-            logger.info(f"[TON_CONNECT] User created successfully: telegram_id={request.telegram_id}, is_early_backer={user.is_early_backer}")
+            logger.info(f"[TON_CONNECT] User created successfully: telegram_id={proof_data.telegram_id}, is_early_backer={user.is_early_backer}")
             
             # Send welcome message based on user type
             try:
-                await handler.send_welcome_message(telegram_id=request.telegram_id, is_early_backer=user.is_early_backer)
+                await handler.send_welcome_message(telegram_id=proof_data.telegram_id, is_early_backer=user.is_early_backer)
             except Exception as e:
                 logger.error(f"[TON_CONNECT] Error creating user: {e}")
             

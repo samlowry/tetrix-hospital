@@ -40,7 +40,7 @@ class SchedulerService:
             try:
                 if task_name == "leaderboard":
                     from .leaderboard_service import LeaderboardService
-                    leaderboard_service = LeaderboardService(session)
+                    leaderboard_service = LeaderboardService(session, self.cache)
                     await leaderboard_service.ensure_populated()
                     await leaderboard_service.update_leaderboard()
                 elif task_name == "metrics":

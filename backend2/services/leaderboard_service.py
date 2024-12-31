@@ -10,8 +10,9 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class LeaderboardService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, cache=None):
         self.session = session
+        self.cache = cache
 
     async def ensure_populated(self):
         """Check if leaderboard is populated and fill it if empty"""
@@ -94,6 +95,7 @@ class LeaderboardService:
 
     async def _get_users_with_stats(self):
         user_service = UserService(self.session)
+        user_service.cache = self.cache  # Set cache instance
         result = await self.session.execute(select(User))
         users = result.scalars().all()
         stats = [await user_service.get_user_stats(user) for user in users]
