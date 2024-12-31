@@ -1,5 +1,4 @@
 # Import necessary libraries for Redis, SQLAlchemy, HTTP requests, and other utilities
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import aiohttp
@@ -9,6 +8,7 @@ from datetime import datetime, timedelta
 from models.metrics import TetrixMetrics
 from typing import Optional
 from locales.emotions import get_emotion_by_percentage
+from core.cache import cache_metrics, CacheKeys, Cache
 
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
@@ -33,14 +33,14 @@ CACHE_TIME = 60  # Fin values cache duration for general metrics (in seconds)
 class TetrixService:
     """Service class for handling Tetrix token-related operations and metrics"""
     
-    def __init__(self, redis: Redis, session: AsyncSession = None):
+    def __init__(self, cache: Cache, session: AsyncSession = None):
         """
-        Initialize TetrixService with Redis connection and optional database session
+        Initialize TetrixService with cache connection and optional database session
         Args:
-            redis (Redis): Redis connection for caching
+            cache (Cache): Cache instance for caching (aiocache)
             session (AsyncSession): SQLAlchemy session for database operations
         """
-        self.redis = redis
+        self.cache = cache
         self.session = session
 
     async def _ensure_max_volume_exists(self):
@@ -52,22 +52,22 @@ class TetrixService:
             return INITIAL_MAX_VOLUME
 
         try:
-            async with self.session.begin():
-                result = await self.session.execute(
-                    select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
+            # Query max volume
+            result = await self.session.execute(
+                select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
+            )
+            max_volume = result.scalar_one_or_none()
+            
+            if not max_volume:
+                max_volume = TetrixMetrics(
+                    key="max_volume",
+                    value=INITIAL_MAX_VOLUME
                 )
-                max_volume = result.scalar_one_or_none()
-                
-                if not max_volume:
-                    max_volume = TetrixMetrics(
-                        key="max_volume",
-                        value=INITIAL_MAX_VOLUME
-                    )
-                    self.session.add(max_volume)
-                    await self.session.commit()
-                    return INITIAL_MAX_VOLUME
-                
-                return max_volume.value
+                self.session.add(max_volume)
+                await self.session.commit()
+                return INITIAL_MAX_VOLUME
+            
+            return max_volume.value
         except Exception as e:
             logger.error(f"Error in ensure_max_volume: {e}")
             await self.session.rollback()
@@ -79,15 +79,15 @@ class TetrixService:
             return
 
         try:
-            async with self.session.begin():
-                result = await self.session.execute(
-                    select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
-                )
-                max_volume = result.scalar_one_or_none()
-                
-                if max_volume and new_volume > max_volume.value:
-                    max_volume.value = new_volume
-                    await self.session.commit()
+            # Query max volume
+            result = await self.session.execute(
+                select(TetrixMetrics).where(TetrixMetrics.key == "max_volume")
+            )
+            max_volume = result.scalar_one_or_none()
+            
+            if max_volume and new_volume > max_volume.value:
+                max_volume.value = new_volume
+                await self.session.commit()
         except Exception as e:
             logger.error(f"Error in update_max_volume: {e}")
             await self.session.rollback()
@@ -99,16 +99,7 @@ class TetrixService:
         filled = max(1, int((percentage / 100) * bar_length))  # At least 1 bar if percentage > 0
         return f"[{'█' * filled}{'░' * (bar_length - filled)}] {percentage:.1f}%"
 
-    async def _get_cached_or_fetch(self, key: str, fetch_func, cache_time: int):
-        """Get data from cache or fetch and cache it"""
-        cached = await self.redis.get(key)
-        if cached:
-            return json.loads(cached)
-        
-        data = await fetch_func()
-        await self.redis.setex(key, cache_time, json.dumps(data))
-        return data
-
+    @cache_metrics(key_pattern=CacheKeys.HOLDERS)
     async def _fetch_holders(self):
         """Fetch current holders count"""
         async with aiohttp.ClientSession() as session:
@@ -122,6 +113,7 @@ class TetrixService:
                 data = await response.json()
                 return {"holders_count": data["holders_count"]}
 
+    @cache_metrics(key_pattern=CacheKeys.DEX_SCREENER)
     async def _fetch_dexscreener_data(self):
         """Fetch price and volume data from DexScreener"""
         async with aiohttp.ClientSession() as session:
@@ -151,17 +143,18 @@ class TetrixService:
                     "max_volume": max_volume
                 }
 
+    @cache_metrics(key_pattern="tetrix:metrics")
     async def get_metrics(self):
         """Get all TETRIX metrics from cache"""
         try:
-            # Get cached values
-            dex_data = await self._get_cached_or_fetch("tetrix:dexscreener", self._fetch_dexscreener_data, CACHE_TIME)
-            holders_data = await self._get_cached_or_fetch("tetrix:holders", self._fetch_holders, CACHE_TIME)
+            # Get cached values using decorated methods
+            dex_data = await self._fetch_dexscreener_data()
+            holders_data = await self._fetch_holders()
             
             if not all([dex_data, holders_data]):
                 logger.error("Some metrics are not available: dex=%s, holders=%s", 
                            bool(dex_data), bool(holders_data))
-                raise ValueError("Some metrics are not available in cache")
+                raise ValueError("Some metrics are not available")
             
             # Calculate percentages
             health_percent = min(100, (holders_data["holders_count"] / MAX_HOLDERS) * 100)
@@ -177,7 +170,7 @@ class TetrixService:
             logger.debug("Calculated metrics: health=%.2f%%, strength=%.2f%%, mood=%.2f%%, weighted_avg=%.2f%%",
                       health_percent, strength_percent, mood_percent, avg_percent)
             
-            return {
+            metrics = {
                 "health": {
                     "value": holders_data["holders_count"],
                     "percent": health_percent,
@@ -202,6 +195,18 @@ class TetrixService:
                     "max_volume": dex_data["max_volume"]
                 }
             }
+
+            # If we got a string, try to deserialize it
+            if isinstance(metrics, str):
+                try:
+                    metrics = json.loads(metrics)
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to decode metrics from cache, raw value: {metrics[:100]}")
+                    # Re-raise to trigger recalculation
+                    raise
+
+            return metrics
+            
         except Exception as e:
             logger.error("Error getting metrics: %s", str(e), exc_info=True)
             raise

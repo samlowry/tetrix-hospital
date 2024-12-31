@@ -14,6 +14,7 @@ from services.tetrix_service import TetrixService
 from core.config import Settings
 from models.database import init_db, engine, Base
 from migrations.migrate import run_migrations
+from core.cache import setup_cache
 
 # Initialize application settings from environment variables
 settings = Settings()
@@ -46,9 +47,17 @@ async def lifespan(app: FastAPI):
     Args:
         app: FastAPI application instance
     """
-    # Initialize Redis connection
+    # Initialize Cache
+    app.state.cache = setup_cache()
+    logger.info("Cache initialized")
+
+    # Initialize Redis service with async client
+    # We use both aiocache (app.state.cache) and direct async Redis client (app.state.redis)
+    # Direct Redis client is used as fallback when cache is unavailable
     redis = RedisService.create(settings.REDIS_HOST, settings.REDIS_PORT)
-    app.state.redis = redis.redis
+    app.state.redis = redis.redis  # Async Redis client instance
+    app.state.redis_service = redis  # Store service instance for fallback operations
+    app.state.redis_service.cache = app.state.cache  # Connect cache to service for primary operations
 
     # Set up database connection and session manager
     engine = create_async_engine(settings.DATABASE_URL)
@@ -60,8 +69,8 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Set up and start the task scheduler
-    scheduler = SchedulerService(redis.redis, async_session)
+    # Set up and start the task scheduler with new cache
+    scheduler = SchedulerService(app.state.cache, async_session)
     app.state.scheduler = scheduler
     await scheduler.start()
 
@@ -71,6 +80,8 @@ async def lifespan(app: FastAPI):
     await scheduler.stop()
     await engine.dispose()
     await app.state.redis.close()
+    await app.state.cache.close()
+    logger.info("All resources cleaned up")
 
 # Initialize FastAPI application with configuration
 app = FastAPI(

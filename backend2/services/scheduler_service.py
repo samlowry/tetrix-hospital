@@ -2,8 +2,8 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from core.cache import cache_metrics, CacheKeys, Cache
 import json
 
 logger = logging.getLogger(__name__)
@@ -13,15 +13,15 @@ class SchedulerService:
     Service responsible for scheduling and executing periodic tasks like 
     updating leaderboards, fetching metrics, and holder information
     """
-    def __init__(self, redis: Redis, session_factory: async_sessionmaker):
+    def __init__(self, cache: Cache, session_factory: async_sessionmaker):
         """
-        Initialize scheduler service with Redis connection and database session factory
+        Initialize scheduler service with cache connection and database session factory
         
         Args:
-            redis: Redis connection instance for caching
+            cache: Cache instance for caching (aiocache)
             session_factory: SQLAlchemy async session maker for database operations
         """
-        self.redis = redis  # Redis instance for caching
+        self.cache = cache  # Replace Redis with cache
         self.session_factory = session_factory  # Database session factory
         self.tasks: Dict[str, asyncio.Task] = {}  # Dictionary to store running tasks
         self._running = False  # Flag to track scheduler running state
@@ -55,6 +55,7 @@ class SchedulerService:
                 await session.rollback()
                 raise
 
+    @cache_metrics(key_pattern=CacheKeys.DEX_SCREENER)
     async def _fetch_metrics(self, session: AsyncSession):
         """
         Fetch and cache price and volume data from DexScreener
@@ -63,10 +64,12 @@ class SchedulerService:
             session: Active database session for the operation
         """
         from .tetrix_service import TetrixService
-        tetrix = TetrixService(self.redis, session)
-        data = await tetrix._fetch_dexscreener_data()
-        await self.redis.setex("tetrix:dexscreener", 90, json.dumps(data))  # Cache for 90 seconds
+        tetrix = TetrixService(self.cache, session)
+        # Use get_metrics instead of direct call to avoid cache duplication
+        metrics = await tetrix.get_metrics()
+        return metrics.get('raw', {})
 
+    @cache_metrics(key_pattern=CacheKeys.HOLDERS)
     async def _fetch_holders(self, session: AsyncSession):
         """
         Fetch and cache the current count of token holders
@@ -75,9 +78,10 @@ class SchedulerService:
             session: Active database session for the operation
         """
         from .tetrix_service import TetrixService
-        tetrix = TetrixService(self.redis, session)
-        data = await tetrix._fetch_holders()
-        await self.redis.setex("tetrix:holders", 90, json.dumps(data))  # 90 seconds cache
+        tetrix = TetrixService(self.cache, session)
+        # Use get_metrics instead of direct call to avoid cache duplication
+        metrics = await tetrix.get_metrics()
+        return {"holders_count": metrics.get('raw', {}).get('holders', 0)}
 
     async def start(self):
         """Start the scheduler"""
@@ -105,23 +109,23 @@ class SchedulerService:
             asyncio.create_task(self._schedule_task(task_name))
 
     async def _ensure_metrics_populated(self):
-        """Check if metrics exist in Redis and populate if missing"""
+        """Check if metrics exist in cache and populate if missing"""
         async with self.session_factory() as session:
             # Check DexScreener data
-            dex_data = await self.redis.get("tetrix:dexscreener")
+            dex_data = await self._fetch_metrics(session)
             if not dex_data:
-                logger.info("DexScreener data missing in Redis, fetching...")
+                logger.info("DexScreener data missing in cache, fetching...")
                 await self._fetch_metrics(session)
             else:
-                logger.info("DexScreener data exists in Redis, skipping initial fetch")
+                logger.info("DexScreener data exists in cache, skipping initial fetch")
 
             # Check holders
-            holders = await self.redis.get("tetrix:holders")
+            holders = await self._fetch_holders(session)
             if not holders:
-                logger.info("Holders count missing in Redis, fetching...")
+                logger.info("Holders count missing in cache, fetching...")
                 await self._fetch_holders(session)
             else:
-                logger.info("Holders count exists in Redis, skipping initial fetch")
+                logger.info("Holders count exists in cache, skipping initial fetch")
 
     async def _schedule_task(self, task_name: str):
         """Schedule a task to run periodically"""

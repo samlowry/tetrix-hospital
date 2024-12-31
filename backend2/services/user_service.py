@@ -10,6 +10,7 @@ import aiohttp
 from models.user import User
 from models.invite_code import InviteCode
 from typing import Optional, List, Dict, Tuple
+from core.cache import CacheKeys, cache_permanent
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,8 @@ def utc_now() -> datetime:
 class UserService:
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.redis = None  # Will be set externally
+        self.cache = None  # Initialize cache attribute
+        self._user_cache = {}  # Local cache for users within request
 
     async def set_redis(self, redis):
         """Set Redis client instance"""
@@ -127,11 +129,25 @@ class UserService:
             raise
 
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
-        """Get user by telegram_id"""
-        result = await self.session.execute(
-            select(User).where(User.telegram_id == telegram_id)
-        )
-        return result.scalar_one_or_none()
+        """Get user by Telegram ID"""
+        try:
+            # Check local cache first
+            if telegram_id in self._user_cache:
+                return self._user_cache[telegram_id]
+            
+            # Query user
+            query = select(User).where(User.telegram_id == telegram_id)
+            result = await self.session.execute(query)
+            user = result.scalar_one_or_none()
+            
+            if user:
+                # Cache user for this request
+                self._user_cache[telegram_id] = user
+            
+            return user
+        except Exception as e:
+            logger.error(f"Failed to get user by telegram_id {telegram_id}: {e}")
+            return None
 
     async def get_user_by_wallet_address(self, wallet_address: str) -> Optional[User]:
         """Get user by wallet address"""
@@ -339,50 +355,77 @@ class UserService:
             await self.session.rollback()
             return False
 
-    async def get_user_locale(self, telegram_id: int) -> str:
+    @cache_permanent(key_pattern=CacheKeys.USER_LANGUAGE)
+    async def get_user_language(self, telegram_id: int) -> Optional[str]:
         """
-        Get user's locale. Check Redis first for performance,
-        if not found - check DB and cache in Redis,
-        if nowhere - return 'ru'
+        Get user's preferred language from cache or database
+        Args:
+            telegram_id (int): User's Telegram ID
+        Returns:
+            Optional[str]: Language code or None if not set
         """
-        # Try Redis first for performance
-        if self.redis:
-            redis_key = f"user:{telegram_id}:language"
-            lang = await self.redis.get(redis_key)
-            logger.debug(f"Got language from Redis for {telegram_id}: {lang}")
-            if lang:
-                return lang  # Redis already returns decoded string
-
-        # If not in Redis, try DB and cache result
+        # Try cache first
+        if self.cache:
+            cached = await self.cache.get(CacheKeys.USER_LANGUAGE.format(telegram_id=telegram_id))
+            if cached is not None:
+                return cached
+        
+        # Check local user cache first
+        if telegram_id in self._user_cache:
+            user = self._user_cache[telegram_id]
+            if user and user.language:
+                # Update cache for future requests
+                if self.cache:
+                    key = CacheKeys.USER_LANGUAGE.format(telegram_id=telegram_id)
+                    await self.cache.set(key, user.language)
+                return user.language
+        
+        # If not in cache or local cache, check database
         user = await self.get_user_by_telegram_id(telegram_id)
         if user and user.language:
-            # Cache in Redis for future fast access
-            if self.redis:
-                redis_key = f"user:{telegram_id}:language"
-                await self.redis.set(redis_key, user.language)
-                logger.debug(f"Cached language in Redis for {telegram_id}: {user.language}")
+            # Update cache for future requests
+            if self.cache:
+                key = CacheKeys.USER_LANGUAGE.format(telegram_id=telegram_id)
+                await self.cache.set(key, user.language)
             return user.language
+            
+        return None
 
-        # Default to Russian
-        logger.debug(f"Using default language for {telegram_id}")
-        return 'ru'
-
-    async def set_user_locale(self, telegram_id: int, language: str) -> None:
-        """Set user's preferred language"""
-        logger.debug(f"Setting language for {telegram_id} to {language}")
-        if self.redis:
-            redis_key = f"user:{telegram_id}:language"
-            await self.redis.set(redis_key, language)
-            logger.debug(f"Set language in Redis for {telegram_id}: {language}")
-
-        # Additionally update in DB if user exists
+    async def set_user_language(self, telegram_id: int, language: str) -> bool:
+        """
+        Set user's preferred language in cache and DB if user exists
+        Args:
+            telegram_id (int): User's Telegram ID
+            language (str): Language code
+        Returns:
+            bool: True if successful
+        """
+        key = CacheKeys.USER_LANGUAGE.format(telegram_id=telegram_id)
+        
+        # Update cache
+        if self.cache:
+            await self.cache.set(key, language)
+        
+        # Update DB if user exists
         user = await self.get_user_by_telegram_id(telegram_id)
-        if user:
+        if user and user.language != language:
             user.language = language
             await self.session.commit()
-            logger.debug(f"Updated language in DB for {telegram_id}: {language}")
-        else:
-            logger.debug(f"User {telegram_id} not found in DB")
+        
+        return True
+
+    async def update_user_language(self, user: User) -> bool:
+        """
+        Update user's language preference in cache from DB
+        Args:
+            user (User): User model instance
+        Returns:
+            bool: True if successful
+        """
+        if not user.telegram_id or not user.language:
+            return False
+        
+        return await self.set_user_language(user.telegram_id, user.language)
 
     async def get_leaderboard_snapshot(self) -> list:
         """Get top users from leaderboard snapshot table"""
