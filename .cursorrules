@@ -5,6 +5,7 @@
 - Always write comments for any new function, new variable or rewrite if you change its functionality. Keep them such desciptable so you will understand the business logic at the next time
 - Prefer iteration and modularizaion over code duplication. Always explore code for existing related logic - maybe some blocks is already partially or fully implemented
 - Do not inroduce new dependencies before you not make sure we don't use already different library or framework
+- Design services to be stateless; leverage external storage and caches (e.g., Redis) for state persistence
 
 # Important project related things to follow
 
