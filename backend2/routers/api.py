@@ -78,12 +78,13 @@ async def get_user(
     user_stats = await user_service.get_user_stats(user)
     return {
         'telegram_id': user.telegram_id,
-        'wallet_address': user.wallet_address,
+        'telegram_display_name': user.telegram_display_name,
+        'telegram_username': user.telegram_username,
         'registration_date': user.registration_date.isoformat(),
         'is_early_backer': user.is_early_backer,
-        'is_fully_registered': user.is_fully_registered,
         'registration_phase': user.registration_phase,
-        **user_stats
+        'language': user.language,
+        'stats': user_stats
     }
 
 class LeaderboardStats(BaseModel):
@@ -190,12 +191,13 @@ async def get_combined_stats(
     return {
         'user': {
             'telegram_id': user.telegram_id,
-            'wallet_address': user.wallet_address,
+            'telegram_display_name': user.telegram_display_name,
+            'telegram_username': user.telegram_username,
             'registration_date': user.registration_date.isoformat(),
             'is_early_backer': user.is_early_backer,
-            'is_fully_registered': user.is_fully_registered,
             'registration_phase': user.registration_phase,
-            **user_stats
+            'language': user.language,
+            'stats': user_stats
         },
         'ranking': rank_info,
         'leaderboard': leaderboard,
@@ -232,12 +234,13 @@ async def get_user_stats(
         user_stats = await user_service.get_user_stats(user)
         return {
             'telegram_id': user.telegram_id,
-            'wallet_address': user.wallet_address,
+            'telegram_display_name': user.telegram_display_name,
+            'telegram_username': user.telegram_username,
             'registration_date': user.registration_date.isoformat(),
             'is_early_backer': user.is_early_backer,
-            'is_fully_registered': user.is_fully_registered,
             'registration_phase': user.registration_phase,
-            **user_stats
+            'language': user.language,
+            'stats': user_stats
         }
     except Exception as e:
         logger.error(f"Error getting user stats: {e}")

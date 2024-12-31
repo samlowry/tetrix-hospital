@@ -28,8 +28,6 @@ class User(Base):
     ignore_slot_reset = Column(Boolean, default=False)
     # Flag indicating if user is an early supporter, which  got into system w/o invites
     is_early_backer = Column(Boolean, default=False)
-    # Flag indicating if registration process is complete
-    is_fully_registered = Column(Boolean, default=False)
     # User's preferred language code
     language = Column(String(2), default='ru', nullable=False)
     # User's registration phase

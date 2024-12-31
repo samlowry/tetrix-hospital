@@ -87,7 +87,6 @@ class UserService:
                     max_invite_slots=5,
                     ignore_slot_reset=False,
                     is_early_backer=False,
-                    is_fully_registered=False,
                     language=language,
                     registration_phase='preregistered'
                 )
@@ -123,7 +122,6 @@ class UserService:
                     max_invite_slots=5,
                     ignore_slot_reset=False,
                     is_early_backer=is_early_backer,
-                    is_fully_registered=is_early_backer,  # Early backers are automatically fully registered
                     language=language,  # Save the language preference
                     registration_phase='active' if is_early_backer else 'pending'  # Set registration phase based on early_backer status
                 )
@@ -283,7 +281,6 @@ class UserService:
 
         invite.used_by_id = user.id
         invite.used_at = utc_now()
-        user.is_fully_registered = True  # Keep this for backward compatibility
         user.registration_phase = 'active'  # Set registration phase to active when invite code is used
 
         try:
