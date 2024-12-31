@@ -120,90 +120,95 @@ class TelegramHandler:
     @with_locale
     async def handle_start_command(self, *, telegram_id: int, strings) -> bool:
         """Handle /start command"""
-        # Check if user exists in DB
-        user = await self.user_service.get_user_by_telegram_id(telegram_id)
-        
-        if not user:
-            # Create new user in pre-registration state
-            display_name, username = await get_telegram_info(telegram_id)
-            user = await self.user_service.create_user(
-                telegram_id=telegram_id,
-                wallet_address=None
-            )
-            logger.info(f"Created new user {telegram_id} in preregistered state")
-        
-        # Check if language is set
-        lang = await self.user_service.get_user_language(telegram_id)
-        
-        if not lang:
-            logger.debug(f"[WebApp] No language set for user {telegram_id}, showing language selection")
-            return await self.handle_language_selection(telegram_id=telegram_id, strings=strings)
+        try:
+            # Check if user exists in DB
+            user = await self.user_service.get_user_by_telegram_id(telegram_id)
+            logger.info(f"[TELEGRAM] User lookup for {telegram_id}: {'found' if user else 'not found'}")
             
-        # If user exists but not fully registered
-        if user.registration_phase == 'preregistered':
-            # New user - send to wallet connection
-            await self.redis_service.set_status_waiting_wallet(telegram_id)
-            user_lang = await self.user_service.get_user_language(telegram_id) or 'ru'
-            web_app_url = f"{settings.FRONTEND_URL}?lang={user_lang}"
-            logger.debug(f"[WebApp] Initial URL for user {telegram_id}: {web_app_url}, language: {user_lang}")
+            if not user:
+                # Create new user in pre-registration state
+                user = await self.user_service.create_user(
+                    telegram_id=telegram_id,
+                    wallet_address=None
+                )
+                logger.info(f"[TELEGRAM] Created new user {telegram_id} in preregistered state")
+            
+            # Check if language is set
+            lang = await self.user_service.get_user_language(telegram_id)
+            logger.info(f"[TELEGRAM] User {telegram_id} language: {lang}")
+            
+            if not lang:
+                logger.debug(f"[TELEGRAM] No language set for user {telegram_id}, showing language selection")
+                return await self.handle_language_selection(telegram_id=telegram_id, strings=strings)
+                
+            # If user exists but not fully registered
+            if user.registration_phase == 'preregistered':
+                # New user - send to wallet connection
+                await self.redis_service.set_status_waiting_wallet(telegram_id)
+                user_lang = await self.user_service.get_user_language(telegram_id) or 'ru'
+                web_app_url = f"{settings.FRONTEND_URL}?lang={user_lang}"
+                logger.debug(f"[TELEGRAM] Initial URL for user {telegram_id}: {web_app_url}, language: {user_lang}")
+                
+                return await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.WELCOME_NEW_USER,
+                    parse_mode="Markdown",
+                    reply_markup={
+                        "inline_keyboard": [
+                            [{
+                                "text": strings.BUTTONS["connect_wallet"],
+                                "web_app": {"url": web_app_url}
+                            }],
+                            [{
+                                "text": strings.BUTTONS["create_wallet"],
+                                "callback_data": "create_wallet"
+                            }]
+                        ]
+                    }
+                )
+            
+            # Check registration status
+            if user.registration_phase == 'pending':
+                # User with wallet but without invite code
+                await self.redis_service.set_status_waiting_invite(telegram_id)
+                return await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.WELCOME_NEED_INVITE,
+                    parse_mode="Markdown"
+                )
+                
+            # Fully registered user
+            await self.redis_service.set_status_registered(telegram_id)
+            stats = await self.user_service.get_user_stats(user)
+            
+            # Get TETRIX metrics
+            tetrix_service = TetrixService(self.redis, self.session)
+            tetrix_metrics = await tetrix_service.get_metrics()
             
             return await send_telegram_message(
                 chat_id=telegram_id,
-                text=strings.WELCOME_NEW_USER,
-                parse_mode="Markdown",
+                text=strings.WELCOME_BACK_SHORT + "\n\n" + strings.STATS_TEMPLATE.format(
+                    points=stats['points'],
+                    health_bar=tetrix_metrics['health']['bar'],
+                    strength_bar=tetrix_metrics['strength']['bar'],
+                    mood_bar=tetrix_metrics['mood']['bar'],
+                    emotion=tetrix_metrics['emotion'],
+                    holding_points=stats['points_breakdown']['holding'],
+                    invite_points=stats['points_breakdown']['invites'],
+                    early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
+                ),
+                parse_mode="HTML",
                 reply_markup={
                     "inline_keyboard": [
-                        [{
-                            "text": strings.BUTTONS["connect_wallet"],
-                            "web_app": {"url": web_app_url}
-                        }],
-                        [{
-                            "text": strings.BUTTONS["create_wallet"],
-                            "callback_data": "create_wallet"
-                        }]
+                        [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
+                        [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}],
+                        [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard"}]
                     ]
                 }
             )
-        
-        # Check registration status
-        if user.registration_phase == 'pending':
-            # User with wallet but without invite code
-            await self.redis_service.set_status_waiting_invite(telegram_id)
-            return await send_telegram_message(
-                chat_id=telegram_id,
-                text=strings.WELCOME_NEED_INVITE,
-                parse_mode="Markdown"
-            )
-            
-        # Fully registered user
-        await self.redis_service.set_status_registered(telegram_id)
-        stats = await self.user_service.get_user_stats(user)
-        
-        # Get TETRIX metrics
-        tetrix_service = TetrixService(self.redis, self.session)
-        tetrix_metrics = await tetrix_service.get_metrics()
-        
-        return await send_telegram_message(
-            chat_id=telegram_id,
-            text=strings.WELCOME_BACK_SHORT + "\n\n" + strings.STATS_TEMPLATE.format(
-                points=stats['points'],
-                health_bar=tetrix_metrics['health']['bar'],
-                strength_bar=tetrix_metrics['strength']['bar'],
-                mood_bar=tetrix_metrics['mood']['bar'],
-                emotion=tetrix_metrics['emotion'],
-                holding_points=stats['points_breakdown']['holding'],
-                invite_points=stats['points_breakdown']['invites'],
-                early_backer_bonus=stats['points_breakdown']['early_backer_bonus']
-            ),
-            parse_mode="HTML",
-            reply_markup={
-                "inline_keyboard": [
-                    [{"text": strings.BUTTONS["refresh_stats"], "callback_data": "refresh_stats"}],
-                    [{"text": strings.BUTTONS["show_invites"], "callback_data": "show_invites"}],
-                    [{"text": strings.BUTTONS["leaderboard"], "callback_data": "leaderboard"}]
-                ]
-            }
-        )
+        except Exception as e:
+            logger.error(f"[TELEGRAM] Error in handle_start_command for {telegram_id}: {str(e)}", exc_info=True)
+            return False
 
     @with_locale
     async def handle_invite_code(self, *, telegram_id: int, code: str, strings) -> bool:

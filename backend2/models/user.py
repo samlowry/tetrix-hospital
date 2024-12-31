@@ -11,7 +11,7 @@ class User(Base):
     # Primary identifier for the user
     id = Column(Integer, primary_key=True)
     # User's TON wallet address
-    wallet_address = Column(String, unique=True, nullable=False)
+    wallet_address = Column(String, unique=True, nullable=True)
     # Telegram user ID for authentication
     telegram_id = Column(BigInteger, unique=True, nullable=False)
     # Display name shown in Telegram
@@ -37,7 +37,7 @@ class User(Base):
 
     # Database constraints for data validation
     __table_args__ = (
-        CheckConstraint("wallet_address ~ '^0:[a-fA-F0-9]{64}$'", name='check_wallet_address'),
+        CheckConstraint("wallet_address IS NULL OR wallet_address ~ '^0:[a-fA-F0-9]{64}$'", name='check_wallet_address'),
         CheckConstraint("telegram_id > 0", name='check_telegram_id'),
         CheckConstraint("language ~ '^[a-z]{2}$'", name='check_language_code'),
         CheckConstraint("registration_phase IN ('preregistered', 'pending', 'active')", name='check_registration_phase'),

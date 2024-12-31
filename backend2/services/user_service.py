@@ -72,9 +72,9 @@ class UserService:
             display_name, username = await get_telegram_info(telegram_id)
             logger.info(f"[USER_SERVICE] Got Telegram info: display_name={display_name}, username={username}")
 
-            # Get user's current language preference
-            language = await self.get_user_language(telegram_id)
-            logger.info(f"[USER_SERVICE] Got user language: {language}")
+            # For new users, default to Russian
+            language = 'ru'
+            logger.info(f"[USER_SERVICE] Using default language: {language}")
 
             # If no wallet address, create user in preregistered state
             if wallet_address is None:
@@ -83,7 +83,7 @@ class UserService:
                     telegram_id=telegram_id,
                     telegram_display_name=display_name,
                     telegram_username=username,
-                    wallet_address='0:0000000000000000000000000000000000000000000000000000000000000000',  # Temporary placeholder
+                    wallet_address=None,  # No placeholder needed anymore
                     max_invite_slots=5,
                     ignore_slot_reset=False,
                     is_early_backer=False,

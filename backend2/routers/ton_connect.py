@@ -98,39 +98,53 @@ async def verify_proof(
         user_service.redis = redis
         handler = TonConnectHandler(user_service, redis_service)
         
-        # Check if user exists with this telegram_id
-        user = await user_service.get_user_by_telegram_id(proof_data.telegram_id)
-        if user:
-            logger.info(f"[TON_CONNECT] User already exists with telegram_id={proof_data.telegram_id}")
-            return {"success": True}
-
-        # Check if user exists with this wallet
-        user = await user_service.get_user_by_wallet_address(proof_data.wallet_address)
-        if user:
-            logger.error(f"[TON_CONNECT] Wallet {proof_data.wallet_address} already registered to telegram_id={user.telegram_id}")
-            raise HTTPException(
-                status_code=400,
-                detail="This wallet is already registered to another user"
-            )
-
-        # Create user
+        # Get or update user
         try:
-            logger.info(f"[TON_CONNECT] Creating new user with telegram_id={proof_data.telegram_id}, wallet={proof_data.wallet_address}")
-            user = await user_service.create_user(
-                telegram_id=proof_data.telegram_id,
-                wallet_address=proof_data.wallet_address
-            )
-            logger.info(f"[TON_CONNECT] User created successfully: telegram_id={proof_data.telegram_id}, is_early_backer={user.is_early_backer}")
+            logger.info(f"[TON_CONNECT] Looking up user with telegram_id={proof_data.telegram_id}")
+            user = await user_service.get_user_by_telegram_id(proof_data.telegram_id)
+            
+            if user:
+                if user.registration_phase != 'preregistered':
+                    logger.error(f"[TON_CONNECT] User {proof_data.telegram_id} is in {user.registration_phase} state, cannot update wallet")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="User is not in preregistration state"
+                    )
+                    
+                # Check if wallet is already registered to another user
+                existing_wallet_user = await user_service.get_user_by_wallet_address(proof_data.wallet_address)
+                if existing_wallet_user:
+                    logger.error(f"[TON_CONNECT] Wallet {proof_data.wallet_address} already registered to telegram_id={existing_wallet_user.telegram_id}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="This wallet is already registered to another user"
+                    )
+                
+                logger.info(f"[TON_CONNECT] Updating preregistered user with telegram_id={proof_data.telegram_id}, wallet={proof_data.wallet_address}")
+                # Update wallet address and phase
+                await user_service.update_user(
+                    user,
+                    wallet_address=proof_data.wallet_address,
+                    registration_phase='pending'
+                )
+            else:
+                logger.info(f"[TON_CONNECT] Creating new user with telegram_id={proof_data.telegram_id}, wallet={proof_data.wallet_address}")
+                user = await user_service.create_user(
+                    telegram_id=proof_data.telegram_id,
+                    wallet_address=proof_data.wallet_address
+                )
+            
+            logger.info(f"[TON_CONNECT] User processed successfully: telegram_id={proof_data.telegram_id}, is_early_backer={user.is_early_backer}")
             
             # Send welcome message based on user type
             try:
                 await handler.send_welcome_message(telegram_id=proof_data.telegram_id, is_early_backer=user.is_early_backer)
             except Exception as e:
-                logger.error(f"[TON_CONNECT] Error creating user: {e}")
+                logger.error(f"[TON_CONNECT] Error sending welcome message: {e}")
             
             return {"success": True}
         except Exception as e:
-            logger.error(f"[TON_CONNECT] Error creating user: {e}", exc_info=True)
+            logger.error(f"[TON_CONNECT] Error processing user: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
             
     except HTTPException:
