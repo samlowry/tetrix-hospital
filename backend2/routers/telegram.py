@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from models.database import get_session
-from services.user_service import UserService
+from services.user_service import UserService, get_telegram_info
 from services.redis_service import RedisService, UserStatus
 from core.deps import get_redis
 from core.config import get_settings
@@ -120,6 +120,20 @@ class TelegramHandler:
     @with_locale
     async def handle_start_command(self, *, telegram_id: int, strings) -> bool:
         """Handle /start command"""
+        # Check if user exists in DB
+        user = await self.user_service.get_user_by_telegram_id(telegram_id)
+        
+        if not user:
+            # Create new user in pre-registration state
+            display_name, username = await get_telegram_info(telegram_id)
+            user = await self.user_service.create_user(
+                telegram_id=telegram_id,
+                telegram_display_name=display_name,
+                telegram_username=username,
+                registration_phase='preregistered'
+            )
+            logger.info(f"Created new user {telegram_id} in preregistered state")
+        
         # Check if language is set
         lang = await self.user_service.get_user_language(telegram_id)
         
@@ -127,10 +141,8 @@ class TelegramHandler:
             logger.debug(f"[WebApp] No language set for user {telegram_id}, showing language selection")
             return await self.handle_language_selection(telegram_id=telegram_id, strings=strings)
             
-        # Check if user exists in DB
-        user = await self.user_service.get_user_by_telegram_id(telegram_id)
-        
-        if not user:
+        # If user exists but not fully registered
+        if user.registration_phase == 'preregistered':
             # New user - send to wallet connection
             await self.redis_service.set_status_waiting_wallet(telegram_id)
             user_lang = await self.user_service.get_user_language(telegram_id) or 'ru'
