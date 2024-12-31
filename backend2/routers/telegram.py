@@ -128,9 +128,7 @@ class TelegramHandler:
             display_name, username = await get_telegram_info(telegram_id)
             user = await self.user_service.create_user(
                 telegram_id=telegram_id,
-                telegram_display_name=display_name,
-                telegram_username=username,
-                registration_phase='preregistered'
+                wallet_address=None
             )
             logger.info(f"Created new user {telegram_id} in preregistered state")
         

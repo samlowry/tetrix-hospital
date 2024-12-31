@@ -54,7 +54,7 @@ class UserService:
     async def create_user(
         self,
         telegram_id: int,
-        wallet_address: str
+        wallet_address: Optional[str] = None
     ) -> User:
         """Create a new user"""
         # Check early_backer status
@@ -76,41 +76,57 @@ class UserService:
             language = await self.get_user_locale(telegram_id)
             logger.info(f"[USER_SERVICE] Got user language: {language}")
 
-            logger.info(f"[USER_SERVICE] Checking early backer status for wallet: {wallet_address}")
-            # Use relative path from app.py
-            file_path = 'first_backers.txt'
-            logger.info(f"[USER_SERVICE] Looking for first_backers.txt at: {file_path}")
-            
-            try:
-                with open(file_path, 'r') as f:
-                    early_backers = f.read().splitlines()
-                    logger.info(f"[USER_SERVICE] Loaded {len(early_backers)} early backers")
-                    logger.info(f"[USER_SERVICE] First few backers: {early_backers[:5]}")
-                    # Normalize wallet address for comparison
-                    wallet_address = wallet_address.strip().lower()
-                    early_backers = [addr.strip().lower() for addr in early_backers]
-                    is_early_backer = wallet_address in early_backers
-                    logger.info(f"[USER_SERVICE] Is early backer check result: {is_early_backer} for wallet {wallet_address}")
-            except FileNotFoundError:
-                logger.error(f"[USER_SERVICE] first_backers.txt not found at {file_path}")
-                raise
-            except Exception as e:
-                logger.error(f"[USER_SERVICE] Error reading first_backers.txt: {e}", exc_info=True)
-                raise
+            # If no wallet address, create user in preregistered state
+            if wallet_address is None:
+                logger.info(f"[USER_SERVICE] Creating new user in preregistered state")
+                user = User(
+                    telegram_id=telegram_id,
+                    telegram_display_name=display_name,
+                    telegram_username=username,
+                    wallet_address='0:0000000000000000000000000000000000000000000000000000000000000000',  # Temporary placeholder
+                    max_invite_slots=5,
+                    ignore_slot_reset=False,
+                    is_early_backer=False,
+                    is_fully_registered=False,
+                    language=language,
+                    registration_phase='preregistered'
+                )
+            else:
+                logger.info(f"[USER_SERVICE] Checking early backer status for wallet: {wallet_address}")
+                # Use relative path from app.py
+                file_path = 'first_backers.txt'
+                logger.info(f"[USER_SERVICE] Looking for first_backers.txt at: {file_path}")
+                
+                try:
+                    with open(file_path, 'r') as f:
+                        early_backers = f.read().splitlines()
+                        logger.info(f"[USER_SERVICE] Loaded {len(early_backers)} early backers")
+                        logger.info(f"[USER_SERVICE] First few backers: {early_backers[:5]}")
+                        # Normalize wallet address for comparison
+                        wallet_address = wallet_address.strip().lower()
+                        early_backers = [addr.strip().lower() for addr in early_backers]
+                        is_early_backer = wallet_address in early_backers
+                        logger.info(f"[USER_SERVICE] Is early backer check result: {is_early_backer} for wallet {wallet_address}")
+                except FileNotFoundError:
+                    logger.error(f"[USER_SERVICE] first_backers.txt not found at {file_path}")
+                    raise
+                except Exception as e:
+                    logger.error(f"[USER_SERVICE] Error reading first_backers.txt: {e}", exc_info=True)
+                    raise
 
-            logger.info(f"[USER_SERVICE] Creating new user object with telegram_id={telegram_id}, is_early_backer={is_early_backer}")
-            user = User(
-                telegram_id=telegram_id,
-                telegram_display_name=display_name,
-                telegram_username=username,
-                wallet_address=wallet_address,
-                max_invite_slots=5,
-                ignore_slot_reset=False,
-                is_early_backer=is_early_backer,
-                is_fully_registered=is_early_backer,  # Early backers are automatically fully registered
-                language=language,  # Save the language preference
-                registration_phase='active' if is_early_backer else 'pending'  # Set registration phase based on early_backer status
-            )
+                logger.info(f"[USER_SERVICE] Creating new user object with telegram_id={telegram_id}, is_early_backer={is_early_backer}")
+                user = User(
+                    telegram_id=telegram_id,
+                    telegram_display_name=display_name,
+                    telegram_username=username,
+                    wallet_address=wallet_address,
+                    max_invite_slots=5,
+                    ignore_slot_reset=False,
+                    is_early_backer=is_early_backer,
+                    is_fully_registered=is_early_backer,  # Early backers are automatically fully registered
+                    language=language,  # Save the language preference
+                    registration_phase='active' if is_early_backer else 'pending'  # Set registration phase based on early_backer status
+                )
             
             logger.info("[USER_SERVICE] Adding user to session")
             self.session.add(user)
