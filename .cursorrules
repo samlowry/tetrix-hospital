@@ -15,6 +15,7 @@
 - the backend folder is backend2/ and project context for start is always this folder!!!
 - local migrations runs from prj folder by python migrations/migrate.py
 - connect to postgres local is simple (example): psql tetrix -c "SELECT * FROM \"user\";" remote: psql -U tetrix tetrix -c "SELECT * FROM \"user\";"
+- debug local user delete - by example: psql tetrix -c "DELETE FROM invite_code WHERE creator_id = 66 OR used_by_id = 66;" && psql tetrix -c "DELETE FROM \"user\" WHERE id = 66;"
 
 # Project context
 
