@@ -73,7 +73,7 @@ class UserService:
             logger.info(f"[USER_SERVICE] Got Telegram info: display_name={display_name}, username={username}")
 
             # Get user's current language preference
-            language = await self.get_user_locale(telegram_id)
+            language = await self.get_user_language(telegram_id)
             logger.info(f"[USER_SERVICE] Got user language: {language}")
 
             # If no wallet address, create user in preregistered state
