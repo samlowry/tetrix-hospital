@@ -16,23 +16,11 @@ class CacheTTL(Enum):
 
 class CacheKeys:
     """Cache key patterns used throughout the application"""
-    USER_STATUS = "user:{telegram_id}:status"
-    USER_CONTEXT = "user:{telegram_id}:context"
-    USER_SESSION = "user_sessions:{telegram_id}"
-    USER_LANGUAGE = "user:{telegram_id}:language"
+    # User related
+    USER_STATUS = "user:{telegram_id}:status"    # User registration status
+    USER_LANGUAGE = "user:{telegram_id}:language" # User language preference
     
-    # Bot related
-    BOT = "bot"                            # Base key for bot-related data
-    BOT_STATE = "bot:state"                # Stores the current state of the bot
-    BOT_DATA = "bot:data"                  # General bot data storage
-    BOT_WEBHOOK_URL = "bot:webhook_url"    # URL for bot webhook
-    BOT_USER_DATA = "bot:user_data"        # User-specific data storage
-    BOT_CHAT_DATA = "bot:chat_data"        # Chat-specific data storage
-    BOT_CALLBACK_DATA = "bot:callback_data" # Callback query data
-    BOT_CONVERSATIONS = "bot:conversations" # Conversation state tracking
-    BOT_INITIALIZED = "bot:initialized"     # Bot initialization flag
-    
-    # Metrics related
+    # Metrics related (TTL: 90 seconds)
     DEX_SCREENER = "tetrix:dexscreener"
     HOLDERS = "tetrix:holders"
     METRICS = "tetrix:metrics"

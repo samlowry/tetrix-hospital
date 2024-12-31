@@ -183,216 +183,24 @@ class RedisService:
         status = await self.get_user_status(telegram_id)
         return status.get('status') if status else None
 
-    # Methods for handling user context
-    @cache_permanent(key_pattern=CacheKeys.USER_CONTEXT)
-    async def get_context(self, telegram_id: int) -> dict:
-        """
-        Get the context of a user's dialog
-        Args:
-            telegram_id (int): User's Telegram ID
-        Returns:
-            dict: User context or an empty dictionary if not found
-        """
-        key = CacheKeys.USER_CONTEXT.format(telegram_id=telegram_id)
-        logger.debug(f"Getting context with key: {key}")
-        
-        if self.cache:
-            context = await self.cache.get(key)
-            logger.debug(f"Got from cache: {context}, type: {type(context)}")
-            if context is not None:
-                try:
-                    if isinstance(context, str):
-                        return json.loads(context)
-                    if isinstance(context, dict):
-                        return context
-                    logger.error(f"Unexpected context type: {type(context)}")
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to decode context from cache for user {telegram_id}")
-        
-        # Fallback to Redis
-        context = await self.redis.get(key)
-        logger.debug(f"Got from Redis: {context}, type: {type(context)}")
-        if context:
-            try:
-                parsed = json.loads(context)
-                # Cache the value for future use
-                if self.cache:
-                    await self.cache.set(key, context)
-                return parsed
-            except json.JSONDecodeError:
-                logger.error(f"Failed to decode context from Redis for user {telegram_id}")
-        
-        return {}
-
-    async def update_context(self, telegram_id: int, context: dict) -> bool:
-        """
-        Update the context of a user's dialog
-        Args:
-            telegram_id (int): User's Telegram ID
-            context (dict): User context
-        Returns:
-            bool: True if the operation was successful
-        """
-        key = CacheKeys.USER_CONTEXT.format(telegram_id=telegram_id)
-        
-        if self.cache:
-            # Ensure context is a dictionary
-            if isinstance(context, str):
-                try:
-                    context = json.loads(context)
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to decode context for user {telegram_id}")
-                    return False
-            
-            await self.cache.set(key, json.dumps(context))
-        
-        return True
-
-    # Methods for handling bot state
-    @cache_permanent(key_pattern=CacheKeys.BOT_STATE)
-    async def get_bot_state(self) -> str:
-        """
-        Get the current state of the bot
-        Returns:
-            str: Bot state or an empty string if not found
-        """
-        key = CacheKeys.BOT_STATE
-        
-        if self.cache:
-            state = await self.cache.get(key)
-            if state is not None:
-                return state
-        
-        # Fallback to Redis
-        state = await self.redis.get(REDIS_KEYS['bot_state'])
-        if state:
-            # Cache the value for future use
-            if self.cache:
-                await self.cache.set(key, state)
-        return state or ""
-
-    async def set_bot_state(self, state: str) -> bool:
-        """
-        Set the state of the bot
-        Args:
-            state (str): Bot state
-        Returns:
-            bool: True if the operation was successful
-        """
-        key = CacheKeys.BOT_STATE
-        
-        if self.cache:
-            await self.cache.set(key, state)
-        
-        return True
-
-    @cache_permanent(key_pattern=CacheKeys.BOT_INITIALIZED)
-    async def is_bot_initialized(self) -> bool:
-        """
-        Check if the bot has been initialized
-        Returns:
-            bool: True if the bot has been initialized
-        """
-        key = CacheKeys.BOT_INITIALIZED
-        
-        if self.cache:
-            initialized = await self.cache.get(key)
-            if initialized is not None:
-                return initialized == 'true'
-        
-        # Fallback to Redis
-        initialized = await self.redis.get(REDIS_KEYS['initialized'])
-        if initialized:
-            # Cache the value for future use
-            if self.cache:
-                await self.cache.set(key, initialized)
-        return initialized == 'true'
-
-    async def set_bot_initialized(self) -> bool:
-        """
-        Set the bot initialization flag
-        Returns:
-            bool: True if the operation was successful
-        """
-        key = CacheKeys.BOT_INITIALIZED
-        
-        if self.cache:
-            await self.cache.set(key, 'true')
-        
-        return True
-
-    # Methods for handling user sessions
-    async def get_user_session(self, telegram_id: int) -> dict:
-        """
-        Get the session data of a user
-        Args:
-            telegram_id (int): User's Telegram ID
-        Returns:
-            dict: User session data or an empty dictionary if not found
-        """
-        key = CacheKeys.USER_SESSION.format(telegram_id=telegram_id)
-        
-        if self.cache:
-            session = await self.cache.get(key)
-            if session is not None:
-                try:
-                    return json.loads(session)
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to decode session from cache for user {telegram_id}")
-        
-        # Fallback to Redis
-        session = await self.redis.get(f"{REDIS_KEYS['user_sessions']}:{telegram_id}")
-        if session:
-            try:
-                parsed = json.loads(session)
-                # Cache the value for future use
-                if self.cache:
-                    await self.cache.set(key, session, ttl=self.default_ttl.total_seconds())
-                return parsed
-            except json.JSONDecodeError:
-                logger.error(f"Failed to decode session from Redis for user {telegram_id}")
-        return {}
-
-    async def set_user_session(self, telegram_id: int, session_data: dict) -> bool:
-        """
-        Set the session data of a user
-        Args:
-            telegram_id (int): User's Telegram ID
-            session_data (dict): User session data
-        Returns:
-            bool: True if the operation was successful
-        """
-        key = CacheKeys.USER_SESSION.format(telegram_id=telegram_id)
-        session_json = json.dumps(session_data)
-        
-        if self.cache:
-            await self.cache.set(key, session_json, ttl=self.default_ttl.total_seconds())
-        
-        return True
-
     async def clear_user_data(self, telegram_id: int) -> bool:
         """
         Clear all user data from cache
         Args:
-            telegram_id: Telegram user ID
+            telegram_id (int): User's Telegram ID
         Returns:
-            bool: True if data was cleared successfully
+            bool: True if the operation was successful
         """
-        try:
-            if self.cache:
-                cache_keys = [
-                    CacheKeys.USER_STATE.format(telegram_id=telegram_id),
-                    CacheKeys.USER_STATUS.format(telegram_id=telegram_id),
-                    CacheKeys.USER_CONTEXT.format(telegram_id=telegram_id),
-                    CacheKeys.USER_SESSION.format(telegram_id=telegram_id)
-                ]
-                for key in cache_keys:
-                    await self.cache.delete(key)
-            
-            return True
-        except Exception as e:
-            logger.error(f"Failed to clear user data: {e}")
-            return False
+        keys = [
+            CacheKeys.USER_STATUS.format(telegram_id=telegram_id),
+            CacheKeys.USER_LANGUAGE.format(telegram_id=telegram_id)
+        ]
+        
+        if self.cache:
+            for key in keys:
+                await self.cache.delete(key)
+        
+        return True
 
     async def health_check(self) -> dict:
         """
