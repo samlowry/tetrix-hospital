@@ -39,7 +39,7 @@ WELCOME_NEED_INVITE = """✨ *Hello there, my new fren!*
 
 To continue registration, enter an invite code.
 
-🔑 You can get one from an active TETRIX fren. Welcome to the community!"""
+🔑 You can get one from an active TETRIX fren (for example at @TETRIXChat). Welcome to the community!"""
 
 WELCOME_BACK_SHORT = "🎉 *Welcome back!* Glad to see you again!"
 
