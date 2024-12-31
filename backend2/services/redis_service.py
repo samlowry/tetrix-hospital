@@ -174,7 +174,7 @@ class RedisService:
 
     async def get_user_status_value(self, telegram_id: int) -> Optional[str]:
         """
-        Get the value of a user's status
+        Get just the status value from user status data
         Args:
             telegram_id (int): User's Telegram ID
         Returns:
@@ -182,47 +182,6 @@ class RedisService:
         """
         status = await self.get_user_status(telegram_id)
         return status.get('status') if status else None
-
-    # Methods for handling user state
-    @cache_permanent(key_pattern=CacheKeys.USER_STATE)
-    async def get_user_state(self, telegram_id: int) -> str:
-        """
-        Get the current state of a user
-        Args:
-            telegram_id (int): User's Telegram ID
-        Returns:
-            str: User state or an empty string if not found
-        """
-        key = CacheKeys.USER_STATE.format(telegram_id=telegram_id)
-        
-        if self.cache:
-            state = await self.cache.get(key)
-            if state is not None:
-                return state
-        
-        # Fallback to Redis
-        state = await self.redis.get(key)
-        if state:
-            # Cache the value for future use
-            if self.cache:
-                await self.cache.set(key, state)
-        return state or ""
-
-    async def set_user_state(self, telegram_id: int, state: str) -> bool:
-        """
-        Set the state of a user
-        Args:
-            telegram_id (int): User's Telegram ID
-            state (str): User state
-        Returns:
-            bool: True if the operation was successful
-        """
-        key = CacheKeys.USER_STATE.format(telegram_id=telegram_id)
-        
-        if self.cache:
-            await self.cache.set(key, state)
-        
-        return True
 
     # Methods for handling user context
     @cache_permanent(key_pattern=CacheKeys.USER_CONTEXT)

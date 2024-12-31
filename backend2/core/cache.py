@@ -16,7 +16,6 @@ class CacheTTL(Enum):
 
 class CacheKeys:
     """Cache key patterns used throughout the application"""
-    USER_STATE = "user:{telegram_id}:state"
     USER_STATUS = "user:{telegram_id}:status"
     USER_CONTEXT = "user:{telegram_id}:context"
     USER_SESSION = "user_sessions:{telegram_id}"
@@ -106,8 +105,8 @@ def cache_result(
                 # Try to get from cache first
                 cached = await cache.get(key)
                 if cached is not None:
-                    # Always try to deserialize if we got a string
-                    if isinstance(cached, str):
+                    # Only try to deserialize if we got a string that looks like JSON
+                    if isinstance(cached, str) and (cached.startswith('{') or cached.startswith('[')):
                         try:
                             return json.loads(cached)
                         except json.JSONDecodeError:

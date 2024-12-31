@@ -475,20 +475,27 @@ class TelegramHandler:
             return False
 
     async def handle_message(self, telegram_id: int, text: str) -> None:
-        """Handle incoming text message"""
+        """Handle incoming message"""
         try:
             # Get user's language
             user_lang = await self.user_service.get_user_language(telegram_id) or 'ru'
             
-            # Process message based on current state
-            state = await self.redis_service.get_user_state(telegram_id)
+            # If it's a command - handle it directly
+            if text.startswith('/'):
+                if text == '/start':
+                    await self.handle_start_command(telegram_id=telegram_id)
+                elif text == '/language':
+                    await self.handle_language_selection(telegram_id=telegram_id)
+                return
+                
+            # Check user status
+            status = await self.redis_service.get_user_status_value(telegram_id)
             
-            if not state:
-                # Initial state - send welcome message
-                await self.handle_initial_state(telegram_id, user_lang)
-            else:
-                # Handle message based on current state
-                await self.handle_state_message(telegram_id, state, text, user_lang)
+            # If waiting for invite code
+            if status == UserStatus.WAITING_INVITE.value and text:
+                await self.handle_invite_code(telegram_id=telegram_id, code=text)
+                return
+                
         except Exception as e:
             logger.error(f"Error handling message from {telegram_id}: {e}")
             await self.send_error_message(telegram_id)
@@ -499,15 +506,20 @@ class TelegramHandler:
             # Get user's language
             user_lang = await self.user_service.get_user_language(telegram_id) or 'ru'
             
-            # Process callback based on current state
-            state = await self.redis_service.get_user_state(telegram_id)
-            
-            if not state:
-                # Initial state - handle callback
-                await self.handle_initial_callback(telegram_id, callback_data, user_lang)
-            else:
-                # Handle callback based on current state
-                await self.handle_state_callback(telegram_id, state, callback_data, user_lang)
+            # Handle callback directly based on data
+            if callback_data.startswith('lang_'):
+                # Language selection
+                language = callback_data[5:]  # Remove 'lang_' prefix
+                await self.handle_language_change(telegram_id=telegram_id, language=language)
+            elif callback_data == 'refresh_stats':
+                await self.handle_refresh_stats(telegram_id=telegram_id)
+            elif callback_data == 'show_invites':
+                await self.handle_show_invites(telegram_id=telegram_id)
+            elif callback_data == 'leaderboard':
+                await self.handle_show_leaderboard(telegram_id=telegram_id)
+            elif callback_data == 'create_wallet':
+                await self.handle_create_wallet(telegram_id=telegram_id)
+                
         except Exception as e:
             logger.error(f"Error handling callback from {telegram_id}: {e}")
             await self.send_error_message(telegram_id)
@@ -607,42 +619,6 @@ async def telegram_webhook(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await session.close()
-
-@router.get("/test/user-state/{telegram_id}")
-async def test_user_state(
-    telegram_id: int,
-    request: Request,
-    redis: Redis = Depends(get_redis)
-):
-    """Test endpoint for get_user_state"""
-    redis_service = request.app.state.redis_service
-    
-    # Check cache first
-    if redis_service.cache:
-        key = CacheKeys.USER_STATE.format(telegram_id=telegram_id)
-        cached = await redis_service.cache.get(key)
-        if cached is not None:
-            return {"state": cached, "source": "cache"}
-    
-    # Check Redis
-    key = CacheKeys.USER_STATE.format(telegram_id=telegram_id)
-    state = await redis.get(key)
-    if state:
-        return {"state": state, "source": "redis"}
-    
-    return {"state": "", "source": "none"}
-
-@router.post("/test/user-state/{telegram_id}")
-async def test_set_user_state(
-    telegram_id: int,
-    state: str,
-    request: Request,
-    redis: Redis = Depends(get_redis)
-):
-    """Test endpoint for set_user_state"""
-    redis_service = request.app.state.redis_service
-    await redis_service.set_user_state(telegram_id, state)
-    return {"status": "ok"}
 
 @router.get("/test/user-status/{telegram_id}")
 async def test_user_status(
