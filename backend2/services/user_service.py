@@ -629,7 +629,14 @@ class UserService:
         Validate and extract Threads username from input text.
         Returns cleaned username or None if invalid.
         """
-        text = text.strip()
+        # Handle None or empty string
+        if not text:
+            return None
+            
+        # Remove all kinds of whitespace from both ends
+        text = ' '.join(text.split()).strip()
+        if not text:
+            return None
         
         # Handle direct username input
         if text.startswith('@'):
@@ -657,6 +664,11 @@ class UserService:
                 logger.error(f"Error parsing Threads URL: {e}")
                 return None
         else:
+            return None
+            
+        # Clean username from any remaining whitespace
+        username = username.strip()
+        if not username:
             return None
             
         # Validate username format (letters, numbers, underscores, dots, no spaces)
