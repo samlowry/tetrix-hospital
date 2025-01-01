@@ -46,8 +46,8 @@ class ThreadsService:
                 logger.error(f"Error getting user ID: {e}")
                 return None
 
-    async def get_user_posts(self, user_id: str, limit: int = 25) -> List[Dict]:
-        """Get user's posts"""
+    async def get_user_posts(self, user_id: str, limit: int = 25) -> List[str]:
+        """Get user's posts texts"""
         async with aiohttp.ClientSession() as session:
             try:
                 url = f"{self.base_url}/user/posts"
@@ -70,19 +70,14 @@ class ThreadsService:
                         logger.error(f"API error for user {user_id}: {error.get('description', 'Unknown error')}")
                         return []
                     
-                    # Extract posts using the provided path
+                    # Extract only post texts
                     try:
                         posts = []
                         for edge in data['data']['mediaData']['edges']:
-                            post = edge['node']['thread_items'][0]['post']
-                            posts.append({
-                                "id": post.get("id"),
-                                "text": post.get("caption", {}).get("text", ""),
-                                "timestamp": post.get("taken_at"),
-                                "likes": post.get("like_count"),
-                                "replies": post.get("reply_count")
-                            })
-                        return posts[:limit]  # Ограничиваем количество постов если нужно
+                            text = edge['node']['thread_items'][0]['post'].get('caption', {}).get('text', '')
+                            if text:  # Сохраняем только непустые тексты
+                                posts.append(text)
+                        return posts[:limit]
                         
                     except (KeyError, IndexError) as e:
                         logger.error(f"Error parsing posts data: {e}")

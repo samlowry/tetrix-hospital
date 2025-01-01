@@ -590,14 +590,14 @@ class UserService:
         openai_service = OpenAIService()
         
         try:
-            # Get user's posts using stored ID
+            # Get user's posts texts
             posts = await threads_service.get_user_posts(campaign.threads_user_id)
             if not posts:
                 logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
                 return False
                 
-            # Store posts in campaign record
-            campaign.posts_json = posts
+            # Store posts texts as JSON array
+            campaign.posts_json = posts  # SQLAlchemy автоматически сериализует список в JSON
             await self.session.commit()
             
             # Analyze posts
