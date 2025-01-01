@@ -528,3 +528,8 @@ class UserService:
             return "experienced"
         else:  # Bottom 50%
             return "newbie"
+
+    async def get_threads_campaign_entry(self, telegram_id: int):
+        """Get threads campaign entry for user by telegram ID"""
+        from models.threads_job_campaign import ThreadsJobCampaign
+        return await ThreadsJobCampaign.get_by_telegram_id(self.session, telegram_id)
