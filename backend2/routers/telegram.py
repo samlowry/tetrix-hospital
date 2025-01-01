@@ -528,7 +528,8 @@ class TelegramHandler:
                 campaign_entry = await self.user_service.get_threads_campaign_entry(telegram_id)
                 if not campaign_entry:
                     # Create campaign entry with validation
-                    if await self.user_service.create_threads_campaign_entry(telegram_id, text):
+                    success, error = await self.user_service.create_threads_campaign_entry(telegram_id, text)
+                    if success:
                         # Send analyzing message
                         await send_telegram_message(
                             chat_id=telegram_id,
@@ -538,12 +539,19 @@ class TelegramHandler:
                         # Start analysis process
                         await self.user_service.analyze_threads_profile(telegram_id)
                     else:
-                        # Invalid format or not found - request correct format
-                        await send_telegram_message(
-                            chat_id=telegram_id,
-                            text=strings.THREADS_PROFILE_REQUEST,
-                            parse_mode="Markdown"
-                        )
+                        # Show appropriate error message
+                        if error == 'not_found':
+                            await send_telegram_message(
+                                chat_id=telegram_id,
+                                text=strings.THREADS_PROFILE_NOT_FOUND,
+                                parse_mode="Markdown"
+                            )
+                        else:  # invalid_format
+                            await send_telegram_message(
+                                chat_id=telegram_id,
+                                text=strings.THREADS_PROFILE_REQUEST,
+                                parse_mode="Markdown"
+                            )
                     return
                 
             # Check user status for other phases

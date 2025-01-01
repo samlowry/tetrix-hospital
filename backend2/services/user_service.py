@@ -534,34 +534,46 @@ class UserService:
         from models.threads_job_campaign import ThreadsJobCampaign
         return await ThreadsJobCampaign.get_by_telegram_id(self.session, telegram_id)
 
-    async def create_threads_campaign_entry(self, telegram_id: int, text: str) -> bool:
-        """Create threads campaign entry for user"""
+    async def create_threads_campaign_entry(self, telegram_id: int, text: str) -> tuple[bool, str]:
+        """
+        Create threads campaign entry for user
+        Returns: (success, error_code)
+        error_code: None if success, 'invalid_format' or 'not_found' if failed
+        """
         from models.threads_job_campaign import ThreadsJobCampaign
+        from services.threads_service import ThreadsService
         
         # Get user
         user = await self.get_user_by_telegram_id(telegram_id)
         if not user:
-            return False
+            return False, 'invalid_format'
             
         # Validate and extract username
         username = self.validate_threads_username(text)
         if not username:
-            return False
+            return False, 'invalid_format'
+            
+        # Check if profile exists
+        threads_service = ThreadsService()
+        user_id = await threads_service.get_user_id(username)
+        if not user_id:
+            return False, 'not_found'
             
         # Create campaign entry
         campaign = ThreadsJobCampaign(
             user_id=user.id,
-            threads_username=username
+            threads_username=username,
+            threads_user_id=user_id  # Store ID right away
         )
         
         try:
             self.session.add(campaign)
             await self.session.commit()
-            return True
+            return True, None
         except Exception as e:
             logger.error(f"Error creating threads campaign entry: {e}")
             await self.session.rollback()
-            return False
+            return False, 'invalid_format'
 
     async def analyze_threads_profile(self, telegram_id: int) -> bool:
         """Analyze user's Threads profile"""
@@ -578,20 +590,13 @@ class UserService:
         openai_service = OpenAIService()
         
         try:
-            # Get user ID from username
-            user_id = await threads_service.get_user_id(campaign.threads_username)
-            if not user_id:
-                logger.error(f"Could not find Threads user ID for {campaign.threads_username}")
-                return False
-                
-            # Get user's posts
-            posts = await threads_service.get_user_posts(user_id)
+            # Get user's posts using stored ID
+            posts = await threads_service.get_user_posts(campaign.threads_user_id)
             if not posts:
                 logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
                 return False
                 
             # Store posts in campaign record
-            campaign.threads_user_id = user_id
             campaign.posts_json = posts
             await self.session.commit()
             
