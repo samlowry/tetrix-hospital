@@ -3,7 +3,7 @@
 import os
 import logging
 import openai
-from typing import List, Dict
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +13,11 @@ class OpenAIService:
     def __init__(self):
         openai.api_key = os.getenv("OPENAI_API_KEY")
         
-    async def analyze_threads_profile(self, posts: List[Dict]) -> str:
+    async def analyze_threads_profile(self, posts: List[str]) -> Optional[str]:
         """Analyze user's Threads posts and generate personality report"""
         try:
-            # Prepare posts for analysis
-            posts_text = []
-            for post in posts:
-                posts_text.append(f"Post: {post['text']}\nLikes: {post['likes']}, Replies: {post['replies']}\n")
+            # Join posts with newlines for better readability
+            posts_text = "\n\n".join(f"Post: {post}" for post in posts)
             
             # Create prompt for analysis
             prompt = f"""Analyze these Threads posts and create a fun, engaging personality report. 
@@ -31,7 +29,7 @@ class OpenAIService:
             5. Potential fit for representing TETRIX
 
             Posts to analyze:
-            {"".join(posts_text)}
+            {posts_text}
 
             Write the analysis in a friendly, personal tone, as if TETRIX AI is excited to learn about this person.
             Make it engaging and fun, but also professional and respectful.
