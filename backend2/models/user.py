@@ -46,6 +46,8 @@ class User(Base):
     created_codes = relationship("InviteCode", foreign_keys="InviteCode.creator_id", back_populates="creator")
     # Tracks invite codes used by this user
     used_codes = relationship("InviteCode", foreign_keys="InviteCode.used_by_id", back_populates="used_by")
+    # Threads job campaign data
+    threads_campaign = relationship("ThreadsJobCampaign", back_populates="user", uselist=False)
 
     def __repr__(self):
         """String representation of User object"""
