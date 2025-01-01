@@ -533,3 +533,27 @@ class UserService:
         """Get threads campaign entry for user by telegram ID"""
         from models.threads_job_campaign import ThreadsJobCampaign
         return await ThreadsJobCampaign.get_by_telegram_id(self.session, telegram_id)
+
+    async def create_threads_campaign_entry(self, telegram_id: int, threads_username: str) -> bool:
+        """Create threads campaign entry for user"""
+        from models.threads_job_campaign import ThreadsJobCampaign
+        
+        # Get user
+        user = await self.get_user_by_telegram_id(telegram_id)
+        if not user:
+            return False
+            
+        # Create campaign entry
+        campaign = ThreadsJobCampaign(
+            user_id=user.id,
+            threads_username=threads_username.strip('@')  # Remove @ if present
+        )
+        
+        try:
+            self.session.add(campaign)
+            await self.session.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error creating threads campaign entry: {e}")
+            await self.session.rollback()
+            return False

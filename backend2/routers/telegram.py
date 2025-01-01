@@ -517,8 +517,39 @@ class TelegramHandler:
                 elif text == '/language':
                     await self.handle_language_selection(telegram_id=telegram_id)
                 return
+
+            # Get user and check phase
+            user = await self.user_service.get_user_by_telegram_id(telegram_id)
+            if not user:
+                return
+
+            # Handle threads campaign messages
+            if user.registration_phase == 'threads_job_campaign':
+                campaign_entry = await self.user_service.get_threads_campaign_entry(telegram_id)
+                if not campaign_entry:
+                    # Check if message is a valid Threads profile
+                    if text.startswith('@') or text.startswith('https://threads.net/'):
+                        # Extract username
+                        username = text.split('/')[-1] if '/' in text else text[1:]
+                        # Create campaign entry
+                        await self.user_service.create_threads_campaign_entry(telegram_id, username)
+                        # Send analyzing message
+                        await send_telegram_message(
+                            chat_id=telegram_id,
+                            text=strings.THREADS_ANALYZING,
+                            parse_mode="Markdown"
+                        )
+                        # TODO: Start analysis process
+                    else:
+                        # Invalid format - request correct format
+                        await send_telegram_message(
+                            chat_id=telegram_id,
+                            text=strings.THREADS_PROFILE_REQUEST,
+                            parse_mode="Markdown"
+                        )
+                    return
                 
-            # Check user status
+            # Check user status for other phases
             status = await self.redis_service.get_user_status_value(telegram_id)
             
             # If waiting for invite code
