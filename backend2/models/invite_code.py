@@ -12,9 +12,9 @@ class InviteCode(Base):
     # Unique 16-character string that serves as the actual invitation code
     code = Column(String(16), unique=True, nullable=False)
     # Foreign key reference to the user who created this invite code
-    creator_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    creator_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     # Foreign key reference to the user who used this invite code (if used)
-    used_by_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    used_by_id = Column(Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     # Timestamp when the invite code was created
     created_at = Column(DateTime, nullable=True)
     # Timestamp when the invite code was used
