@@ -1,4 +1,4 @@
-"""Service for working with Threads API"""
+"""Service for working with Threads API via RapidAPI"""
 
 import aiohttp
 import logging
@@ -12,34 +12,21 @@ class ThreadsService:
     """Service for interacting with Threads API"""
     
     def __init__(self):
-        self.base_url = "https://www.threads.net/api/graphql"
-        self.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
+        self.base_url = "https://threads-api4.p.rapidapi.com/api"
         self.headers = {
-            "User-Agent": self.user_agent,
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.5",
-            "X-IG-App-ID": "238260118697367"  # Threads web app ID
+            "x-rapidapi-host": "threads-api4.p.rapidapi.com",
+            "x-rapidapi-key": os.getenv("RAPIDAPI_KEY", "260c39343cmsh06d5efb8c560088p1f376djsn74c2482ddaa9")
         }
 
     async def get_user_id(self, username: str) -> Optional[str]:
         """Get user ID by username"""
         async with aiohttp.ClientSession() as session:
             try:
-                # First get user ID from username
-                params = {
-                    "q": f"""
-                    query SearchBarQuery($username: String!) {{
-                        one_to_one_threads_user(username: $username) {{
-                            id
-                            username
-                        }}
-                    }}
-                    """,
-                    "variables": json.dumps({"username": username})
-                }
+                url = f"{self.base_url}/user/info"
+                params = {"username": username}
                 
                 async with session.get(
-                    self.base_url,
+                    url,
                     headers=self.headers,
                     params=params
                 ) as response:
@@ -48,12 +35,12 @@ class ThreadsService:
                         return None
                         
                     data = await response.json()
-                    user = data.get("data", {}).get("one_to_one_threads_user")
+                    user = data.get("data", {}).get("user")
                     if not user:
                         logger.error(f"User {username} not found")
                         return None
                         
-                    return user.get("id")
+                    return user.get("id")  # или user.get("pk") - они одинаковые
                     
             except Exception as e:
                 logger.error(f"Error getting user ID: {e}")
@@ -61,56 +48,6 @@ class ThreadsService:
 
     async def get_user_posts(self, user_id: str, limit: int = 25) -> List[Dict]:
         """Get user's posts"""
-        async with aiohttp.ClientSession() as session:
-            try:
-                params = {
-                    "q": f"""
-                    query ThreadsProfileQuery($userId: String!, $first: Int!) {{
-                        mediaData: one_to_one_threads_media(userID: $userId, first: $first) {{
-                            edges {{
-                                node {{
-                                    id
-                                    caption
-                                    taken_at
-                                    like_count
-                                    reply_count
-                                }}
-                            }}
-                        }}
-                    }}
-                    """,
-                    "variables": json.dumps({
-                        "userId": user_id,
-                        "first": limit
-                    })
-                }
-                
-                async with session.get(
-                    self.base_url,
-                    headers=self.headers,
-                    params=params
-                ) as response:
-                    if response.status != 200:
-                        logger.error(f"Error getting posts for user {user_id}: {response.status}")
-                        return []
-                        
-                    data = await response.json()
-                    edges = data.get("data", {}).get("mediaData", {}).get("edges", [])
-                    
-                    posts = []
-                    for edge in edges:
-                        node = edge.get("node", {})
-                        if node and node.get("caption"):
-                            posts.append({
-                                "id": node.get("id"),
-                                "text": node.get("caption"),
-                                "timestamp": node.get("taken_at"),
-                                "likes": node.get("like_count"),
-                                "replies": node.get("reply_count")
-                            })
-                    
-                    return posts
-                    
-            except Exception as e:
-                logger.error(f"Error getting user posts: {e}")
-                return [] 
+        # TODO: Implement with RapidAPI
+        # For now returning empty list
+        return [] 
