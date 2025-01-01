@@ -527,21 +527,18 @@ class TelegramHandler:
             if user.registration_phase == 'threads_job_campaign':
                 campaign_entry = await self.user_service.get_threads_campaign_entry(telegram_id)
                 if not campaign_entry:
-                    # Check if message is a valid Threads profile
-                    if text.startswith('@') or text.startswith('https://threads.net/'):
-                        # Extract username
-                        username = text.split('/')[-1] if '/' in text else text[1:]
-                        # Create campaign entry
-                        await self.user_service.create_threads_campaign_entry(telegram_id, username)
+                    # Create campaign entry with validation
+                    if await self.user_service.create_threads_campaign_entry(telegram_id, text):
                         # Send analyzing message
                         await send_telegram_message(
                             chat_id=telegram_id,
                             text=strings.THREADS_ANALYZING,
                             parse_mode="Markdown"
                         )
-                        # TODO: Start analysis process
+                        # Start analysis process
+                        await self.user_service.analyze_threads_profile(telegram_id)
                     else:
-                        # Invalid format - request correct format
+                        # Invalid format or not found - request correct format
                         await send_telegram_message(
                             chat_id=telegram_id,
                             text=strings.THREADS_PROFILE_REQUEST,

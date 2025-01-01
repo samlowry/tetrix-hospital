@@ -534,7 +534,7 @@ class UserService:
         from models.threads_job_campaign import ThreadsJobCampaign
         return await ThreadsJobCampaign.get_by_telegram_id(self.session, telegram_id)
 
-    async def create_threads_campaign_entry(self, telegram_id: int, threads_username: str) -> bool:
+    async def create_threads_campaign_entry(self, telegram_id: int, text: str) -> bool:
         """Create threads campaign entry for user"""
         from models.threads_job_campaign import ThreadsJobCampaign
         
@@ -543,10 +543,15 @@ class UserService:
         if not user:
             return False
             
+        # Validate and extract username
+        username = self.validate_threads_username(text)
+        if not username:
+            return False
+            
         # Create campaign entry
         campaign = ThreadsJobCampaign(
             user_id=user.id,
-            threads_username=threads_username.strip('@')  # Remove @ if present
+            threads_username=username
         )
         
         try:
@@ -557,3 +562,106 @@ class UserService:
             logger.error(f"Error creating threads campaign entry: {e}")
             await self.session.rollback()
             return False
+
+    async def analyze_threads_profile(self, telegram_id: int) -> bool:
+        """Analyze user's Threads profile"""
+        from services.threads_service import ThreadsService
+        from services.openai_service import OpenAIService
+        
+        # Get campaign entry
+        campaign = await self.get_threads_campaign_entry(telegram_id)
+        if not campaign:
+            return False
+            
+        # Initialize services
+        threads_service = ThreadsService()
+        openai_service = OpenAIService()
+        
+        try:
+            # Get user ID from username
+            user_id = await threads_service.get_user_id(campaign.threads_username)
+            if not user_id:
+                logger.error(f"Could not find Threads user ID for {campaign.threads_username}")
+                return False
+                
+            # Get user's posts
+            posts = await threads_service.get_user_posts(user_id)
+            if not posts:
+                logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
+                return False
+                
+            # Store posts in campaign record
+            campaign.threads_user_id = user_id
+            campaign.posts_json = posts
+            await self.session.commit()
+            
+            # Analyze posts
+            analysis = await openai_service.analyze_threads_profile(posts)
+            if not analysis:
+                logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
+                return False
+                
+            # Store analysis
+            campaign.analysis_report = analysis
+            await self.session.commit()
+            
+            # Send analysis to user
+            user = await self.get_user_by_telegram_id(telegram_id)
+            if user:
+                from locales.i18n import get_strings
+                strings = get_strings(user.language or 'ru')
+                from routers.telegram import send_telegram_message
+                await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=analysis),
+                    parse_mode="Markdown"
+                )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error analyzing Threads profile: {e}")
+            await self.session.rollback()
+            return False
+
+    def validate_threads_username(self, text: str) -> Optional[str]:
+        """
+        Validate and extract Threads username from input text.
+        Returns cleaned username or None if invalid.
+        """
+        text = text.strip()
+        
+        # Handle direct username input
+        if text.startswith('@'):
+            username = text[1:]  # Remove @
+        # Handle full URL
+        elif text.startswith(('http://', 'https://')):
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(text)
+                # Verify it's a threads.net URL (with or without www)
+                if not any(parsed.netloc.endswith(domain) for domain in ['threads.net', 'www.threads.net']):
+                    return None
+                    
+                # Get path without leading/trailing slashes
+                path = parsed.path.strip('/')
+                
+                # Path should start with @ for username
+                if not path.startswith('@'):
+                    return None
+                    
+                # Get username part (before any query params or additional path segments)
+                username = path[1:].split('?')[0].split('/')[0]
+                
+            except Exception as e:
+                logger.error(f"Error parsing Threads URL: {e}")
+                return None
+        else:
+            return None
+            
+        # Validate username format (letters, numbers, underscores, dots, no spaces)
+        import re
+        if not re.match(r'^[a-zA-Z0-9_.]+$', username):
+            return None
+            
+        return username
