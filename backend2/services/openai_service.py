@@ -7,16 +7,18 @@ from langgraph.graph import Graph, StateGraph
 from langgraph.prebuilt import ToolExecutor
 import openai
 from operator import itemgetter
+from locales.i18n import get_strings
 
 logger = logging.getLogger(__name__)
 
 class ThreadsAnalysisState(TypedDict):
     """State for threads analysis flow"""
     posts: List[str]
-    writing_style: Optional[str]
-    topics: Optional[str]
-    engagement: Optional[str]
-    personality: Optional[str]
+    language: str
+    vibe_check: Optional[str]
+    content_gems: Optional[str]
+    social_energy: Optional[str]
+    character_arc: Optional[str]
     final_report: Optional[str]
 
 class OpenAIService:
@@ -26,131 +28,102 @@ class OpenAIService:
         openai.api_key = os.getenv("OPENAI_API_KEY")
         self.workflow = self._create_analysis_workflow()
         
-    def _analyze_writing_style(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
-        """Analyze writing style and tone"""
+    def _analyze_vibe(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+        """Do a vibe check of the profile"""
         try:
+            strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are TETRIX, analyzing writing style and tone."},
-                    {"role": "user", "content": f"""Analyze the writing style and tone in these posts:
-                    {posts_text}
-                    
-                    Focus on:
-                    - Language formality/informality
-                    - Use of humor/emojis
-                    - Sentence structure
-                    - Vocabulary choices
-                    
-                    Keep response focused and under 100 words."""}
+                    {"role": "system", "content": strings.THREADS_SYSTEM_VIBE},
+                    {"role": "user", "content": strings.THREADS_PROMPT_VIBE.format(posts_text=posts_text)}
                 ],
-                temperature=0.7
+                temperature=0.9
             )
-            state['writing_style'] = response.choices[0].message.content
+            state['vibe_check'] = response.choices[0].message.content
             return state
         except Exception as e:
-            logger.error(f"Error analyzing writing style: {e}")
-            state['writing_style'] = "Could not analyze writing style"
+            logger.error(f"Error analyzing vibe: {e}")
+            state['vibe_check'] = "Could not analyze vibe"
             return state
 
-    def _analyze_topics(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
-        """Analyze main topics and interests"""
+    def _analyze_content(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+        """Find the best content gems"""
         try:
+            strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are TETRIX, analyzing topics and interests."},
-                    {"role": "user", "content": f"""Identify main topics and interests from these posts:
-                    {posts_text}
-                    
-                    List key themes and subjects the person discusses.
-                    Keep response focused and under 100 words."""}
+                    {"role": "system", "content": strings.THREADS_SYSTEM_CONTENT},
+                    {"role": "user", "content": strings.THREADS_PROMPT_CONTENT.format(posts_text=posts_text)}
                 ],
-                temperature=0.7
+                temperature=0.9
             )
-            state['topics'] = response.choices[0].message.content
+            state['content_gems'] = response.choices[0].message.content
             return state
         except Exception as e:
-            logger.error(f"Error analyzing topics: {e}")
-            state['topics'] = "Could not analyze topics"
+            logger.error(f"Error analyzing content: {e}")
+            state['content_gems'] = "Could not analyze content"
             return state
 
-    def _analyze_engagement(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
-        """Analyze engagement with others"""
+    def _analyze_social(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+        """Analyze social energy and interaction style"""
         try:
+            strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are TETRIX, analyzing social engagement."},
-                    {"role": "user", "content": f"""Analyze how this person engages with others:
-                    {posts_text}
-                    
-                    Focus on:
-                    - Response style to others
-                    - Community interaction
-                    - Conversation patterns
-                    
-                    Keep response focused and under 100 words."""}
+                    {"role": "system", "content": strings.THREADS_SYSTEM_SOCIAL},
+                    {"role": "user", "content": strings.THREADS_PROMPT_SOCIAL.format(posts_text=posts_text)}
                 ],
-                temperature=0.7
+                temperature=0.9
             )
-            state['engagement'] = response.choices[0].message.content
+            state['social_energy'] = response.choices[0].message.content
             return state
         except Exception as e:
-            logger.error(f"Error analyzing engagement: {e}")
-            state['engagement'] = "Could not analyze engagement"
+            logger.error(f"Error analyzing social style: {e}")
+            state['social_energy'] = "Could not analyze social style"
             return state
 
-    def _analyze_personality(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
-        """Analyze personality traits"""
+    def _analyze_character(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+        """Create a character profile"""
         try:
+            strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are TETRIX, analyzing personality traits."},
-                    {"role": "user", "content": f"""Identify key personality traits from these posts:
-                    {posts_text}
-                    
-                    Focus on:
-                    - Character strengths
-                    - Communication style
-                    - Values and beliefs
-                    - Potential as TETRIX representative
-                    
-                    Keep response focused and under 100 words."""}
+                    {"role": "system", "content": strings.THREADS_SYSTEM_CHARACTER},
+                    {"role": "user", "content": strings.THREADS_PROMPT_CHARACTER.format(posts_text=posts_text)}
                 ],
-                temperature=0.7
+                temperature=0.9
             )
-            state['personality'] = response.choices[0].message.content
+            state['character_arc'] = response.choices[0].message.content
             return state
         except Exception as e:
-            logger.error(f"Error analyzing personality: {e}")
-            state['personality'] = "Could not analyze personality"
+            logger.error(f"Error analyzing character: {e}")
+            state['character_arc'] = "Could not analyze character"
             return state
 
     def _create_final_report(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
-        """Create final analysis report"""
+        """Create final viral-worthy report"""
         try:
+            strings = get_strings(state['language'])
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are TETRIX, creating final personality report."},
-                    {"role": "user", "content": f"""Create an engaging final report based on these analyses:
-
-                    Writing Style: {state['writing_style']}
-                    Topics: {state['topics']}
-                    Engagement: {state['engagement']}
-                    Personality: {state['personality']}
-                    
-                    Write in a friendly, excited tone as TETRIX AI.
-                    Make it fun and engaging while staying professional.
-                    Keep it to 3-4 paragraphs."""}
+                    {"role": "system", "content": strings.THREADS_SYSTEM_FINAL},
+                    {"role": "user", "content": strings.THREADS_PROMPT_FINAL.format(
+                        vibe_check=state['vibe_check'],
+                        content_gems=state['content_gems'],
+                        social_energy=state['social_energy'],
+                        character_arc=state['character_arc']
+                    )}
                 ],
-                temperature=0.7
+                temperature=0.9
             )
             state['final_report'] = response.choices[0].message.content
             return state
@@ -166,34 +139,35 @@ class OpenAIService:
         workflow = StateGraph(ThreadsAnalysisState)
         
         # Add nodes
-        workflow.add_node("analyze_writing", self._analyze_writing_style)
-        workflow.add_node("analyze_topics", self._analyze_topics)
-        workflow.add_node("analyze_engagement", self._analyze_engagement)
-        workflow.add_node("analyze_personality", self._analyze_personality)
+        workflow.add_node("analyze_vibe", self._analyze_vibe)
+        workflow.add_node("analyze_content", self._analyze_content)
+        workflow.add_node("analyze_social", self._analyze_social)
+        workflow.add_node("analyze_character", self._analyze_character)
         workflow.add_node("create_report", self._create_final_report)
         
         # Define edges
-        workflow.add_edge("analyze_writing", "analyze_topics")
-        workflow.add_edge("analyze_topics", "analyze_engagement")
-        workflow.add_edge("analyze_engagement", "analyze_personality")
-        workflow.add_edge("analyze_personality", "create_report")
+        workflow.add_edge("analyze_vibe", "analyze_content")
+        workflow.add_edge("analyze_content", "analyze_social")
+        workflow.add_edge("analyze_social", "analyze_character")
+        workflow.add_edge("analyze_character", "create_report")
         
         # Set entry and end nodes
-        workflow.set_entry_point("analyze_writing")
+        workflow.set_entry_point("analyze_vibe")
         workflow.set_finish_point("create_report")
         
         return workflow.compile()
         
-    async def analyze_threads_profile(self, posts: List[str]) -> Optional[str]:
+    async def analyze_threads_profile(self, posts: List[str], language: str = 'en') -> Optional[str]:
         """Analyze user's Threads posts and generate personality report"""
         try:
             # Initialize state
             state = ThreadsAnalysisState(
                 posts=posts,
-                writing_style=None,
-                topics=None,
-                engagement=None,
-                personality=None,
+                language=language,
+                vibe_check=None,
+                content_gems=None,
+                social_energy=None,
+                character_arc=None,
                 final_report=None
             )
             
