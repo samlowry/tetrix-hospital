@@ -18,6 +18,7 @@ class ThreadsAnalysisState(TypedDict):
     """State for threads analysis flow"""
     posts: List[str]
     language: str
+    telegram_id: int
     vibe_check: Optional[str]
     content_gems: Optional[str]
     social_energy: Optional[str]
@@ -256,63 +257,36 @@ class LLMService:
             )
             return False
         
-    async def analyze_threads_profile(self, posts: List[str], telegram_id: int, language: str = 'en') -> Optional[Dict]:
-        """Analyze user's Threads posts and generate personality report
-        Returns JSON report if successful, None if failed"""
+    async def analyze_threads_profile(self, posts: List[str], telegram_id: int, language: str = 'ru') -> Optional[Dict]:
+        """Run threads profile analysis workflow"""
         try:
-            strings = get_strings(language)
-            
-            # Отправляем сообщение о начале анализа
-            await send_telegram_message(
-                chat_id=telegram_id,
-                text=strings.THREADS_ANALYZING,
-                parse_mode="Markdown"
-            )
-            
             # Initialize state
-            state = ThreadsAnalysisState(
-                posts=posts,
-                language=language,
-                vibe_check=None,
-                content_gems=None,
-                social_energy=None,
-                character_arc=None,
-                final_report=None
-            )
+            state = {
+                'posts': posts,
+                'language': language,
+                'telegram_id': telegram_id,
+                'vibe_check': None,
+                'content_gems': None,
+                'social_energy': None,
+                'character_arc': None,
+                'final_report': None
+            }
             
             # Run workflow
-            final_state = self.workflow.invoke(state)
+            final_state = await self.workflow.arun(state)
             
-            # Get report
-            report = final_state.get('final_report')
-            if not report:
-                await send_telegram_message(
-                    chat_id=telegram_id,
-                    text=strings.THREADS_ANALYSIS_ERROR,
-                    parse_mode="Markdown"
-                )
-                return None
-                
-            # Parse JSON report
+            # Send progress messages
             try:
-                json_report = json.loads(report)
-                return json_report
-            except json.JSONDecodeError:
-                logger.error("Failed to parse JSON report")
                 await send_telegram_message(
-                    chat_id=telegram_id,
-                    text=strings.THREADS_ANALYSIS_ERROR,
-                    parse_mode="Markdown"
+                    telegram_id=telegram_id,
+                    text=get_strings(language).THREADS_ANALYSIS_COMPLETE.format(
+                        analysis_text=self.format_report(final_state)
+                    )
                 )
-                return None
+            except Exception as e:
+                logger.error(f"Error sending progress message: {e}")
             
+            return final_state
         except Exception as e:
             logger.error(f"Error in analysis workflow: {e}")
-            # Отправляем сообщение об ошибке
-            strings = get_strings(language)
-            await send_telegram_message(
-                chat_id=telegram_id,
-                text=strings.THREADS_ANALYSIS_ERROR,
-                parse_mode="Markdown"
-            )
             return None 
