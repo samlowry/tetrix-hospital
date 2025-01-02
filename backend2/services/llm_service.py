@@ -267,18 +267,21 @@ class LLMService:
             # Run workflow (using arun since we have async nodes)
             final_state = await self.workflow.arun(state)
             
+            # Remove posts from final state before returning
+            analysis_report = {k: v for k, v in final_state.items() if k != 'posts'}
+            
             # Send progress messages
             try:
                 await send_telegram_message(
                     telegram_id=telegram_id,
                     text=get_strings(language).THREADS_ANALYSIS_COMPLETE.format(
-                        analysis_text=self.format_report(final_state)
+                        analysis_text=self.format_report(analysis_report)
                     )
                 )
             except Exception as e:
                 logger.error(f"Error sending progress message: {e}")
             
-            return final_state
+            return analysis_report
         except Exception as e:
             logger.error(f"Error in analysis workflow: {e}")
             return None 

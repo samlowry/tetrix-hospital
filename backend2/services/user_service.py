@@ -688,7 +688,7 @@ class UserService:
                     return False
                 
                 try:
-                    # Store posts texts as JSON array
+                    # Store posts texts as JSON array with proper encoding
                     campaign.posts_json = posts
                     await self.session.commit()
                 except SQLAlchemyError as e:
@@ -713,8 +713,8 @@ class UserService:
                 return False
                 
             try:
-                # Store JSON report
-                campaign.analysis_report = json.dumps(json_report)
+                # Store JSON report with proper encoding for Russian text
+                campaign.analysis_report = json.dumps(json_report, ensure_ascii=False)
                 await self.session.commit()
                 return True
             except SQLAlchemyError as e:
