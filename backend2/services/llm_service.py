@@ -9,6 +9,7 @@ import openai
 import json
 from operator import itemgetter
 from locales.i18n import get_strings
+from locales.ascii_art import REPORT_HEADER, REPORT_FOOTER, get_block_border
 from routers.telegram import send_telegram_message
 
 logger = logging.getLogger(__name__)
@@ -163,40 +164,32 @@ class LLMService:
         """Format a single analysis block with ASCII frame"""
         width = 50  # Общая ширина блока
         
-        # Создаем рамку
-        top = f"┌{'─' * (width-2)}┐"
-        title_line = f"│ {title.center(width-4)} │"
-        bottom = f"└{'─' * (width-2)}┘"
+        # Получаем рамки из ascii_art
+        top, title_template, bottom = get_block_border(width)
+        title_line = title_template.format(title=title)
         
-        # Форматируем контент
+        # Форматируем контент без боковых рамок
         content_lines = []
         for line in content:
-            # Добавляем отступы для контента
-            content_lines.append(f"│  {line.ljust(width-5)}│")
+            content_lines.append(f"  {line}")  # Добавляем отступ в два пробела
         
         # Собираем блок
         return "\n".join([
             top,
             title_line,
+            "",  # Пустая строка после заголовка
             *content_lines,
+            "",  # Пустая строка перед нижней рамкой
             bottom
         ])
 
     def _format_header(self) -> str:
         """Create ASCII header for the report"""
-        return """╔════════════════════════════════════════╗
-║ TETRIX PROFILE ANALYZER v1.337        ║
-║ Loading personality data...            ║
-╚════════════════════════════════════════╝
-   [█████████████████████] 100%"""
+        return REPORT_HEADER
 
     def _format_footer(self) -> str:
         """Create ASCII footer for the report"""
-        return """╔═══════════════════════════════════════════╗
-║  > JOIN_TETRIX_UNIVERSE.exe               ║
-║  > INITIALIZATION_COMPLETE                ║
-║  > WAITING_FOR_YOUR_RESPONSE...          ║
-╚═══════════════════════════════════════════╝"""
+        return REPORT_FOOTER
 
     def format_report(self, json_report: Dict) -> str:
         """Format full analysis report with ASCII styling"""
