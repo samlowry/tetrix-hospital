@@ -545,21 +545,29 @@ class UserService:
         from models.threads_job_campaign import ThreadsJobCampaign
         from services.threads_service import ThreadsService
         
+        logger.debug(f"Starting create_threads_campaign_entry for telegram_id={telegram_id}, text='{text}'")
+        
         # Get user
         user = await self.get_user_by_telegram_id(telegram_id)
         if not user:
+            logger.debug(f"User not found for telegram_id={telegram_id}")
             return False, 'invalid_format'
+        logger.debug(f"Found user: id={user.id}, telegram_id={user.telegram_id}")
             
         # Validate and extract username
         username = self.validate_threads_username(text)
         if not username:
+            logger.debug(f"Invalid Threads URL/username format: {text}")
             return False, 'invalid_format'
+        logger.debug(f"Extracted username: {username}")
             
         # Check if profile exists
         threads_service = ThreadsService()
         user_id = await threads_service.get_user_id(username)
         if not user_id:
+            logger.debug(f"Threads profile not found for username: {username}")
             return False, 'not_found'
+        logger.debug(f"Found Threads user_id: {user_id}")
             
         # Create campaign entry
         campaign = ThreadsJobCampaign(
@@ -569,13 +577,83 @@ class UserService:
         )
         
         try:
+            logger.debug(f"Attempting to save campaign entry: user_id={user.id}, threads_username={username}")
             self.session.add(campaign)
             await self.session.commit()
+            logger.debug("Successfully created campaign entry")
             return True, None
         except Exception as e:
             logger.error(f"Error creating threads campaign entry: {e}")
             await self.session.rollback()
             return False, 'invalid_format'
+
+    def validate_threads_username(self, text: str) -> Optional[str]:
+        """
+        Validate and extract Threads username from input text.
+        Returns cleaned username or None if invalid.
+        """
+        logger.debug(f"Starting validate_threads_username with text: '{text}'")
+        
+        # Handle None or empty string
+        if not text:
+            logger.debug("Empty text input")
+            return None
+            
+        # Remove all kinds of whitespace from both ends
+        text = ' '.join(text.split()).strip()
+        if not text:
+            logger.debug("Text is only whitespace")
+            return None
+        
+        # Handle direct username input
+        if text.startswith('@'):
+            username = text[1:]  # Remove @
+            logger.debug(f"Direct username input: {username}")
+        # Handle full URL
+        elif text.startswith(('http://', 'https://')):
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(text)
+                logger.debug(f"Parsed URL: netloc={parsed.netloc}, path={parsed.path}")
+                
+                # Verify it's a threads.net URL (with or without www)
+                if not any(parsed.netloc.endswith(domain) for domain in ['threads.net', 'www.threads.net']):
+                    logger.debug(f"Invalid domain: {parsed.netloc}")
+                    return None
+                    
+                # Get path without leading/trailing slashes
+                path = parsed.path.strip('/')
+                
+                # Path should start with @ for username
+                if not path.startswith('@'):
+                    logger.debug(f"Path doesn't start with @: {path}")
+                    return None
+                    
+                # Get username part (before any query params or additional path segments)
+                username = path[1:].split('?')[0].split('/')[0]
+                logger.debug(f"Extracted username from URL: {username}")
+                
+            except Exception as e:
+                logger.error(f"Error parsing Threads URL: {e}")
+                return None
+        else:
+            logger.debug("Text is not a username (@) or URL (http)")
+            return None
+            
+        # Clean username from any remaining whitespace
+        username = username.strip()
+        if not username:
+            logger.debug("Username is empty after cleaning")
+            return None
+            
+        # Validate username format (letters, numbers, underscores, dots, no spaces)
+        import re
+        if not re.match(r'^[a-zA-Z0-9_.]+$', username):
+            logger.debug(f"Username contains invalid characters: {username}")
+            return None
+            
+        logger.debug(f"Successfully validated username: {username}")
+        return username
 
     async def analyze_threads_profile(self, telegram_id: int) -> bool:
         """Analyze user's Threads profile"""
@@ -639,57 +717,3 @@ class UserService:
             logger.error(f"Error analyzing Threads profile: {e}")
             await self.session.rollback()
             return False
-
-    def validate_threads_username(self, text: str) -> Optional[str]:
-        """
-        Validate and extract Threads username from input text.
-        Returns cleaned username or None if invalid.
-        """
-        # Handle None or empty string
-        if not text:
-            return None
-            
-        # Remove all kinds of whitespace from both ends
-        text = ' '.join(text.split()).strip()
-        if not text:
-            return None
-        
-        # Handle direct username input
-        if text.startswith('@'):
-            username = text[1:]  # Remove @
-        # Handle full URL
-        elif text.startswith(('http://', 'https://')):
-            try:
-                from urllib.parse import urlparse
-                parsed = urlparse(text)
-                # Verify it's a threads.net URL (with or without www)
-                if not any(parsed.netloc.endswith(domain) for domain in ['threads.net', 'www.threads.net']):
-                    return None
-                    
-                # Get path without leading/trailing slashes
-                path = parsed.path.strip('/')
-                
-                # Path should start with @ for username
-                if not path.startswith('@'):
-                    return None
-                    
-                # Get username part (before any query params or additional path segments)
-                username = path[1:].split('?')[0].split('/')[0]
-                
-            except Exception as e:
-                logger.error(f"Error parsing Threads URL: {e}")
-                return None
-        else:
-            return None
-            
-        # Clean username from any remaining whitespace
-        username = username.strip()
-        if not username:
-            return None
-            
-        # Validate username format (letters, numbers, underscores, dots, no spaces)
-        import re
-        if not re.match(r'^[a-zA-Z0-9_.]+$', username):
-            return None
-            
-        return username

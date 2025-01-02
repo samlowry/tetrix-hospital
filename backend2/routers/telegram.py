@@ -507,67 +507,62 @@ class TelegramHandler:
             logger.error("Error in handle_callback_query: %s", str(e), exc_info=True)
             return False
 
-    async def handle_message(self, telegram_id: int, text: str) -> None:
-        """Handle incoming message"""
-        try:
-            # Get user's language
-            user_lang = await self.user_service.get_user_language(telegram_id) or 'ru'
+    async def handle_message(self, telegram_id: int, text: str, language: str = 'ru') -> None:
+        """Handle incoming message from user"""
+        logger.debug(f"Handling message from telegram_id={telegram_id}, text='{text}'")
+        
+        # Get user
+        user = await self.user_service.get_user_by_telegram_id(telegram_id)
+        if not user:
+            logger.debug(f"User not found for telegram_id={telegram_id}")
+            return
+        logger.debug(f"Found user: id={user.id}, telegram_id={user.telegram_id}, phase={user.phase}")
+        
+        # Handle different registration phases
+        if user.phase == UserPhase.THREADS_JOB_CAMPAIGN:
+            logger.debug("User is in THREADS_JOB_CAMPAIGN phase")
             
-            # If it's a command - handle it directly
-            if text.startswith('/'):
-                if text == '/start':
-                    await self.handle_start_command(telegram_id=telegram_id)
-                elif text == '/language':
-                    await self.handle_language_selection(telegram_id=telegram_id)
-                return
-
-            # Get user and check phase
-            user = await self.user_service.get_user_by_telegram_id(telegram_id)
-            if not user:
-                return
-
-            # Handle threads campaign messages
-            if user.registration_phase == 'threads_job_campaign':
-                campaign_entry = await self.user_service.get_threads_campaign_entry(telegram_id)
-                if not campaign_entry:
-                    # Create campaign entry with validation
-                    success, error = await self.user_service.create_threads_campaign_entry(telegram_id, text)
-                    if success:
-                        # Send analyzing message
-                        await send_telegram_message(
-                            chat_id=telegram_id,
-                            text=strings.THREADS_ANALYZING,
-                            parse_mode="Markdown"
-                        )
-                        # Start analysis process
-                        await self.user_service.analyze_threads_profile(telegram_id)
-                    else:
-                        # Show appropriate error message
-                        if error == 'not_found':
-                            await send_telegram_message(
-                                chat_id=telegram_id,
-                                text=strings.THREADS_PROFILE_NOT_FOUND,
-                                parse_mode="Markdown"
-                            )
-                        else:  # invalid_format
-                            await send_telegram_message(
-                                chat_id=telegram_id,
-                                text=strings.THREADS_PROFILE_REQUEST,
-                                parse_mode="Markdown"
-                            )
-                    return
-                
-            # Check user status for other phases
-            status = await self.redis_service.get_user_status_value(telegram_id)
-            
-            # If waiting for invite code
-            if status == UserStatus.WAITING_INVITE.value and text:
-                await self.handle_invite_code(telegram_id=telegram_id, code=text)
+            # Check if user already has analysis report
+            campaign = await self.user_service.get_threads_campaign_entry(telegram_id)
+            if campaign and campaign.analysis_report:
+                logger.debug("User already has analysis report, ignoring message")
                 return
                 
-        except Exception as e:
-            logger.error(f"Error handling message from {telegram_id}: {e}")
-            await self.send_error_message(telegram_id)
+            # Try to create campaign entry
+            success, error = await self.user_service.create_threads_campaign_entry(telegram_id, text)
+            logger.debug(f"create_threads_campaign_entry result: success={success}, error={error}")
+            
+            if not success:
+                # Send error message
+                if error == 'invalid_format':
+                    logger.debug("Sending invalid format message")
+                    await send_telegram_message(
+                        chat_id=telegram_id,
+                        text=strings.THREADS_INVALID_FORMAT,
+                        parse_mode="Markdown"
+                    )
+                elif error == 'not_found':
+                    logger.debug("Sending profile not found message")
+                    await send_telegram_message(
+                        chat_id=telegram_id,
+                        text=strings.THREADS_PROFILE_NOT_FOUND,
+                        parse_mode="Markdown"
+                    )
+                return
+                
+            # Start analysis
+            logger.debug("Starting threads profile analysis")
+            success = await self.user_service.analyze_threads_profile(telegram_id)
+            logger.debug(f"analyze_threads_profile result: success={success}")
+            
+            if not success:
+                logger.debug("Sending analysis error message")
+                await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.THREADS_ANALYSIS_ERROR,
+                    parse_mode="Markdown"
+                )
+                return
 
     async def handle_callback(self, telegram_id: int, callback_data: str) -> None:
         """Handle callback query"""

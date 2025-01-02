@@ -20,10 +20,12 @@ class ThreadsService:
 
     async def get_user_id(self, username: str) -> Optional[str]:
         """Get user ID by username"""
+        logger.debug(f"Starting get_user_id for username: {username}")
         async with aiohttp.ClientSession() as session:
             try:
                 url = f"{self.base_url}/user/info"
                 params = {"username": username}
+                logger.debug(f"Making request to {url} with params: {params}")
                 
                 async with session.get(
                     url,
@@ -31,27 +33,35 @@ class ThreadsService:
                     params=params
                 ) as response:
                     if response.status != 200:
-                        logger.error(f"Error getting user ID for {username}: {response.status}")
+                        logger.error(f"Error getting user ID for {username}: status={response.status}")
+                        response_text = await response.text()
+                        logger.error(f"Response body: {response_text}")
                         return None
                         
                     data = await response.json()
+                    logger.debug(f"Got response data: {json.dumps(data, indent=2)}")
+                    
                     user = data.get("data", {}).get("user")
                     if not user:
-                        logger.error(f"User {username} not found")
+                        logger.error(f"User {username} not found in response data")
                         return None
                         
-                    return user.get("id")  # или user.get("pk") - они одинаковые
+                    user_id = user.get("id")
+                    logger.debug(f"Successfully got user_id: {user_id}")
+                    return user_id  # или user.get("pk") - они одинаковые
                     
             except Exception as e:
-                logger.error(f"Error getting user ID: {e}")
+                logger.error(f"Error getting user ID: {str(e)}")
                 return None
 
     async def get_user_posts(self, user_id: str, limit: int = 25) -> List[str]:
         """Get user's posts texts"""
+        logger.debug(f"Starting get_user_posts for user_id: {user_id}, limit: {limit}")
         async with aiohttp.ClientSession() as session:
             try:
                 url = f"{self.base_url}/user/posts"
                 params = {"user_id": user_id}
+                logger.debug(f"Making request to {url} with params: {params}")
                 
                 async with session.get(
                     url,
@@ -59,10 +69,13 @@ class ThreadsService:
                     params=params
                 ) as response:
                     if response.status != 200:
-                        logger.error(f"Error getting posts for user {user_id}: {response.status}")
+                        logger.error(f"Error getting posts for user {user_id}: status={response.status}")
+                        response_text = await response.text()
+                        logger.error(f"Response body: {response_text}")
                         return []
                         
                     data = await response.json()
+                    logger.debug(f"Got response data: {json.dumps(data, indent=2)}")
                     
                     # Check for errors
                     if data.get("errors") or not data.get("data"):
@@ -77,12 +90,13 @@ class ThreadsService:
                             text = edge['node']['thread_items'][0]['post'].get('caption', {}).get('text', '')
                             if text:  # Сохраняем только непустые тексты
                                 posts.append(text)
+                        logger.debug(f"Successfully extracted {len(posts)} posts")
                         return posts[:limit]
                         
                     except (KeyError, IndexError) as e:
-                        logger.error(f"Error parsing posts data: {e}")
+                        logger.error(f"Error parsing posts data: {str(e)}")
                         return []
-                    
+                        
             except Exception as e:
-                logger.error(f"Error getting user posts: {e}")
+                logger.error(f"Error getting user posts: {str(e)}")
                 return [] 
