@@ -507,6 +507,7 @@ class TelegramHandler:
             logger.error("Error in handle_callback_query: %s", str(e), exc_info=True)
             return False
 
+    @with_locale
     async def handle_message(self, telegram_id: int, text: str, language: str = 'ru') -> None:
         """Handle incoming message from user"""
         logger.debug(f"Handling message from telegram_id={telegram_id}, text='{text}'")
@@ -516,10 +517,10 @@ class TelegramHandler:
         if not user:
             logger.debug(f"User not found for telegram_id={telegram_id}")
             return
-        logger.debug(f"Found user: id={user.id}, telegram_id={user.telegram_id}, phase={user.phase}")
+        logger.debug(f"Found user: id={user.id}, telegram_id={user.telegram_id}, phase={user.registration_phase}")
         
         # Handle different registration phases
-        if user.phase == UserPhase.THREADS_JOB_CAMPAIGN:
+        if user.registration_phase == 'threads_job_campaign':
             logger.debug("User is in THREADS_JOB_CAMPAIGN phase")
             
             # Check if user already has analysis report
@@ -641,6 +642,10 @@ async def telegram_webhook(
             if status == UserStatus.WAITING_INVITE.value and text:
                 success = await handler.handle_invite_code(telegram_id=telegram_id, code=text)
                 return {"ok": success}
+                
+            # Handle regular messages
+            await handler.handle_message(telegram_id=telegram_id, text=text)
+            return {"ok": True}
             
         elif callback_query:
             telegram_id = callback_query.get("from", {}).get("id")
