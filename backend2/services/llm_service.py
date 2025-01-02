@@ -229,20 +229,15 @@ class LLMService:
             # Форматируем отчет
             formatted_report = self.format_report(json_report)
             
-            # Разбиваем на части, если сообщение слишком длинное
-            MAX_LENGTH = 4096  # Максимальная длина сообщения в Telegram
-            parts = [formatted_report[i:i + MAX_LENGTH] for i in range(0, len(formatted_report), MAX_LENGTH)]
+            # Получаем строки для нужного языка
+            strings = get_strings(language)
             
-            # Отправляем каждую часть отдельно
-            for part in parts:
-                await send_telegram_message(
-                    telegram_id=telegram_id,
-                    text=part,
-                    parse_mode="Markdown"
-                )
-            
-            return True
-            
+            # Отправляем отчет пользователю
+            from routers.telegram import split_and_send_message
+            return await split_and_send_message(
+                telegram_id=telegram_id,
+                text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report)
+            )
         except Exception as e:
             logger.error(f"Error sending analysis: {e}")
             # Отправляем сообщение об ошибке

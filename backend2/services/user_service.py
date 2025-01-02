@@ -668,15 +668,14 @@ class UserService:
             # Get user language
             language = await self.get_user_language(telegram_id)
             
-            # Initialize services
+            # Initialize threads service
             threads_service = ThreadsService()
-            llm_service = LLMService()
 
             # If we have posts but no analysis, resume analysis
             if campaign.posts_json and not campaign.analysis_report:
                 logger.info(f"Resuming analysis for user {telegram_id} with existing posts")
                 posts = json.loads(campaign.posts_json)
-                analysis_report = await llm_service.analyze_threads_profile(posts, telegram_id, language)
+                analysis_report = await self.llm_service.analyze_threads_profile(posts, telegram_id, language)
                 if analysis_report:
                     campaign.analysis_report = json.dumps(analysis_report, ensure_ascii=False)
                     await self.session.commit()
@@ -687,7 +686,7 @@ class UserService:
             if campaign.posts_json and campaign.analysis_report:
                 logger.info(f"Sending existing analysis for user {telegram_id}")
                 analysis_report = json.loads(campaign.analysis_report)
-                await llm_service.send_analysis_to_user(telegram_id, analysis_report, language)
+                await self.llm_service.send_analysis_to_user(telegram_id, analysis_report, language)
                 return True
 
             # Get user posts
@@ -701,7 +700,7 @@ class UserService:
             await self.session.commit()
 
             # Analyze posts
-            analysis_report = await llm_service.analyze_threads_profile(posts, telegram_id, language)
+            analysis_report = await self.llm_service.analyze_threads_profile(posts, telegram_id, language)
             if not analysis_report:
                 logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
                 return False

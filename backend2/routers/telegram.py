@@ -24,19 +24,22 @@ router = APIRouter(tags=["telegram"])
 # Hardcoded for security - obscure webhook path with random suffix
 WEBHOOK_PATH = '/telegram-webhook9eu3f3843ry9834843'
 
-async def send_telegram_message(chat_id: int, **kwargs) -> bool:
+async def send_telegram_message(telegram_id: int, **kwargs) -> bool:
     """Send message via Telegram API"""
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": chat_id, **kwargs}
+    data = {"chat_id": telegram_id, **kwargs}
     
-    logger.info(f"Sending telegram message to chat_id={chat_id}")
+    logger.info(f"Sending telegram message to chat_id={telegram_id}")
+    logger.debug(f"Message data: {data}")
     
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=data) as response:
             if response.status == 200:
-                logger.info(f"Message sent successfully to chat_id={chat_id}")
+                logger.info(f"Message sent successfully to chat_id={telegram_id}")
                 return True
-            logger.error(f"Error sending message to chat_id={chat_id}. Status: {response.status}")
+            logger.error(f"Error sending message to chat_id={telegram_id}. Status: {response.status}")
+            response_text = await response.text()
+            logger.error(f"Response text: {response_text}")
             return False
 
 async def answer_callback_query(callback_query_id: str) -> bool:
@@ -79,6 +82,39 @@ def trim_to_visual_width(s: str, max_width: int) -> str:
         
     return result
 
+async def split_and_send_message(telegram_id: int, text: str, **kwargs) -> bool:
+    """Split long message and send parts"""
+    MAX_LENGTH = 4000  # Leave some room for formatting
+    
+    # If message is short enough, send as is
+    if len(text) <= MAX_LENGTH:
+        return await send_telegram_message(telegram_id=telegram_id, text=text, **kwargs)
+    
+    # Split message into parts
+    parts = []
+    while text:
+        if len(text) <= MAX_LENGTH:
+            parts.append(text)
+            break
+            
+        # Find last newline before MAX_LENGTH
+        split_pos = text.rfind('\n', 0, MAX_LENGTH)
+        if split_pos == -1:
+            # If no newline found, split at MAX_LENGTH
+            split_pos = MAX_LENGTH
+            
+        parts.append(text[:split_pos])
+        text = text[split_pos:].lstrip()
+    
+    # Send each part
+    success = True
+    for i, part in enumerate(parts, 1):
+        part_text = f"Part {i}/{len(parts)}:\n\n{part}"
+        if not await send_telegram_message(telegram_id=telegram_id, text=part_text, **kwargs):
+            success = False
+            
+    return success
+
 class TelegramHandler:
     def __init__(self, user_service: UserService, redis_service: RedisService, redis: Redis, session: AsyncSession):
         self.user_service = user_service
@@ -92,7 +128,7 @@ class TelegramHandler:
     async def handle_language_selection(self, *, telegram_id: int, strings) -> bool:
         """Show language selection menu"""
         return await send_telegram_message(
-            chat_id=telegram_id,
+            telegram_id=telegram_id,
             text=strings.LANGUAGE_SELECT,
             reply_markup={
                 "inline_keyboard": [
@@ -152,12 +188,11 @@ class TelegramHandler:
                         logger.info(f"[TELEGRAM] Showing existing analysis for user {telegram_id}")
                         try:
                             report = json.loads(campaign_entry.analysis_report)
-                            await send_telegram_message(
-                                chat_id=telegram_id,
+                            return await split_and_send_message(
+                                telegram_id=telegram_id,
                                 text=strings.THREADS_ANALYSIS_COMPLETE.format(
                                     analysis_text=self.user_service.llm_service.format_report(report)
-                                ),
-                                parse_mode="Markdown"
+                                )
                             )
                         except Exception as e:
                             logger.error(f"Error showing analysis: {e}")
@@ -166,7 +201,7 @@ class TelegramHandler:
                         # If we have posts but no analysis - resume analysis
                         logger.info(f"[TELEGRAM] Resuming analysis for user {telegram_id}")
                         await send_telegram_message(
-                            chat_id=telegram_id,
+                            telegram_id=telegram_id,
                             text=strings.THREADS_ANALYZING,
                             parse_mode="Markdown"
                         )
@@ -177,7 +212,7 @@ class TelegramHandler:
                         # If we have profile but no posts - fetch posts and analyze
                         logger.info(f"[TELEGRAM] Starting analysis for existing profile of user {telegram_id}")
                         await send_telegram_message(
-                            chat_id=telegram_id,
+                            telegram_id=telegram_id,
                             text=strings.THREADS_ANALYZING,
                             parse_mode="Markdown"
                         )
@@ -187,13 +222,13 @@ class TelegramHandler:
                         # If we have campaign entry but no profile info - something went wrong, request profile again
                         logger.warning(f"[TELEGRAM] Campaign entry without profile info for user {telegram_id}")
                         return await send_telegram_message(
-                            chat_id=telegram_id,
+                            telegram_id=telegram_id,
                             text=strings.THREADS_PROFILE_REQUEST,
                             parse_mode="Markdown"
                         )
                 # If no campaign entry - request threads profile
                 return await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.THREADS_PROFILE_REQUEST,
                     parse_mode="Markdown"
                 )
@@ -207,7 +242,7 @@ class TelegramHandler:
                 logger.debug(f"[TELEGRAM] Initial URL for user {telegram_id}: {web_app_url}, language: {user_lang}")
                 
                 return await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.WELCOME_NEW_USER,
                     parse_mode="Markdown",
                     reply_markup={
@@ -229,7 +264,7 @@ class TelegramHandler:
                 # User with wallet but without invite code
                 await self.redis_service.set_status_waiting_invite(telegram_id)
                 return await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.WELCOME_NEED_INVITE,
                     parse_mode="Markdown"
                 )
@@ -243,7 +278,7 @@ class TelegramHandler:
             tetrix_metrics = await tetrix_service.get_metrics()
             
             return await send_telegram_message(
-                chat_id=telegram_id,
+                telegram_id=telegram_id,
                 text=strings.WELCOME_BACK_SHORT + "\n\n" + strings.STATS_TEMPLATE.format(
                     points=stats['points'],
                     health_bar=tetrix_metrics['health']['bar'],
@@ -279,7 +314,7 @@ class TelegramHandler:
             await self.redis_service.set_status_registered(telegram_id)
             
             return await send_telegram_message(
-                chat_id=telegram_id,
+                telegram_id=telegram_id,
                 text=strings.REGISTRATION_COMPLETE,
                 parse_mode="Markdown",
                 reply_markup={
@@ -292,7 +327,7 @@ class TelegramHandler:
             )
         else:
             return await send_telegram_message(
-                chat_id=telegram_id,
+                telegram_id=telegram_id,
                 text=strings.INVALID_INVITE_CODE
             )
 
@@ -321,7 +356,7 @@ class TelegramHandler:
                 logger.debug(f"[WebApp] Generated URL from create_wallet for user {telegram_id}: {web_app_url}, language: {user_lang}")
                 
                 return await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.WALLET_CREATION_GUIDE,
                     reply_markup={
                         "inline_keyboard": [
@@ -342,7 +377,7 @@ class TelegramHandler:
                 logger.debug(f"[WebApp] Generated URL from back_to_start for user {telegram_id}: {web_app_url}, language: {user_lang}")
                 
                 return await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.WELCOME_NEW_USER,
                     parse_mode="Markdown",
                     reply_markup={
@@ -378,7 +413,7 @@ class TelegramHandler:
                         code_lines.append(strings.INVITE_CODES_EMPTY)
                     
                     return await send_telegram_message(
-                        chat_id=telegram_id,
+                        telegram_id=telegram_id,
                         text=(
                             f"{strings.INVITE_CODES_TITLE}\n\n" +
                             "\n".join(code_lines) +
@@ -505,7 +540,7 @@ class TelegramHandler:
                     logger.debug(f"Final keyboard: {keyboard}")
                     
                     return await send_telegram_message(
-                        chat_id=telegram_id,
+                        telegram_id=telegram_id,
                         text=message,
                         parse_mode="HTML",
                         reply_markup={
@@ -518,7 +553,7 @@ class TelegramHandler:
                     tetrix_metrics = await tetrix_service.get_metrics()
                     
                     return await send_telegram_message(
-                        chat_id=telegram_id,
+                        telegram_id=telegram_id,
                         text=strings.STATS_TEMPLATE.format(
                             points=stats['points'],
                             health_bar=tetrix_metrics['health']['bar'],
@@ -577,14 +612,14 @@ class TelegramHandler:
                 if error == 'invalid_format':
                     logger.debug("Sending invalid format message")
                     await send_telegram_message(
-                        chat_id=telegram_id,
+                        telegram_id=telegram_id,
                         text=strings.THREADS_INVALID_FORMAT,
                         parse_mode="Markdown"
                     )
                 elif error == 'not_found':
                     logger.debug("Sending profile not found message")
                     await send_telegram_message(
-                        chat_id=telegram_id,
+                        telegram_id=telegram_id,
                         text=strings.THREADS_PROFILE_NOT_FOUND,
                         parse_mode="Markdown"
                     )
@@ -598,7 +633,7 @@ class TelegramHandler:
             if not success:
                 logger.debug("Sending analysis error message")
                 await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.THREADS_ANALYSIS_ERROR,
                     parse_mode="Markdown"
                 )
@@ -642,7 +677,7 @@ class TelegramHandler:
                 # Send error message
                 logger.debug("Sending analysis error message")
                 await send_telegram_message(
-                    chat_id=telegram_id,
+                    telegram_id=telegram_id,
                     text=strings.THREADS_ANALYSIS_ERROR,
                     parse_mode="Markdown"
                 )
@@ -652,7 +687,7 @@ class TelegramHandler:
         except Exception as e:
             logger.error(f"Error in analyze_threads_profile: {e}")
             await send_telegram_message(
-                chat_id=telegram_id,
+                telegram_id=telegram_id,
                 text=strings.THREADS_ANALYSIS_ERROR,
                 parse_mode="Markdown"
             )
