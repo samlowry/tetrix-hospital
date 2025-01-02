@@ -239,7 +239,7 @@ class LLMService:
             
             # Отправляем сообщение пользователю
             await send_telegram_message(
-                telegram_id=telegram_id,
+                chat_id=telegram_id,
                 text=formatted_report,
                 parse_mode="Markdown"
             )
@@ -251,7 +251,7 @@ class LLMService:
             # Отправляем сообщение об ошибке
             strings = get_strings(language)
             await send_telegram_message(
-                telegram_id=telegram_id,
+                chat_id=telegram_id,
                 text=strings.THREADS_ANALYSIS_ERROR,
                 parse_mode="Markdown"
             )
@@ -272,8 +272,8 @@ class LLMService:
                 'final_report': None
             }
             
-            # Run workflow
-            final_state = await self.workflow.arun(state)
+            # Run workflow (synchronously since the graph is not async)
+            final_state = self.workflow.invoke(state)
             
             # Send progress messages
             try:
