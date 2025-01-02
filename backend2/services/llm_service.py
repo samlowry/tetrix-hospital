@@ -229,12 +229,17 @@ class LLMService:
             # Форматируем отчет
             formatted_report = self.format_report(json_report)
             
-            # Отправляем сообщение пользователю
-            await send_telegram_message(
-                chat_id=telegram_id,
-                text=formatted_report,
-                parse_mode="Markdown"
-            )
+            # Разбиваем на части, если сообщение слишком длинное
+            MAX_LENGTH = 4096  # Максимальная длина сообщения в Telegram
+            parts = [formatted_report[i:i + MAX_LENGTH] for i in range(0, len(formatted_report), MAX_LENGTH)]
+            
+            # Отправляем каждую часть отдельно
+            for part in parts:
+                await send_telegram_message(
+                    telegram_id=telegram_id,
+                    text=part,
+                    parse_mode="Markdown"
+                )
             
             return True
             
@@ -243,7 +248,7 @@ class LLMService:
             # Отправляем сообщение об ошибке
             strings = get_strings(language)
             await send_telegram_message(
-                chat_id=telegram_id,
+                telegram_id=telegram_id,
                 text=strings.THREADS_ANALYSIS_ERROR,
                 parse_mode="Markdown"
             )
@@ -264,8 +269,8 @@ class LLMService:
                 'final_report': None
             }
             
-            # Run workflow (synchronously since the graph is not async)
-            final_state = self.workflow.invoke(state)
+            # Run workflow with async nodes
+            final_state = await self.workflow.ainvoke(state)
             
             # Remove posts from final state before returning
             analysis_report = {k: v for k, v in final_state.items() if k != 'posts'}

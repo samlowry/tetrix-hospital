@@ -658,70 +658,60 @@ class UserService:
 
     async def analyze_threads_profile(self, telegram_id: int) -> bool:
         """Analyze user's Threads profile"""
-        from services.threads_service import ThreadsService
-        from services.llm_service import LLMService
-        from sqlalchemy.exc import SQLAlchemyError
-        
-        # Get campaign entry
-        campaign = await self.get_threads_campaign_entry(telegram_id)
-        if not campaign:
-            logger.error(f"No campaign entry found for telegram_id={telegram_id}")
-            return False
-            
-        # Initialize services
-        threads_service = ThreadsService()
-        llm_service = LLMService()
-        
         try:
-            # Check if we need to fetch posts or can use existing ones
-            posts = None
-            if campaign.posts_json and not campaign.analysis_report:
-                # We have posts but no analysis - resume from analysis
-                logger.info(f"Resuming analysis for user {telegram_id} with existing posts")
-                posts = campaign.posts_json
-            else:
-                # Fetch fresh posts
-                logger.info(f"Fetching new posts for user {telegram_id}")
-                posts = await threads_service.get_user_posts(campaign.threads_user_id)
-                if not posts:
-                    logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
-                    return False
-                
-                try:
-                    # Store posts texts as JSON array with proper encoding
-                    campaign.posts_json = posts
-                    await self.session.commit()
-                except SQLAlchemyError as e:
-                    logger.error(f"Database error storing posts: {str(e)}")
-                    await self.session.rollback()
-                    return False
+            # Get campaign entry
+            campaign = await self.get_threads_campaign_entry(telegram_id)
+            if not campaign:
+                logger.error(f"No campaign entry found for user {telegram_id}")
+                return False
+
+            # Get user language
+            language = await self.get_user_language(telegram_id)
             
-            # Get user's language
-            user = await self.get_user_by_telegram_id(telegram_id)
-            if not user:
-                logger.error(f"User not found for telegram_id={telegram_id}")
+            # Initialize services
+            threads_service = ThreadsService()
+            llm_service = LLMService()
+
+            # If we have posts but no analysis, resume analysis
+            if campaign.posts_json and not campaign.analysis_report:
+                logger.info(f"Resuming analysis for user {telegram_id} with existing posts")
+                posts = json.loads(campaign.posts_json)
+                analysis_report = await llm_service.analyze_threads_profile(posts, telegram_id, language)
+                if analysis_report:
+                    campaign.analysis_report = json.dumps(analysis_report, ensure_ascii=False)
+                    await self.session.commit()
+                    return True
                 return False
             
-            # Analyze posts and get JSON report
-            json_report = await llm_service.analyze_threads_profile(
-                posts=posts,
-                telegram_id=telegram_id,
-                language=user.language or 'ru'
-            )
-            if not json_report:
+            # If we have both posts and analysis, just send the formatted report
+            if campaign.posts_json and campaign.analysis_report:
+                logger.info(f"Sending existing analysis for user {telegram_id}")
+                analysis_report = json.loads(campaign.analysis_report)
+                await llm_service.send_analysis_to_user(telegram_id, analysis_report, language)
+                return True
+
+            # Get user posts
+            posts = await threads_service.get_user_posts(campaign.threads_username)
+            if not posts:
+                logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
+                return False
+
+            # Store posts
+            campaign.posts_json = json.dumps(posts, ensure_ascii=False)
+            await self.session.commit()
+
+            # Analyze posts
+            analysis_report = await llm_service.analyze_threads_profile(posts, telegram_id, language)
+            if not analysis_report:
                 logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
                 return False
-                
-            try:
-                # Store JSON report with proper encoding for Russian text
-                campaign.analysis_report = json.dumps(json_report, ensure_ascii=False)
-                await self.session.commit()
-                return True
-            except SQLAlchemyError as e:
-                logger.error(f"Database error storing analysis report: {str(e)}")
-                await self.session.rollback()
-                return False
-                
+
+            # Store analysis
+            campaign.analysis_report = json.dumps(analysis_report, ensure_ascii=False)
+            await self.session.commit()
+
+            return True
+
         except Exception as e:
-            logger.error(f"Error in analyze_threads_profile: {str(e)}")
+            logger.error(f"Error in analyze_threads_profile: {e}")
             return False
