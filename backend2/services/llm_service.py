@@ -5,7 +5,7 @@ import logging
 from typing import List, Optional, TypedDict, Annotated, Dict
 from langgraph.graph import Graph, StateGraph
 from langgraph.prebuilt import ToolExecutor
-import openai
+from openai import AsyncOpenAI
 import json
 from operator import itemgetter
 from locales.language_utils import get_strings
@@ -29,15 +29,15 @@ class LLMService:
     """Service for interacting with LLM APIs"""
     
     def __init__(self):
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.workflow = self._create_analysis_workflow()
         
-    def _analyze_vibe(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+    async def _analyze_vibe(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
         """Do a vibe check of the profile"""
         try:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
-            response = openai.ChatCompletion.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_VIBE},
@@ -52,12 +52,12 @@ class LLMService:
             state['vibe_check'] = "Could not analyze vibe"
             return state
 
-    def _analyze_content(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+    async def _analyze_content(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
         """Find the best content gems"""
         try:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
-            response = openai.ChatCompletion.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_CONTENT},
@@ -72,12 +72,12 @@ class LLMService:
             state['content_gems'] = "Could not analyze content"
             return state
 
-    def _analyze_social(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+    async def _analyze_social(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
         """Analyze social energy and interaction style"""
         try:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
-            response = openai.ChatCompletion.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_SOCIAL},
@@ -92,12 +92,12 @@ class LLMService:
             state['social_energy'] = "Could not analyze social style"
             return state
 
-    def _analyze_character(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+    async def _analyze_character(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
         """Create a character profile"""
         try:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
-            response = openai.ChatCompletion.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_CHARACTER},
@@ -112,11 +112,11 @@ class LLMService:
             state['character_arc'] = "Could not analyze character"
             return state
 
-    def _create_final_report(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
+    async def _create_final_report(self, state: ThreadsAnalysisState) -> ThreadsAnalysisState:
         """Create final viral-worthy report"""
         try:
             strings = get_strings(state['language'])
-            response = openai.ChatCompletion.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_FINAL},
@@ -192,39 +192,31 @@ class LLMService:
         """Create ASCII footer for the report"""
         return REPORT_FOOTER
 
-    def format_report(self, json_report: Dict) -> str:
+    def format_report(self, state: Dict) -> str:
         """Format full analysis report with ASCII styling"""
         try:
-            # Начинаем с заголовка
+            # Start with header
             sections = [self._format_header()]
             
-            # Сортируем и форматируем основные блоки
-            blocks = json_report["blocks"]
-            sorted_blocks = sorted(blocks.items(), key=lambda x: x[1]["order"])
+            # Format analysis blocks
+            blocks = [
+                ("VIBE CHECK", state.get('vibe_check', 'Could not analyze vibe')),
+                ("CONTENT GEMS", state.get('content_gems', 'Could not analyze content')),
+                ("SOCIAL ENERGY", state.get('social_energy', 'Could not analyze social style')),
+                ("CHARACTER ARC", state.get('character_arc', 'Could not analyze character')),
+                ("FINAL REPORT", state.get('final_report', 'Could not create final report'))
+            ]
             
-            for _, block in sorted_blocks:
+            for title, content in blocks:
                 sections.append(self._format_block(
-                    block["title"],
-                    block["content"]
+                    title,
+                    content.split('\n') if content else ['Analysis not available']
                 ))
             
-            # Форматируем финальный анализ
-            final = json_report["final_analysis"]
-            final_text = [
-                "🚀 FINAL ANALYSIS:",
-                "",
-                final["opener"],
-                "",
-                *final["main_points"],
-                "",
-                final["call_to_action"]
-            ]
-            sections.append("\n".join(final_text))
-            
-            # Добавляем футер
+            # Add footer
             sections.append(self._format_footer())
             
-            # Соединяем все секции с двойным переносом строки
+            # Join all sections with double newlines
             return "\n\n".join(sections)
             
         except Exception as e:
@@ -272,8 +264,8 @@ class LLMService:
                 'final_report': None
             }
             
-            # Run workflow (synchronously since the graph is not async)
-            final_state = self.workflow.invoke(state)
+            # Run workflow (using arun since we have async nodes)
+            final_state = await self.workflow.arun(state)
             
             # Send progress messages
             try:
