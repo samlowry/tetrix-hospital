@@ -6,6 +6,7 @@ import secrets
 import logging
 import os
 import aiohttp
+import json
 
 from models.user import User
 from models.invite_code import InviteCode
@@ -601,25 +602,34 @@ class UserService:
             campaign.posts_json = posts  # SQLAlchemy автоматически сериализует список в JSON
             await self.session.commit()
             
-            # Analyze posts
-            analysis = await llm_service.analyze_threads_profile(posts)
-            if not analysis:
+            # Get user's language
+            user = await self.get_user_by_telegram_id(telegram_id)
+            if not user:
+                return False
+            
+            # Analyze posts and get JSON report
+            json_report = await llm_service.analyze_threads_profile(
+                posts=posts,
+                telegram_id=telegram_id,
+                language=user.language or 'ru'
+            )
+            if not json_report:
                 logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
                 return False
                 
-            # Store analysis
-            campaign.analysis_report = analysis
+            # Store JSON report
+            campaign.analysis_report = json.dumps(json_report)
             await self.session.commit()
             
-            # Send analysis to user
-            user = await self.get_user_by_telegram_id(telegram_id)
+            # Format and send report to user
+            formatted_report = llm_service.format_report(json_report)
             if user:
                 from locales.i18n import get_strings
                 strings = get_strings(user.language or 'ru')
                 from routers.telegram import send_telegram_message
                 await send_telegram_message(
                     chat_id=telegram_id,
-                    text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=analysis),
+                    text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report),
                     parse_mode="Markdown"
                 )
             

@@ -256,8 +256,9 @@ class LLMService:
             )
             return False
         
-    async def analyze_threads_profile(self, posts: List[str], telegram_id: int, language: str = 'en') -> bool:
-        """Analyze user's Threads posts and generate personality report"""
+    async def analyze_threads_profile(self, posts: List[str], telegram_id: int, language: str = 'en') -> Optional[Dict]:
+        """Analyze user's Threads posts and generate personality report
+        Returns JSON report if successful, None if failed"""
         try:
             strings = get_strings(language)
             
@@ -290,11 +291,12 @@ class LLMService:
                     text=strings.THREADS_ANALYSIS_ERROR,
                     parse_mode="Markdown"
                 )
-                return False
+                return None
                 
             # Parse JSON report
             try:
                 json_report = json.loads(report)
+                return json_report
             except json.JSONDecodeError:
                 logger.error("Failed to parse JSON report")
                 await send_telegram_message(
@@ -302,10 +304,7 @@ class LLMService:
                     text=strings.THREADS_ANALYSIS_ERROR,
                     parse_mode="Markdown"
                 )
-                return False
-                
-            # Send formatted report to user
-            return await self.send_analysis_to_user(telegram_id, json_report, language)
+                return None
             
         except Exception as e:
             logger.error(f"Error in analysis workflow: {e}")
@@ -316,4 +315,4 @@ class LLMService:
                 text=strings.THREADS_ANALYSIS_ERROR,
                 parse_mode="Markdown"
             )
-            return False 
+            return None 
