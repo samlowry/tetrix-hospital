@@ -163,7 +163,7 @@ class LLMService:
 
     def _format_block(self, title: str, content: List[str]) -> str:
         """Format a single analysis block with ASCII frame"""
-        width = 50  # Общая ширина блока
+        width = 27  # Ширина блока для мобильных устройств
         
         # Получаем рамки из ascii_art
         top, title_template, bottom = get_block_border(width)

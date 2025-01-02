@@ -58,6 +58,6 @@ def get_block_border(width: int = 50) -> tuple[str, str, str]:
     Returns tuple of (top_border, title_border, bottom_border)"""
     return (
         f"┌{'─' * (width-2)}┐",
-        f"│{{title:^{width-4}}}│",  # Template for title
+        f"│{{title:^{width-2}}}│",  # Исправленный шаблон для заголовка
         f"└{'─' * (width-2)}┘"
     ) 
