@@ -41,17 +41,17 @@ def get_emotion_by_percentage(percentage: float) -> list[str]:
         return EMOTIONS["20-0"]
 
 # ASCII art elements for report formatting
-REPORT_HEADER = """╔════════════════════════════════════════╗
-║ TETRIX PROFILE ANALYZER v1.337        ║
-║ Loading personality data...            ║
-╚════════════════════════════════════════╝
-   [█████████████████████] 100%"""
+REPORT_HEADER = """╔═════════════════════════╗
+║ TETRIX ANALYZER v1.337  ║
+║ Loading data...         ║
+╚═════════════════════════╝
+  [██████████████████] 100%"""
 
-REPORT_FOOTER = """╔═══════════════════════════════════════════╗
-║  > JOIN_TETRIX_UNIVERSE.exe               ║
-║  > INITIALIZATION_COMPLETE                ║
-║  > WAITING_FOR_YOUR_RESPONSE...          ║
-╚═══════════════════════════════════════════╝"""
+REPORT_FOOTER = """╔═════════════════════════╗
+║ > TETRIX_UNIVERSE.exe   ║
+║ > INIT_COMPLETE         ║
+║ > WAITIN_4UR_RSPNSE...  ║
+╚═════════════════════════╝"""
 
 def get_block_border(width: int = 50) -> tuple[str, str, str]:
     """Get top, title and bottom borders for a block

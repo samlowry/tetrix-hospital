@@ -192,7 +192,8 @@ class TelegramHandler:
                                 telegram_id=telegram_id,
                                 text=strings.THREADS_ANALYSIS_COMPLETE.format(
                                     analysis_text=self.user_service.llm_service.format_report(report)
-                                )
+                                ),
+                                parse_mode="HTML"
                             )
                         except Exception as e:
                             logger.error(f"Error showing analysis: {e}")

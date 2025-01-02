@@ -169,31 +169,35 @@ class LLMService:
         top, title_template, bottom = get_block_border(width)
         title_line = title_template.format(title=title)
         
-        # Форматируем контент без боковых рамок
-        content_lines = []
-        for line in content:
-            content_lines.append(f"  {line}")  # Добавляем отступ в два пробела
-        
-        # Собираем блок
-        return "\n".join([
-            top,
-            title_line,
+        # Собираем блок с HTML-тегами для ASCII-графики
+        lines = [
+            f"<code>{top}</code>",
+            f"<code>{title_line}</code>",
             "",  # Пустая строка после заголовка
-            *content_lines,
+        ]
+        
+        # Добавляем контент
+        for line in content:
+            lines.append(f"  {line}")  # Добавляем отступ в два пробела
+            
+        # Добавляем нижнюю рамку
+        lines.extend([
             "",  # Пустая строка перед нижней рамкой
-            bottom
+            f"<code>{bottom}</code>"
         ])
+        
+        return "\n".join(lines)
 
     def _format_header(self) -> str:
-        """Create ASCII header for the report"""
-        return REPORT_HEADER
+        """Create ASCII header for the report with HTML tags"""
+        return "\n".join(f"<code>{line}</code>" for line in REPORT_HEADER.split("\n"))
 
     def _format_footer(self) -> str:
-        """Create ASCII footer for the report"""
-        return REPORT_FOOTER
+        """Create ASCII footer for the report with HTML tags"""
+        return "\n".join(f"<code>{line}</code>" for line in REPORT_FOOTER.split("\n"))
 
     def format_report(self, state: Dict) -> str:
-        """Format full analysis report with ASCII styling"""
+        """Format full analysis report with ASCII styling and HTML tags"""
         try:
             # Start with header
             sections = [self._format_header()]
@@ -290,7 +294,8 @@ class LLMService:
             from routers.telegram import split_and_send_message
             return await split_and_send_message(
                 telegram_id=telegram_id,
-                text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report)
+                text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report),
+                parse_mode="HTML"
             )
         except Exception as e:
             logger.error(f"Error sending analysis: {e}")
