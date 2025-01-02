@@ -4,12 +4,15 @@ from redis.asyncio import Redis
 from pydantic import BaseModel
 import secrets
 import logging
+from typing import Optional, Dict, Any
+import json
 
 from models.database import get_session
 from services.user_service import UserService
 from services.redis_service import RedisService
 from core.deps import get_redis
-from locales.i18n import with_locale
+from core.config import get_settings
+from locales.language_utils import with_locale
 from routers.telegram import send_telegram_message
 
 logger = logging.getLogger(__name__)

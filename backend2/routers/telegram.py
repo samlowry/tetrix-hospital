@@ -13,7 +13,7 @@ from services.user_service import UserService, get_telegram_info
 from services.redis_service import RedisService, UserStatus
 from core.deps import get_redis
 from core.config import get_settings
-from locales.i18n import with_locale
+from locales.language_utils import with_locale
 from services.tetrix_service import TetrixService
 from core.cache import CacheKeys
 

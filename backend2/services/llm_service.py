@@ -10,7 +10,7 @@ import json
 from operator import itemgetter
 from locales.language_utils import get_strings
 from locales.ascii_art import REPORT_HEADER, REPORT_FOOTER, get_block_border
-from routers.telegram import send_telegram_message
+from utils.telegram_utils import send_telegram_message
 
 logger = logging.getLogger(__name__)
 
