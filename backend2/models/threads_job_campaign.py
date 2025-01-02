@@ -1,8 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, text, select
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from .database import Base
-from sqlalchemy.orm import select
 
 class ThreadsJobCampaign(Base):
     """
