@@ -264,8 +264,8 @@ class LLMService:
                 'final_report': None
             }
             
-            # Run workflow (using arun since we have async nodes)
-            final_state = await self.workflow.arun(state)
+            # Run workflow (synchronously since the graph is not async)
+            final_state = self.workflow.invoke(state)
             
             # Remove posts from final state before returning
             analysis_report = {k: v for k, v in final_state.items() if k != 'posts'}
