@@ -12,3 +12,5 @@ python-jose[cryptography]==3.3.0  # для JWT
 aiohttp==3.9.3  # для асинхронных HTTP запросов
 requests==2.31.0  # для синхронных HTTP запросов в миграциях
 aiocache[redis]>=0.12.3
+langgraph==0.2.60
+openai==1.58.1
