@@ -508,7 +508,7 @@ class TelegramHandler:
             return False
 
     @with_locale
-    async def handle_message(self, telegram_id: int, text: str, language: str = 'ru') -> None:
+    async def handle_message(self, *, telegram_id: int, text: str, strings, language: str = 'ru') -> None:
         """Handle incoming message from user"""
         logger.debug(f"Handling message from telegram_id={telegram_id}, text='{text}'")
         

@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from .database import Base
+from sqlalchemy.orm import select
 
 class ThreadsJobCampaign(Base):
     """
@@ -30,16 +31,14 @@ class ThreadsJobCampaign(Base):
     @classmethod
     async def get_by_telegram_id(cls, session, telegram_id: int):
         """Get campaign record by telegram ID"""
-        result = await session.execute(
-            text("""
-            SELECT tjc.* 
-            FROM threads_job_campaign tjc
-            JOIN "user" u ON u.id = tjc.user_id
-            WHERE u.telegram_id = :telegram_id
-            """),
-            {"telegram_id": telegram_id}
+        from models.user import User
+        stmt = (
+            select(cls)
+            .join(User, User.id == cls.user_id)
+            .where(User.telegram_id == telegram_id)
         )
-        return result.first()
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
     @classmethod
     async def get_by_threads_username(cls, session, threads_username: str):

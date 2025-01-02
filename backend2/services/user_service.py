@@ -659,10 +659,12 @@ class UserService:
         """Analyze user's Threads profile"""
         from services.threads_service import ThreadsService
         from services.llm_service import LLMService
+        from sqlalchemy.exc import SQLAlchemyError
         
         # Get campaign entry
         campaign = await self.get_threads_campaign_entry(telegram_id)
         if not campaign:
+            logger.error(f"No campaign entry found for telegram_id={telegram_id}")
             return False
             
         # Initialize services
@@ -676,13 +678,19 @@ class UserService:
                 logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
                 return False
                 
-            # Store posts texts as JSON array
-            campaign.posts_json = posts  # SQLAlchemy автоматически сериализует список в JSON
-            await self.session.commit()
+            try:
+                # Store posts texts as JSON array
+                campaign.posts_json = posts
+                await self.session.commit()
+            except SQLAlchemyError as e:
+                logger.error(f"Database error storing posts: {str(e)}")
+                await self.session.rollback()
+                return False
             
             # Get user's language
             user = await self.get_user_by_telegram_id(telegram_id)
             if not user:
+                logger.error(f"User not found for telegram_id={telegram_id}")
                 return False
             
             # Analyze posts and get JSON report
@@ -695,25 +703,16 @@ class UserService:
                 logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
                 return False
                 
-            # Store JSON report
-            campaign.analysis_report = json.dumps(json_report)
-            await self.session.commit()
-            
-            # Format and send report to user
-            formatted_report = llm_service.format_report(json_report)
-            if user:
-                from locales.i18n import get_strings
-                strings = get_strings(user.language or 'ru')
-                from routers.telegram import send_telegram_message
-                await send_telegram_message(
-                    chat_id=telegram_id,
-                    text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report),
-                    parse_mode="Markdown"
-                )
-            
-            return True
-            
+            try:
+                # Store JSON report
+                campaign.analysis_report = json.dumps(json_report)
+                await self.session.commit()
+                return True
+            except SQLAlchemyError as e:
+                logger.error(f"Database error storing analysis report: {str(e)}")
+                await self.session.rollback()
+                return False
+                
         except Exception as e:
-            logger.error(f"Error analyzing Threads profile: {e}")
-            await self.session.rollback()
+            logger.error(f"Error in analyze_threads_profile: {str(e)}")
             return False
