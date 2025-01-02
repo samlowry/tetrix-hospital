@@ -198,26 +198,80 @@ class LLMService:
             # Start with header
             sections = [self._format_header()]
             
-            # Format analysis blocks
-            blocks = [
-                ("VIBE CHECK", state.get('vibe_check', 'Could not analyze vibe')),
-                ("CONTENT GEMS", state.get('content_gems', 'Could not analyze content')),
-                ("SOCIAL ENERGY", state.get('social_energy', 'Could not analyze social style')),
-                ("CHARACTER ARC", state.get('character_arc', 'Could not analyze character')),
-                ("FINAL REPORT", state.get('final_report', 'Could not create final report'))
-            ]
-            
-            for title, content in blocks:
-                sections.append(self._format_block(
-                    title,
-                    content.split('\n') if content else ['Analysis not available']
-                ))
+            # Get the blocks from final_report if it exists, otherwise use direct state values
+            if 'final_report' in state:
+                try:
+                    # Parse the JSON string if it's a string
+                    if isinstance(state['final_report'], str):
+                        report_data = json.loads(state['final_report'])
+                    else:
+                        report_data = state['final_report']
+                        
+                    blocks = report_data.get('blocks', {})
+                    final_analysis = report_data.get('final_analysis', {})
+                    
+                    # Format blocks in order
+                    ordered_blocks = sorted(
+                        [(name, data) for name, data in blocks.items()],
+                        key=lambda x: x[1].get('order', 999)
+                    )
+                    
+                    for _, block_data in ordered_blocks:
+                        title = block_data.get('title', '').upper()
+                        content = block_data.get('content', [])
+                        sections.append(self._format_block(
+                            title,
+                            content
+                        ))
+                    
+                    # Add final analysis if exists
+                    if final_analysis:
+                        final_content = [
+                            final_analysis.get('opener', ''),
+                            *final_analysis.get('main_points', []),
+                            '',
+                            final_analysis.get('call_to_action', '')
+                        ]
+                        sections.append(self._format_block('FINAL THOUGHTS', final_content))
+                        
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.error(f"Error parsing final_report JSON: {e}")
+                    # Fallback to direct state values
+                    blocks = [
+                        ("VIBE CHECK", state.get('vibe_check', 'Could not analyze vibe')),
+                        ("CONTENT GEMS", state.get('content_gems', 'Could not analyze content')),
+                        ("SOCIAL ENERGY", state.get('social_energy', 'Could not analyze social style')),
+                        ("CHARACTER ARC", state.get('character_arc', 'Could not analyze character'))
+                    ]
+                    for title, content in blocks:
+                        sections.append(self._format_block(
+                            title,
+                            content.split('\n') if content else ['Analysis not available']
+                        ))
+            else:
+                # Use direct state values if no final_report
+                blocks = [
+                    ("VIBE CHECK", state.get('vibe_check', 'Could not analyze vibe')),
+                    ("CONTENT GEMS", state.get('content_gems', 'Could not analyze content')),
+                    ("SOCIAL ENERGY", state.get('social_energy', 'Could not analyze social style')),
+                    ("CHARACTER ARC", state.get('character_arc', 'Could not analyze character'))
+                ]
+                for title, content in blocks:
+                    sections.append(self._format_block(
+                        title,
+                        content.split('\n') if content else ['Analysis not available']
+                    ))
             
             # Add footer
             sections.append(self._format_footer())
             
-            # Join all sections with double newlines
-            return "\n\n".join(sections)
+            # Add final message
+            sections.append("\nЗнаешь, общение с тобой было таким вдохновляющим! 🌟")
+            sections.append("Я обязательно свяжусь с тобой позже, чтобы сообщить о своём решении насчёт работы...")
+            sections.append("\nА пока — спасибо за этот удивительный опыт! 💫")
+            
+            # Join all sections with single newlines to make it more compact
+            return "\n".join(sections)
             
         except Exception as e:
             logger.error(f"Error formatting report: {e}")
