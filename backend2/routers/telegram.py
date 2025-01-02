@@ -146,15 +146,18 @@ class TelegramHandler:
             if user.registration_phase == 'threads_job_campaign':
                 # Check if user already started threads campaign
                 campaign_entry = await self.user_service.get_threads_campaign_entry(telegram_id)
-                if not campaign_entry:
-                    # Send threads campaign welcome message
-                    return await send_telegram_message(
-                        chat_id=telegram_id,
-                        text=strings.WELCOME_THREADS_CAMPAIGN,
-                        parse_mode="Markdown"
-                    )
-                # TODO: Handle other states of threads campaign
-                return True
+                if campaign_entry:
+                    if campaign_entry.analysis_report:
+                        # If user already has analysis report - ignore /start
+                        return True
+                    # If no analysis report yet - do nothing and let analysis continue
+                    return True
+                # If no campaign entry - send request for threads profile
+                return await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.THREADS_PROFILE_REQUEST,
+                    parse_mode="Markdown"
+                )
                 
             # If user exists but not fully registered
             if user.registration_phase == 'preregistered':
