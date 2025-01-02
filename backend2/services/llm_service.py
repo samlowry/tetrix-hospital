@@ -37,7 +37,7 @@ class LLMService:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_VIBE},
                     {"role": "user", "content": strings.THREADS_PROMPT_VIBE.format(posts_text=posts_text)}
@@ -57,7 +57,7 @@ class LLMService:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_CONTENT},
                     {"role": "user", "content": strings.THREADS_PROMPT_CONTENT.format(posts_text=posts_text)}
@@ -77,7 +77,7 @@ class LLMService:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_SOCIAL},
                     {"role": "user", "content": strings.THREADS_PROMPT_SOCIAL.format(posts_text=posts_text)}
@@ -97,7 +97,7 @@ class LLMService:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_CHARACTER},
                     {"role": "user", "content": strings.THREADS_PROMPT_CHARACTER.format(posts_text=posts_text)}
@@ -116,7 +116,7 @@ class LLMService:
         try:
             strings = get_strings(state['language'])
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": strings.THREADS_SYSTEM_FINAL},
                     {"role": "user", "content": strings.THREADS_PROMPT_FINAL.format(
