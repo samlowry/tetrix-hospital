@@ -163,30 +163,39 @@ class LLMService:
 
     def _format_block(self, title: str, content: List[str]) -> str:
         """Format a single analysis block with ASCII frame"""
-        width = 27  # Ширина блока для мобильных устройств
-        
-        # Получаем рамки из ascii_art
-        top, title_template, bottom = get_block_border(width)
-        title_line = title_template.format(title=title)
-        
-        # Собираем блок с HTML-тегами для ASCII-графики
-        lines = [
-            f"<code>{top}</code>",
-            f"<code>{title_line}</code>",
-            "",  # Пустая строка после заголовка
-        ]
-        
-        # Добавляем контент
-        for line in content:
-            lines.append(f"  {line}")  # Добавляем отступ в два пробела
+        try:
+            width = 27  # Ширина блока для мобильных устройств
             
-        # Добавляем нижнюю рамку
-        lines.extend([
-            "",  # Пустая строка перед нижней рамкой
-            f"<code>{bottom}</code>"
-        ])
-        
-        return "\n".join(lines)
+            # Получаем рамки из ascii_art
+            top, title_template, bottom = get_block_border(width)
+            
+            # Форматируем заголовок, убедившись что он не длиннее чем width-2
+            title = title[:width-4] if len(title) > width-4 else title
+            title_line = title_template.format(title=title)
+            
+            # Собираем блок с HTML-тегами для ASCII-графики
+            lines = [
+                f"<code>{top}</code>",
+                f"<code>{title_line}</code>",
+                "",  # Пустая строка после заголовка
+            ]
+            
+            # Добавляем контент
+            for line in content:
+                if line:  # Проверяем, что строка не пустая
+                    lines.append(f"  {line}")  # Добавляем отступ в два пробела
+                
+            # Добавляем нижнюю рамку
+            lines.extend([
+                "",  # Пустая строка перед нижней рамкой
+                f"<code>{bottom}</code>"
+            ])
+            
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error(f"Error formatting block '{title}': {e}")
+            logger.error(f"Content: {content}")
+            return f"Error formatting block {title}"
 
     def _format_header(self) -> str:
         """Create ASCII header for the report with HTML tags"""
@@ -207,22 +216,35 @@ class LLMService:
                 try:
                     # Parse the JSON string if it's a string
                     if isinstance(state['final_report'], str):
-                        report_data = json.loads(state['final_report'])
+                        logger.info(f"Initial final_report type: str")
+                        try:
+                            report_data = json.loads(state['final_report'])
+                            logger.info(f"After json.loads, report_data type: {type(report_data)}")
+                            logger.info(f"report_data keys: {report_data.keys() if isinstance(report_data, dict) else 'not a dict'}")
+                        except json.JSONDecodeError:
+                            logger.error("Failed to parse final_report JSON, using fallback")
+                            report_data = {}
                     else:
+                        logger.info(f"final_report is not a string, type: {type(state['final_report'])}")
                         report_data = state['final_report']
                         
                     blocks = report_data.get('blocks', {})
+                    logger.info(f"Blocks: {list(blocks.keys()) if isinstance(blocks, dict) else 'not a dict'}")
                     final_analysis = report_data.get('final_analysis', {})
+                    
+                    if not blocks:
+                        raise ValueError("No blocks found in report_data")
                     
                     # Format blocks in order
                     ordered_blocks = sorted(
-                        [(name, data) for name, data in blocks.items()],
+                        [(name, block) for name, block in blocks.items()],
                         key=lambda x: x[1].get('order', 999)
                     )
                     
-                    for _, block_data in ordered_blocks:
-                        title = block_data.get('title', '').upper()
-                        content = block_data.get('content', [])
+                    for name, block in ordered_blocks:
+                        logger.info(f"Processing block {name}: {block}")
+                        title = block.get('title', name.upper())
+                        content = block.get('content', [])
                         sections.append(self._format_block(
                             title,
                             content
@@ -237,9 +259,11 @@ class LLMService:
                             final_analysis.get('call_to_action', '')
                         ]
                         sections.append(self._format_block('FINAL THOUGHTS', final_content))
-                        
-                except (json.JSONDecodeError, KeyError) as e:
+                    
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
                     logger.error(f"Error parsing final_report JSON: {e}")
+                    logger.error(f"State keys: {state.keys()}")
+                    logger.error(f"Final report value: {state.get('final_report', 'not found')[:200]}")
                     # Fallback to direct state values
                     blocks = [
                         ("VIBE CHECK", state.get('vibe_check', 'Could not analyze vibe')),
@@ -279,6 +303,7 @@ class LLMService:
             
         except Exception as e:
             logger.error(f"Error formatting report: {e}")
+            logger.error(f"State: {state}")
             return "Error formatting report"
 
     async def send_analysis_to_user(self, telegram_id: int, json_report: Dict, language: str) -> bool:
@@ -304,7 +329,7 @@ class LLMService:
             await send_telegram_message(
                 telegram_id=telegram_id,
                 text=strings.THREADS_ANALYSIS_ERROR,
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
             return False
         
