@@ -13,7 +13,13 @@ from models.invite_code import InviteCode
 from typing import Optional, List, Dict, Tuple
 from core.cache import CacheKeys, cache_permanent
 from services.llm_service import LLMService
+from services.threads_service import ThreadsService
+from services.redis_service import RedisService
+from models.threads_job_campaign import ThreadsJobCampaign
+from core.config import get_settings
+from locales.language_utils import get_strings
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 async def get_telegram_info(telegram_id: int) -> Tuple[Optional[str], Optional[str]]:
@@ -689,10 +695,10 @@ class UserService:
                 await self.llm_service.send_analysis_to_user(telegram_id, analysis_report, language)
                 return True
 
-            # Get user posts
-            posts = await threads_service.get_user_posts(campaign.threads_username)
+            # Get user posts using threads_user_id
+            posts = await threads_service.get_user_posts(campaign.threads_user_id)
             if not posts:
-                logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
+                logger.error(f"Could not get posts for Threads user ID {campaign.threads_user_id}")
                 return False
 
             # Store posts
@@ -702,7 +708,7 @@ class UserService:
             # Analyze posts
             analysis_report = await self.llm_service.analyze_threads_profile(posts, telegram_id, language)
             if not analysis_report:
-                logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
+                logger.error(f"Could not analyze posts for Threads user ID {campaign.threads_user_id}")
                 return False
 
             # Store analysis
