@@ -15,7 +15,7 @@ class ThreadsService:
         self.base_url = "https://threads-api4.p.rapidapi.com/api"
         self.headers = {
             "x-rapidapi-host": "threads-api4.p.rapidapi.com",
-            "x-rapidapi-key": os.getenv("RAPIDAPI_KEY", "260c39343cmsh06d5efb8c560088p1f376djsn74c2482ddaa9")
+            "x-rapidapi-key": os.getenv("RAPIDAPI_KEY")
         }
 
     async def get_user_id(self, username: str) -> Optional[str]:

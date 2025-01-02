@@ -24,6 +24,7 @@ jobs:
             JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
             API_KEY=${{ secrets.API_KEY }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            RAPIDAPI_KEY=${{ secrets.RAPIDAPI_KEY }}
             BACKEND_URL=${{ vars.BACKEND_URL }}
             FRONTEND_URL=${{ vars.FRONTEND_URL }}
             EOL

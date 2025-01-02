@@ -46,6 +46,7 @@ FRONTEND_URL=http://localhost:3000 # or your frontend URL in production
 TELEGRAM_BOT_TOKEN=your_bot_token  # from @BotFather
 JWT_SECRET_KEY=your_secret_key     # for JWT token generation
 OPENAI_API_KEY=your_openai_key     # from OpenAI platform
+RAPIDAPI_KEY=your_rapidapi_key     # from RapidAPI platform
 
 # Optional development variables (defaults shown)
 FLASK_ENV=development              # development/production
@@ -108,6 +109,7 @@ docker-compose up -d
    JWT_SECRET_KEY         - Secret key for JWT token generation
    PROD_SSH_KEY          - Private SSH key for deployment
    OPENAI_API_KEY        - Your OpenAI API key from platform.openai.com
+   RAPIDAPI_KEY          - Your RapidAPI key from rapidapi.com
 
    # Required variables
    BACKEND_URL          - Your backend URL (e.g., https://api.your-domain.com)
