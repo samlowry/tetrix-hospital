@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta
 from models.metrics import TetrixMetrics
 from typing import Optional
-from locales.emotions import get_emotion_by_percentage
+from locales.ascii_art import get_emotion_by_percentage
 from core.cache import cache_metrics, CacheKeys, Cache
 
 # Initialize logger for this module
