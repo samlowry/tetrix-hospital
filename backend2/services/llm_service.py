@@ -1,4 +1,4 @@
-"""Service for working with OpenAI API using LangGraph for flow control"""
+"""Service for working with LLM APIs using LangGraph for flow control"""
 
 import os
 import logging
@@ -23,8 +23,8 @@ class ThreadsAnalysisState(TypedDict):
     character_arc: Optional[str]
     final_report: Optional[str]
 
-class OpenAIService:
-    """Service for interacting with OpenAI API"""
+class LLMService:
+    """Service for interacting with LLM APIs"""
     
     def __init__(self):
         openai.api_key = os.getenv("OPENAI_API_KEY")

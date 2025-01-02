@@ -11,6 +11,7 @@ from models.user import User
 from models.invite_code import InviteCode
 from typing import Optional, List, Dict, Tuple
 from core.cache import CacheKeys, cache_permanent
+from services.llm_service import LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -578,7 +579,7 @@ class UserService:
     async def analyze_threads_profile(self, telegram_id: int) -> bool:
         """Analyze user's Threads profile"""
         from services.threads_service import ThreadsService
-        from services.openai_service import OpenAIService
+        from services.llm_service import LLMService
         
         # Get campaign entry
         campaign = await self.get_threads_campaign_entry(telegram_id)
@@ -587,7 +588,7 @@ class UserService:
             
         # Initialize services
         threads_service = ThreadsService()
-        openai_service = OpenAIService()
+        llm_service = LLMService()
         
         try:
             # Get user's posts texts
@@ -601,7 +602,7 @@ class UserService:
             await self.session.commit()
             
             # Analyze posts
-            analysis = await openai_service.analyze_threads_profile(posts)
+            analysis = await llm_service.analyze_threads_profile(posts)
             if not analysis:
                 logger.error(f"Could not analyze posts for Threads user {campaign.threads_username}")
                 return False
