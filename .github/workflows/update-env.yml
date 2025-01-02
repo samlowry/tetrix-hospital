@@ -23,6 +23,7 @@ jobs:
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
             API_KEY=${{ secrets.API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             BACKEND_URL=${{ vars.BACKEND_URL }}
             FRONTEND_URL=${{ vars.FRONTEND_URL }}
             EOL
