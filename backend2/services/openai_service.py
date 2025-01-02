@@ -2,12 +2,14 @@
 
 import os
 import logging
-from typing import List, Optional, TypedDict, Annotated
+from typing import List, Optional, TypedDict, Annotated, Dict
 from langgraph.graph import Graph, StateGraph
 from langgraph.prebuilt import ToolExecutor
 import openai
+import json
 from operator import itemgetter
 from locales.i18n import get_strings
+from routers.telegram import send_telegram_message
 
 logger = logging.getLogger(__name__)
 
@@ -156,10 +158,123 @@ class OpenAIService:
         workflow.set_finish_point("create_report")
         
         return workflow.compile()
+
+    def _format_block(self, title: str, content: List[str]) -> str:
+        """Format a single analysis block with ASCII frame"""
+        width = 50  # Общая ширина блока
         
-    async def analyze_threads_profile(self, posts: List[str], language: str = 'en') -> Optional[str]:
+        # Создаем рамку
+        top = f"┌{'─' * (width-2)}┐"
+        title_line = f"│ {title.center(width-4)} │"
+        bottom = f"└{'─' * (width-2)}┘"
+        
+        # Форматируем контент
+        content_lines = []
+        for line in content:
+            # Добавляем отступы для контента
+            content_lines.append(f"│  {line.ljust(width-5)}│")
+        
+        # Собираем блок
+        return "\n".join([
+            top,
+            title_line,
+            *content_lines,
+            bottom
+        ])
+
+    def _format_header(self) -> str:
+        """Create ASCII header for the report"""
+        return """╔════════════════════════════════════════╗
+║ TETRIX PROFILE ANALYZER v1.337        ║
+║ Loading personality data...            ║
+╚════════════════════════════════════════╝
+   [█████████████████████] 100%"""
+
+    def _format_footer(self) -> str:
+        """Create ASCII footer for the report"""
+        return """╔═══════════════════════════════════════════╗
+║  > JOIN_TETRIX_UNIVERSE.exe               ║
+║  > INITIALIZATION_COMPLETE                ║
+║  > WAITING_FOR_YOUR_RESPONSE...          ║
+╚═══════════════════════════════════════════╝"""
+
+    def format_report(self, json_report: Dict) -> str:
+        """Format full analysis report with ASCII styling"""
+        try:
+            # Начинаем с заголовка
+            sections = [self._format_header()]
+            
+            # Сортируем и форматируем основные блоки
+            blocks = json_report["blocks"]
+            sorted_blocks = sorted(blocks.items(), key=lambda x: x[1]["order"])
+            
+            for _, block in sorted_blocks:
+                sections.append(self._format_block(
+                    block["title"],
+                    block["content"]
+                ))
+            
+            # Форматируем финальный анализ
+            final = json_report["final_analysis"]
+            final_text = [
+                "🚀 FINAL ANALYSIS:",
+                "",
+                final["opener"],
+                "",
+                *final["main_points"],
+                "",
+                final["call_to_action"]
+            ]
+            sections.append("\n".join(final_text))
+            
+            # Добавляем футер
+            sections.append(self._format_footer())
+            
+            # Соединяем все секции с двойным переносом строки
+            return "\n\n".join(sections)
+            
+        except Exception as e:
+            logger.error(f"Error formatting report: {e}")
+            return "Error formatting report"
+
+    async def send_analysis_to_user(self, telegram_id: int, json_report: Dict, language: str) -> bool:
+        """Format and send analysis to user"""
+        try:
+            # Форматируем отчет
+            formatted_report = self.format_report(json_report)
+            
+            # Отправляем сообщение пользователю
+            await send_telegram_message(
+                chat_id=telegram_id,
+                text=formatted_report,
+                parse_mode="Markdown"
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending analysis: {e}")
+            # Отправляем сообщение об ошибке
+            strings = get_strings(language)
+            await send_telegram_message(
+                chat_id=telegram_id,
+                text=strings.THREADS_ANALYSIS_ERROR,
+                parse_mode="Markdown"
+            )
+            return False
+        
+    async def analyze_threads_profile(self, posts: List[str], telegram_id: int, language: str = 'en') -> bool:
         """Analyze user's Threads posts and generate personality report"""
         try:
+            strings = get_strings(language)
+            
+            # Отправляем сообщение о начале анализа
+            await send_telegram_message(
+                chat_id=telegram_id,
+                text=strings.THREADS_ANALYZING,
+                parse_mode="Markdown"
+            )
+            
             # Initialize state
             state = ThreadsAnalysisState(
                 posts=posts,
@@ -174,8 +289,38 @@ class OpenAIService:
             # Run workflow
             final_state = self.workflow.invoke(state)
             
-            return final_state.get('final_report')
+            # Get report
+            report = final_state.get('final_report')
+            if not report:
+                await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.THREADS_ANALYSIS_ERROR,
+                    parse_mode="Markdown"
+                )
+                return False
+                
+            # Parse JSON report
+            try:
+                json_report = json.loads(report)
+            except json.JSONDecodeError:
+                logger.error("Failed to parse JSON report")
+                await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.THREADS_ANALYSIS_ERROR,
+                    parse_mode="Markdown"
+                )
+                return False
+                
+            # Send formatted report to user
+            return await self.send_analysis_to_user(telegram_id, json_report, language)
             
         except Exception as e:
             logger.error(f"Error in analysis workflow: {e}")
-            return None 
+            # Отправляем сообщение об ошибке
+            strings = get_strings(language)
+            await send_telegram_message(
+                chat_id=telegram_id,
+                text=strings.THREADS_ANALYSIS_ERROR,
+                parse_mode="Markdown"
+            )
+            return False 
