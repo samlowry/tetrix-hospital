@@ -1,8 +1,9 @@
 import functools
 from typing import Callable, Any
 from . import ru, en
-from services.user_service import UserService
 import logging
+
+logger = logging.getLogger(__name__)
 
 # Mapping of language codes to modules
 LANGUAGE_MODULES = {
@@ -33,7 +34,12 @@ def with_locale(func: Callable) -> Callable:
             raise ValueError("telegram_id must be provided as keyword argument")
 
         # Get user's language
-        language = await get_language(telegram_id, user_service)
+        try:
+            language = await user_service.get_user_language(telegram_id)
+            language = language or 'ru'  # Default to Russian if no language set
+        except Exception as e:
+            logger.error(f"Failed to get language for user {telegram_id}: {e}")
+            language = 'ru'  # Default to Russian on error
         
         # Get corresponding language module
         strings = LANGUAGE_MODULES.get(language, ru)  # Default to Russian if language not found
@@ -43,13 +49,8 @@ def with_locale(func: Callable) -> Callable:
         
         return await func(*args, **kwargs)
     
-    return wrapper 
+    return wrapper
 
-async def get_language(telegram_id: int, user_service: UserService) -> str:
-    """Get user's preferred language or default to Russian"""
-    try:
-        language = await user_service.get_user_language(telegram_id)
-        return language or 'ru'  # Default to Russian if no language set
-    except Exception as e:
-        logger.error(f"Failed to get language for user {telegram_id}: {e}")
-        return 'ru'  # Default to Russian on error 
+def get_strings(language: str = 'ru'):
+    """Get strings for a specific language"""
+    return LANGUAGE_MODULES.get(language, ru)  # Default to Russian if language not found 

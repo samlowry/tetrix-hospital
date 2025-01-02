@@ -8,7 +8,7 @@ from langgraph.prebuilt import ToolExecutor
 import openai
 import json
 from operator import itemgetter
-from locales.i18n import get_strings
+from locales.language_utils import get_strings
 from locales.ascii_art import REPORT_HEADER, REPORT_FOOTER, get_block_border
 from routers.telegram import send_telegram_message
 
