@@ -48,6 +48,7 @@ class UserService:
         self.session = session
         self.cache = None  # Initialize cache attribute
         self._user_cache = {}  # Local cache for users within request
+        self.llm_service = LLMService()  # Initialize LLM service
 
     async def set_redis(self, redis):
         """Set Redis client instance"""
@@ -672,20 +673,28 @@ class UserService:
         llm_service = LLMService()
         
         try:
-            # Get user's posts texts
-            posts = await threads_service.get_user_posts(campaign.threads_user_id)
-            if not posts:
-                logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
-                return False
+            # Check if we need to fetch posts or can use existing ones
+            posts = None
+            if campaign.posts_json and not campaign.analysis_report:
+                # We have posts but no analysis - resume from analysis
+                logger.info(f"Resuming analysis for user {telegram_id} with existing posts")
+                posts = campaign.posts_json
+            else:
+                # Fetch fresh posts
+                logger.info(f"Fetching new posts for user {telegram_id}")
+                posts = await threads_service.get_user_posts(campaign.threads_user_id)
+                if not posts:
+                    logger.error(f"Could not get posts for Threads user {campaign.threads_username}")
+                    return False
                 
-            try:
-                # Store posts texts as JSON array
-                campaign.posts_json = posts
-                await self.session.commit()
-            except SQLAlchemyError as e:
-                logger.error(f"Database error storing posts: {str(e)}")
-                await self.session.rollback()
-                return False
+                try:
+                    # Store posts texts as JSON array
+                    campaign.posts_json = posts
+                    await self.session.commit()
+                except SQLAlchemyError as e:
+                    logger.error(f"Database error storing posts: {str(e)}")
+                    await self.session.rollback()
+                    return False
             
             # Get user's language
             user = await self.get_user_by_telegram_id(telegram_id)

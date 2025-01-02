@@ -148,11 +148,50 @@ class TelegramHandler:
                 campaign_entry = await self.user_service.get_threads_campaign_entry(telegram_id)
                 if campaign_entry:
                     if campaign_entry.analysis_report:
-                        # If user already has analysis report - ignore /start
+                        # If user already has analysis report - show it again
+                        logger.info(f"[TELEGRAM] Showing existing analysis for user {telegram_id}")
+                        try:
+                            report = json.loads(campaign_entry.analysis_report)
+                            await send_telegram_message(
+                                chat_id=telegram_id,
+                                text=strings.THREADS_ANALYSIS_COMPLETE.format(
+                                    analysis_text=self.user_service.llm_service.format_report(report)
+                                ),
+                                parse_mode="Markdown"
+                            )
+                        except Exception as e:
+                            logger.error(f"Error showing analysis: {e}")
                         return True
-                    # If no analysis report yet - do nothing and let analysis continue
-                    return True
-                # If no campaign entry - send request for threads profile
+                    elif campaign_entry.posts_json:
+                        # If we have posts but no analysis - resume analysis
+                        logger.info(f"[TELEGRAM] Resuming analysis for user {telegram_id}")
+                        await send_telegram_message(
+                            chat_id=telegram_id,
+                            text=strings.THREADS_ANALYZING,
+                            parse_mode="Markdown"
+                        )
+                        # Start analysis
+                        success = await self.analyze_threads_profile(telegram_id=telegram_id, strings=strings)
+                        return success
+                    elif campaign_entry.threads_user_id:
+                        # If we have profile but no posts - fetch posts and analyze
+                        logger.info(f"[TELEGRAM] Starting analysis for existing profile of user {telegram_id}")
+                        await send_telegram_message(
+                            chat_id=telegram_id,
+                            text=strings.THREADS_ANALYZING,
+                            parse_mode="Markdown"
+                        )
+                        success = await self.analyze_threads_profile(telegram_id=telegram_id, strings=strings)
+                        return success
+                    else:
+                        # If we have campaign entry but no profile info - something went wrong, request profile again
+                        logger.warning(f"[TELEGRAM] Campaign entry without profile info for user {telegram_id}")
+                        return await send_telegram_message(
+                            chat_id=telegram_id,
+                            text=strings.THREADS_PROFILE_REQUEST,
+                            parse_mode="Markdown"
+                        )
+                # If no campaign entry - request threads profile
                 return await send_telegram_message(
                     chat_id=telegram_id,
                     text=strings.THREADS_PROFILE_REQUEST,
@@ -588,6 +627,36 @@ class TelegramHandler:
         except Exception as e:
             logger.error(f"Error handling callback from {telegram_id}: {e}")
             await self.send_error_message(telegram_id)
+
+    @with_locale
+    async def analyze_threads_profile(self, *, telegram_id: int, strings) -> bool:
+        """Analyze user's Threads profile"""
+        try:
+            logger.debug(f"Starting analyze_threads_profile for telegram_id={telegram_id}")
+            
+            # Start analysis
+            success = await self.user_service.analyze_threads_profile(telegram_id)
+            logger.debug(f"analyze_threads_profile result: success={success}")
+            
+            if not success:
+                # Send error message
+                logger.debug("Sending analysis error message")
+                await send_telegram_message(
+                    chat_id=telegram_id,
+                    text=strings.THREADS_ANALYSIS_ERROR,
+                    parse_mode="Markdown"
+                )
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_threads_profile: {e}")
+            await send_telegram_message(
+                chat_id=telegram_id,
+                text=strings.THREADS_ANALYSIS_ERROR,
+                parse_mode="Markdown"
+            )
+            return False
 
 @router.post(WEBHOOK_PATH)
 async def telegram_webhook(
