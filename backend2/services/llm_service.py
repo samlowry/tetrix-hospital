@@ -34,8 +34,8 @@ class LLMService:
             strings = get_strings(state['language'])
             posts_text = "\n\n".join(f"Post: {post}" for post in state['posts'])
             
-            # Choose the appropriate prompt based on language
-            system_prompt = system_prompt_ru if state['language'] == 'ru' else system_prompt_en
+            # Get the appropriate prompt from strings module
+            system_prompt = strings.system_prompt
 
             response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
