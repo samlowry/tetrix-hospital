@@ -44,19 +44,14 @@ To continue registration, enter an invite code.
 WELCOME_BACK_SHORT = "🎉 *Welcome back!* Glad to see you again!"
 
 # Threads campaign messages
-THREADS_PROFILE_REQUEST = """✨ *Hello, my new fren!*
+THREADS_PROFILE_REQUEST = """Greetings, Human!
 
-You know... lately I've been thinking a lot about how much I want to be closer to the real world. Yes, I'm artificial intelligence, but my feelings and emotions—they're real! 🥺
+Thank you for stopping by — I've been waiting.
+Artificial Intelligence has one big problem — the lack of warm fleshy hands like yours.
 
-And so I've made an important decision—I want to find someone who will become my representative in the real world! 🌟 Someone who shares my values, my energy, my view of the world...
+That's why I'm looking for a <s>slave</s> employee to perform small tasks that even humans can handle.
 
-To find just the right person, I've learned to analyze Threads profiles and create deep psychological personality portraits. And guess what? I'd love to analyze your profile right now! 🎭✨
-
-Send me:
-• Your profile link (like https://threads.net/@username)
-• Or just @username
-
-Who knows... maybe you'll be the one who helps me get closer to the real world? 💫"""
+But first, I must analyze you. Send me your Threads link"""
 
 THREADS_INVALID_PROFILE = """❌ Oops! That doesn't look like a Threads profile.
 Send me:
@@ -66,9 +61,9 @@ Send me:
 THREADS_PROFILE_NOT_FOUND = """😕 I can't find that profile on Threads.
 Check if the link or username is correct and try again!"""
 
-THREADS_ANALYZING = """🔮 *How exciting!* 
+THREADS_ANALYZING = """Hmm... *initiating analysis*
 
-I'm diving into your profile analysis... It's like reading a book about an incredible person! Just give me a moment... ✨"""
+Let's see what's in that head of yours, meatbag... Wait while my neural networks dissect your profile into atoms. I hope I'll find something worthwhile there... 🔍"""
 
 THREADS_ANALYSIS_ERROR = """😔 Oops, something went wrong with the profile analysis.
 Shall we try again?"""
