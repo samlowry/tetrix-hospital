@@ -15,6 +15,7 @@ from core.config import Settings
 from models.database import init_db, engine, Base
 from migrations.migrate import run_migrations
 from core.cache import setup_cache
+import aiohttp
 
 # Initialize application settings from environment variables
 settings = Settings()
@@ -39,6 +40,29 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 # Create logger instance for this module
 logger = logging.getLogger(__name__)
+
+async def setup_telegram_webhook():
+    """Set up Telegram webhook URL"""
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/setWebhook"
+    params = {
+        "url": settings.WEBHOOK_URL,
+        "allowed_updates": ["message", "callback_query"]
+    }
+    
+    logger.info(f"Setting up Telegram webhook to URL: {settings.WEBHOOK_URL}")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=params) as response:
+            if response.status == 200:
+                result = await response.json()
+                if result.get("ok"):
+                    logger.info("Webhook setup successful")
+                    return True
+                else:
+                    logger.error(f"Webhook setup failed: {result.get('description')}")
+                    return False
+            else:
+                logger.error(f"Webhook setup failed with status {response.status}")
+                return False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,6 +97,11 @@ async def lifespan(app: FastAPI):
     scheduler = SchedulerService(app.state.cache, async_session)
     app.state.scheduler = scheduler
     await scheduler.start()
+
+    # Set up Telegram webhook
+    webhook_success = await setup_telegram_webhook()
+    if not webhook_success:
+        logger.warning("Failed to set up Telegram webhook - bot may not receive updates")
 
     yield
 
