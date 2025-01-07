@@ -730,7 +730,7 @@ async def telegram_webhook(
             # Handle /start command
             if text.startswith("/start"):
                 # Check for threads campaign parameter
-                is_threads_campaign = "threads_campaign=1" in text
+                is_threads_campaign = "threads_campaign" in text
                 success = await handler.handle_start_command(telegram_id=telegram_id, is_threads_campaign=is_threads_campaign)
                 return {"ok": success}
             
