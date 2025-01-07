@@ -225,13 +225,13 @@ class TelegramHandler:
                         return await send_telegram_message(
                             telegram_id=telegram_id,
                             text=strings.THREADS_PROFILE_REQUEST,
-                            parse_mode="Markdown"
+                            parse_mode="HTML"
                         )
                 # If no campaign entry - request threads profile
                 return await send_telegram_message(
                     telegram_id=telegram_id,
                     text=strings.THREADS_PROFILE_REQUEST,
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
                 
             # If user exists but not fully registered

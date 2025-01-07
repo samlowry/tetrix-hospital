@@ -568,22 +568,32 @@ class UserService:
             return False, 'invalid_format'
         logger.debug(f"Extracted username: {username}")
             
-        # Check if profile exists
+        # Get user data and posts
         threads_service = ThreadsService()
-        user_id = await threads_service.get_user_id(username)
-        if not user_id:
+        threads_data = await threads_service.get_user_data(username)
+        if not threads_data:
             logger.debug(f"Threads profile not found for username: {username}")
             return False, 'not_found'
+        
+        user_id = threads_data['user']['data']['user']['id']
         logger.debug(f"Found Threads user_id: {user_id}")
             
-        # Create campaign entry
-        campaign = ThreadsJobCampaign(
-            user_id=user.id,
-            threads_username=username,
-            threads_user_id=user_id  # Store ID right away
-        )
-        
         try:
+            # Delete any existing campaign entry for this user
+            existing_campaign = await ThreadsJobCampaign.get_by_telegram_id(self.session, telegram_id)
+            if existing_campaign:
+                logger.debug(f"Deleting existing campaign entry for user_id={user.id}")
+                await self.session.delete(existing_campaign)
+                await self.session.commit()
+            
+            # Create new campaign entry with posts data
+            campaign = ThreadsJobCampaign(
+                user_id=user.id,
+                threads_username=username,
+                threads_user_id=user_id,
+                posts_json=json.dumps(threads_data, ensure_ascii=False)  # Store full response
+            )
+            
             logger.debug(f"Attempting to save campaign entry: user_id={user.id}, threads_username={username}")
             self.session.add(campaign)
             await self.session.commit()
@@ -680,7 +690,8 @@ class UserService:
             # If we have posts but no analysis, resume analysis
             if campaign.posts_json and not campaign.analysis_report:
                 logger.info(f"Resuming analysis for user {telegram_id} with existing posts")
-                posts = json.loads(campaign.posts_json)
+                threads_data = json.loads(campaign.posts_json)
+                posts = threads_service.extract_posts_from_json(threads_data)
                 analysis_report = await self.llm_service.analyze_threads_profile(posts, telegram_id, language)
                 if analysis_report:
                     campaign.analysis_report = json.dumps(analysis_report, ensure_ascii=False)
@@ -695,27 +706,9 @@ class UserService:
                 await self.llm_service.send_analysis_to_user(telegram_id, analysis_report, language)
                 return True
 
-            # Get user posts using threads_user_id
-            posts = await threads_service.get_user_posts(campaign.threads_user_id)
-            if not posts:
-                logger.error(f"Could not get posts for Threads user ID {campaign.threads_user_id}")
-                return False
-
-            # Store posts
-            campaign.posts_json = json.dumps(posts, ensure_ascii=False)
-            await self.session.commit()
-
-            # Analyze posts
-            analysis_report = await self.llm_service.analyze_threads_profile(posts, telegram_id, language)
-            if not analysis_report:
-                logger.error(f"Could not analyze posts for Threads user ID {campaign.threads_user_id}")
-                return False
-
-            # Store analysis
-            campaign.analysis_report = json.dumps(analysis_report, ensure_ascii=False)
-            await self.session.commit()
-
-            return True
+            # This should never happen since we now get posts data during campaign creation
+            logger.error(f"Campaign found without posts_json for user {telegram_id}")
+            return False
 
         except Exception as e:
             logger.error(f"Error in analyze_threads_profile: {e}")

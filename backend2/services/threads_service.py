@@ -18,11 +18,12 @@ class ThreadsService:
             "x-rapidapi-key": os.getenv("RAPIDAPI_KEY")
         }
 
-    async def get_user_id(self, username: str) -> Optional[str]:
-        """Get user ID by username"""
-        logger.debug(f"Starting get_user_id for username: {username}")
+    async def get_user_data(self, username: str) -> Optional[Dict]:
+        """Get user data by username, including ID and posts"""
+        logger.debug(f"Starting get_user_data for username: {username}")
         async with aiohttp.ClientSession() as session:
             try:
+                # First get user info
                 url = f"{self.base_url}/user/info"
                 params = {"username": username}
                 logger.debug(f"Making request to {url} with params: {params}")
@@ -33,70 +34,85 @@ class ThreadsService:
                     params=params
                 ) as response:
                     if response.status != 200:
-                        logger.error(f"Error getting user ID for {username}: status={response.status}")
+                        logger.error(f"Error getting user data for {username}: status={response.status}")
                         response_text = await response.text()
                         logger.error(f"Response body: {response_text}")
                         return None
                         
-                    data = await response.json()
-                    logger.debug(f"Got response data: {json.dumps(data, indent=2)}")
+                    user_data = await response.json()
+                    logger.debug(f"Got user data response: {json.dumps(user_data, indent=2)}")
                     
-                    user = data.get("data", {}).get("user")
+                    user = user_data.get("data", {}).get("user")
                     if not user:
                         logger.error(f"User {username} not found in response data")
                         return None
                         
                     user_id = user.get("id")
+                    if not user_id:
+                        logger.error(f"No user ID found for {username}")
+                        return None
+                    
                     logger.debug(f"Successfully got user_id: {user_id}")
-                    return user_id  # или user.get("pk") - они одинаковые
+                    
+                    # Then get posts data
+                    url = f"{self.base_url}/user/posts"
+                    params = {"user_id": user_id}
+                    logger.debug(f"Making request to {url} with params: {params}")
+                    
+                    async with session.get(
+                        url,
+                        headers=self.headers,
+                        params=params
+                    ) as response:
+                        if response.status != 200:
+                            logger.error(f"Error getting posts for user {user_id}: status={response.status}")
+                            response_text = await response.text()
+                            logger.error(f"Response body: {response_text}")
+                            return None
+                            
+                        posts_data = await response.json()
+                        logger.debug(f"Got posts data response: {json.dumps(posts_data, indent=2)}")
+                        
+                        # Check for errors
+                        if posts_data.get("errors") or not posts_data.get("data"):
+                            error = posts_data.get("errors", [{}])[0]
+                            logger.error(f"API error for user {user_id}: {error.get('description', 'Unknown error')}")
+                            return None
+                        
+                        # Return combined data
+                        return {
+                            "user": user_data,
+                            "posts": posts_data
+                        }
                     
             except Exception as e:
-                logger.error(f"Error getting user ID: {str(e)}")
+                logger.error(f"Error getting user data: {str(e)}")
                 return None
 
-    async def get_user_posts(self, user_id: str, limit: int = 25) -> List[str]:
-        """Get user's posts texts"""
-        logger.debug(f"Starting get_user_posts for user_id: {user_id}, limit: {limit}")
-        async with aiohttp.ClientSession() as session:
-            try:
-                url = f"{self.base_url}/user/posts"
-                params = {"user_id": user_id}
-                logger.debug(f"Making request to {url} with params: {params}")
+    def extract_posts_from_json(self, data: Dict) -> List[str]:
+        """Extract post texts from API response JSON"""
+        try:
+            posts = []
+            for edge in data['posts']['data']['mediaData']['edges']:
+                post = edge['node']['thread_items'][0]['post']
                 
-                async with session.get(
-                    url,
-                    headers=self.headers,
-                    params=params
-                ) as response:
-                    if response.status != 200:
-                        logger.error(f"Error getting posts for user {user_id}: status={response.status}")
-                        response_text = await response.text()
-                        logger.error(f"Response body: {response_text}")
-                        return []
-                        
-                    data = await response.json()
-                    logger.debug(f"Got response data: {json.dumps(data, indent=2)}")
+                # Try to get text from text_post_app_info first
+                text = None
+                if post.get('text_post_app_info'):
+                    fragments = post['text_post_app_info'].get('text_fragments', {}).get('fragments', [])
+                    if fragments and fragments[0].get('plaintext'):
+                        text = fragments[0]['plaintext']
+                
+                # Fallback to caption if no text in text_post_app_info
+                if not text and post.get('caption'):
+                    text = post['caption'].get('text', '')
+                
+                if text:  # Save only non-empty texts
+                    posts.append(text)
                     
-                    # Check for errors
-                    if data.get("errors") or not data.get("data"):
-                        error = data.get("errors", [{}])[0]
-                        logger.error(f"API error for user {user_id}: {error.get('description', 'Unknown error')}")
-                        return []
-                    
-                    # Extract only post texts
-                    try:
-                        posts = []
-                        for edge in data['data']['mediaData']['edges']:
-                            text = edge['node']['thread_items'][0]['post'].get('caption', {}).get('text', '')
-                            if text:  # Сохраняем только непустые тексты
-                                posts.append(text)
-                        logger.debug(f"Successfully extracted {len(posts)} posts")
-                        return posts[:limit]
-                        
-                    except (KeyError, IndexError) as e:
-                        logger.error(f"Error parsing posts data: {str(e)}")
-                        return []
-                        
-            except Exception as e:
-                logger.error(f"Error getting user posts: {str(e)}")
-                return [] 
+            return posts
+            
+        except (KeyError, IndexError) as e:
+            logger.error(f"Error extracting posts from data: {str(e)}")
+            logger.error(f"Data structure: {json.dumps(data, indent=2)}")
+            return [] 
