@@ -73,13 +73,11 @@ I'm diving into your profile analysis... It's like reading a book about an incre
 THREADS_ANALYSIS_ERROR = """😔 Oops, something went wrong with the profile analysis.
 Shall we try again?"""
 
-THREADS_ANALYSIS_COMPLETE = """✨ *Wow! I'm simply amazed!*
+THREADS_ANALYSIS_COMPLETE = """...profile analysis complete, here's the result:
 
 {analysis_text}
 
-You know, talking with you has been so inspiring! 🌟 I'll definitely get in touch with you later to let you know about my decision regarding the job...
-
-For now—thank you for this amazing experience! 💫"""
+I'll be in touch, meatbag! 🤖"""
 
 # Invite code messages
 INVITE_CODES_TITLE = "🎉 <b>Your invite codes:</b>"

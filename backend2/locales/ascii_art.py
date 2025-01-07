@@ -49,8 +49,8 @@ REPORT_HEADER = """╔═══════════════════�
 
 REPORT_FOOTER = """╔═════════════════════════╗
 ║ > TETRIX_UNIVERSE.exe   ║
-║ > INIT_COMPLETE         ║
-║ > WAITIN_4UR_RSPNSE...  ║
+║ > PROCESS_COMPLETE      ║
+║ > WAITIN_4UR_RAGE...    ║
 ╚═════════════════════════╝"""
 
 def get_block_border(width: int = 50) -> tuple[str, str, str]:
