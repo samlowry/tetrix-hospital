@@ -5,6 +5,9 @@ Language file with English messages
 # Language selection
 LANGUAGE_SELECT = "🌐 Choose language / Выбери язык:"
 
+# Path selection
+CHOOSE_PATH = "Choose why you're here:"
+
 BOT_SIGNATURE_HTML = """<i>
 I am TETRIX (@T3TR1Xbot) - the first AI memecoin on TON (cryptamagotchi)
 
@@ -187,7 +190,9 @@ BUTTONS = {
     "leaderboard_next": "10 ▶️",
     "leaderboard_page": "🏆 {start}-{end}/{total}",
     "lang_ru": "🇷🇺 Russian",
-    "lang_en": "🇬🇧 English"
+    "lang_en": "🇬🇧 English",
+    "be_friend": "🤝 Want to be TETRIX's friend",
+    "get_job": "💼 Want to work for TETRIX"
 }
 
 # System prompt for Threads analysis

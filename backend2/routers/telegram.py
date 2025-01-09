@@ -13,9 +13,10 @@ from services.user_service import UserService, get_telegram_info
 from services.redis_service import RedisService, UserStatus
 from core.deps import get_redis
 from core.config import get_settings
-from locales.language_utils import with_locale
+from locales.language_utils import with_locale, LANGUAGE_MODULES
 from services.tetrix_service import TetrixService
 from core.cache import CacheKeys
+from locales import ru, en
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -147,8 +148,28 @@ class TelegramHandler:
             # Update language in cache and DB
             await self.user_service.set_user_language(telegram_id, language)
             
-            # Show main menu immediately after language change
+            # Get strings for the new language
+            strings = LANGUAGE_MODULES.get(language, ru)
+            
+            # Get user
+            user = await self.user_service.get_user_by_telegram_id(telegram_id)
+            
+            if user.registration_phase == 'preregistered':
+                # Show path selection menu
+                return await send_telegram_message(
+                    telegram_id=telegram_id,
+                    text=strings.CHOOSE_PATH,
+                    reply_markup={
+                        "inline_keyboard": [
+                            [{"text": strings.BUTTONS["be_friend"], "callback_data": "path_friend"}],
+                            [{"text": strings.BUTTONS["get_job"], "callback_data": "path_job"}]
+                        ]
+                    }
+                )
+            
+            # For all other phases - standard logic
             return await self.handle_start_command(telegram_id=telegram_id, strings=strings)
+            
         except Exception as e:
             logger.error(f"Failed to change language for user {telegram_id}: {e}")
             return False
@@ -353,6 +374,15 @@ class TelegramHandler:
                 lang = callback_data[5:]  # Extract language code
                 return await self.handle_language_change(telegram_id=telegram_id, language=lang, strings=strings)
             
+            if callback_data == "path_friend":
+                # Show standard wallet connection menu
+                return await self.handle_start_command(telegram_id=telegram_id, strings=strings)
+                
+            elif callback_data == "path_job":
+                # Change phase and show threads profile request
+                await self.user_service.update_user(user, registration_phase='threads_job_campaign')
+                return await self.handle_start_command(telegram_id=telegram_id, strings=strings)
+                
             if callback_data == "create_wallet":
                 web_app_url = f"{settings.FRONTEND_URL}?lang={user_lang}"
                 logger.debug(f"[WebApp] Generated URL from create_wallet for user {telegram_id}: {web_app_url}, language: {user_lang}")
