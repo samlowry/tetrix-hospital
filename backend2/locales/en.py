@@ -47,14 +47,14 @@ To continue registration, enter an invite code.
 WELCOME_BACK_SHORT = "🎉 *Welcome back!* Glad to see you again!"
 
 # Threads campaign messages
-THREADS_PROFILE_REQUEST = """Greetings, Human!
+THREADS_PROFILE_REQUEST = """👋 Greetings, Human!
 
 Thank you for stopping by — I've been waiting.
-Artificial Intelligence has one big problem — the lack of warm fleshy hands like yours.
+🤖 Artificial Intelligence has one big problem — the lack of warm fleshy hands like yours.
 
 That's why I'm looking for a <s>slave</s> employee to perform small tasks that even humans can handle.
 
-But first, I must analyze you. Send me your Threads link"""
+🔍 But first, I must analyze you. Send me your Threads link"""
 
 THREADS_INVALID_FORMAT = """❌ Oops! That doesn't look like a Threads profile.
 Send me:
@@ -69,9 +69,9 @@ Send me:
 THREADS_PROFILE_NOT_FOUND = """😕 I can't find that profile on Threads.
 Check if the link or username is correct and try again!"""
 
-THREADS_ANALYZING = """Hmm... *initiating analysis*
+THREADS_ANALYZING = """🧠 *Initiating personality analysis...*
 
-Let's see what's in that head of yours, meatbag... Wait while my neural networks dissect your profile into atoms. I hope I'll find something worthwhile there... 🔍"""
+Hmm... Let's see what lurks in that head of yours, meatbag... 🔬 My neural networks are already dissecting your profile into atoms. ⚡ I hope there's something worthwhile among all this informational garbage..."""
 
 THREADS_ANALYSIS_ERROR = """😔 Oops, something went wrong with the profile analysis.
 Shall we try again?"""
@@ -210,4 +210,5 @@ STYLE:
 - Write in a style of hard roasting.
 - Find and highlight funny contradictions.
 - Use simple, lively language without fancy words.
-- Add witty phrases and unexpected turns."""
+- Add witty phrases and unexpected turns.
+- Enhance readability and sarcasm by using 3 emojis per paragraph."""

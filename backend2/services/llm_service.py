@@ -10,7 +10,7 @@ import json
 from operator import itemgetter
 from locales.language_utils import get_strings
 from locales.ascii_art import REPORT_HEADER, REPORT_FOOTER, get_block_border
-from utils.telegram_utils import send_telegram_message
+from utils.telegram_utils import send_telegram_message, split_and_send_message
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,6 @@ class LLMService:
             strings = get_strings(language)
             
             # Send report to user
-            from routers.telegram import split_and_send_message
             return await split_and_send_message(
                 telegram_id=telegram_id,
                 text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report),
