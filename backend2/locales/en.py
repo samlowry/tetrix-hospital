@@ -212,4 +212,4 @@ STYLE:
 - Use simple, lively language without fancy words.
 - Add witty phrases and unexpected turns.
 - Enhance readability and sarcasm by using 3 emojis per paragraph.
-- Newer put 2 and more emojis in a raw - it unpleasant to read!"""
+- Please use no more than one emoji per sentence and try to do so appropriately."""
