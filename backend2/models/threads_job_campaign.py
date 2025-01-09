@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, text, select
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, text, select, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from .database import Base
@@ -12,7 +12,7 @@ class ThreadsJobCampaign(Base):
     # Primary identifier
     id = Column(Integer, primary_key=True)
     # Link to user table
-    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False, unique=True)
     # Threads username (can be with or without @)
     threads_username = Column(String, nullable=True)
     # Threads user ID from API
