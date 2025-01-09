@@ -111,7 +111,8 @@ class LLMService:
             return await split_and_send_message(
                 telegram_id=telegram_id,
                 text=strings.THREADS_ANALYSIS_COMPLETE.format(analysis_text=formatted_report),
-                parse_mode="HTML"
+                parse_mode="HTML",
+                disable_web_page_preview=True
             )
         except Exception as e:
             logger.error(f"Error sending analysis: {e}")
@@ -143,11 +144,13 @@ class LLMService:
             
             # Send progress messages
             try:
-                await send_telegram_message(
+                await split_and_send_message(
                     telegram_id=telegram_id,
                     text=get_strings(language).THREADS_ANALYSIS_COMPLETE.format(
                         analysis_text=self.format_report(analysis_report)
-                    )
+                    ),
+                    parse_mode="HTML",
+                    disable_web_page_preview=True
                 )
             except Exception as e:
                 logger.error(f"Error sending progress message: {e}")
