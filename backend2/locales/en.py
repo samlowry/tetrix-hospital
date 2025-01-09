@@ -72,7 +72,9 @@ THREADS_ANALYSIS_COMPLETE = """...profile analysis complete, here's the result:
 
 {analysis_text}
 
-I'll be in touch, meatbag! 🤖"""
+I'll be in touch, meatbag! 🤖
+
+https://t.me/T3TR1Xbot?start=ai_job_offer"""
 
 # Invite code messages
 INVITE_CODES_TITLE = "🎉 <b>Your invite codes:</b>"

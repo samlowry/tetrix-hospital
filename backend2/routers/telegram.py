@@ -193,7 +193,8 @@ class TelegramHandler:
                                 text=strings.THREADS_ANALYSIS_COMPLETE.format(
                                     analysis_text=self.user_service.llm_service.format_report(report)
                                 ),
-                                parse_mode="HTML"
+                                parse_mode="HTML",
+                                disable_web_page_preview=True
                             )
                         except Exception as e:
                             logger.error(f"Error showing analysis: {e}")
@@ -730,7 +731,7 @@ async def telegram_webhook(
             # Handle /start command
             if text.startswith("/start"):
                 # Check for threads campaign parameter
-                is_threads_campaign = "threads_campaign" in text
+                is_threads_campaign = "ai_job_offer" in text
                 success = await handler.handle_start_command(telegram_id=telegram_id, is_threads_campaign=is_threads_campaign)
                 return {"ok": success}
             
