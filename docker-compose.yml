@@ -23,6 +23,7 @@ services:
       - REDIS_PORT=6379
       - POSTGRES_PORT=5432
       - REDIS_URL=redis://redis:6379/0
+      - RAPIDAPI_KEY=${RAPIDAPI_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
