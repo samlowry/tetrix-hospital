@@ -657,6 +657,13 @@ class TelegramHandler:
                     )
                 return
                 
+            # Send analyzing message
+            await send_telegram_message(
+                telegram_id=telegram_id,
+                text=strings.THREADS_ANALYZING,
+                parse_mode="Markdown"
+            )
+                
             # Start analysis
             logger.debug("Starting threads profile analysis")
             success = await self.user_service.analyze_threads_profile(telegram_id)

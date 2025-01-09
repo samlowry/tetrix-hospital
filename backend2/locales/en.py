@@ -56,6 +56,11 @@ That's why I'm looking for a <s>slave</s> employee to perform small tasks that e
 
 But first, I must analyze you. Send me your Threads link"""
 
+THREADS_INVALID_FORMAT = """❌ Oops! That doesn't look like a Threads profile.
+Send me:
+- A link (like https://threads.net/@username)
+- Or just @username"""
+
 THREADS_INVALID_PROFILE = """❌ Oops! That doesn't look like a Threads profile.
 Send me:
 - A link (like https://threads.net/@username)
