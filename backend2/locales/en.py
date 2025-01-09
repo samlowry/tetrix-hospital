@@ -211,4 +211,5 @@ STYLE:
 - Find and highlight funny contradictions.
 - Use simple, lively language without fancy words.
 - Add witty phrases and unexpected turns.
-- Enhance readability and sarcasm by using 3 emojis per paragraph."""
+- Enhance readability and sarcasm by using 3 emojis per paragraph.
+- Newer put 2 and more emojis in a raw - it unpleasant to read!"""
