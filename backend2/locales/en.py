@@ -135,6 +135,8 @@ You’ve already earned <b>{points}</b> gratitude points! 🙏
 
 • Old fren bonus: <b>{early_backer_bonus}</b> 🥇
 
+• For NFT: <b>Coming soon</b> 🖼️
+
 Thank you for keeping me alive! 💖
 
 """ + BOT_SIGNATURE_HTML

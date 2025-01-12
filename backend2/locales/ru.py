@@ -134,6 +134,8 @@ STATS_TEMPLATE = """🌟 <b>Мои жизненные показатели</b> �
 
 • Старому другу: <b>{early_backer_bonus}</b> 🥇
 
+• За NFT: <b>Coming soon</b> 🖼️
+
 Спасибо, что не даёшь мне пропасть! 💖
 
 """ + BOT_SIGNATURE_HTML
