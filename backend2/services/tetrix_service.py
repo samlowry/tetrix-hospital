@@ -121,27 +121,40 @@ class TetrixService:
                 f"{DEXSCREENER_API_URL}/pairs/ton/{TETRIX_POOL}",
                 headers={"accept": "application/json"}
             ) as response:
-                data = await response.json()
-                pair = data["pairs"][0]  # Get the first pair (should be only one)
-                
-                volume_usd = float(pair["volume"]["h24"])
-                price = float(pair["priceUsd"])
-                cap = price * TOTAL_SUPPLY
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DexScreener API returned status {response.status}: {error_text}")
+                    return None
+                    
+                try:
+                    data = await response.json()
+                    if not data or "pairs" not in data or not data["pairs"]:
+                        logger.error(f"Invalid response from DexScreener API: {data}")
+                        return None
+                        
+                    pair = data["pairs"][0]  # Get the first pair (should be only one)
+                    
+                    volume_usd = float(pair["volume"]["h24"])
+                    price = float(pair["priceUsd"])
+                    cap = price * TOTAL_SUPPLY
 
-                # Get max volume from database
-                max_volume = await self._ensure_max_volume_exists()
-                
-                # Update max volume if needed
-                if volume_usd > max_volume:
-                    await self._update_max_volume(volume_usd)
-                    max_volume = volume_usd
+                    # Get max volume from database
+                    max_volume = await self._ensure_max_volume_exists()
+                    
+                    # Update max volume if needed
+                    if volume_usd > max_volume:
+                        await self._update_max_volume(volume_usd)
+                        max_volume = volume_usd
 
-                return {
-                    "price": price,
-                    "cap": cap,
-                    "volume": volume_usd,
-                    "max_volume": max_volume
-                }
+                    return {
+                        "price": price,
+                        "cap": cap,
+                        "volume": volume_usd,
+                        "max_volume": max_volume
+                    }
+                except Exception as e:
+                    logger.error(f"Error in _fetch_dexscreener_data: {e}")
+                    return None
 
     @cache_metrics(key_pattern="tetrix:metrics")
     async def get_metrics(self):
@@ -151,10 +164,15 @@ class TetrixService:
             dex_data = await self._fetch_dexscreener_data()
             holders_data = await self._fetch_holders()
             
-            if not all([dex_data, holders_data]):
-                logger.error("Some metrics are not available: dex=%s, holders=%s", 
-                           bool(dex_data), bool(holders_data))
-                raise ValueError("Some metrics are not available")
+            missing_metrics = []
+            if not dex_data:
+                missing_metrics.append("dexscreener")
+            if not holders_data:
+                missing_metrics.append("holders")
+                
+            if missing_metrics:
+                logger.error("Missing metrics: %s", ", ".join(missing_metrics))
+                raise ValueError(f"Missing required metrics: {', '.join(missing_metrics)}")
             
             # Calculate percentages
             health_percent = min(100, (holders_data["holders_count"] / MAX_HOLDERS) * 100)
