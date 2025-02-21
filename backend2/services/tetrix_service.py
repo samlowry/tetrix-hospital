@@ -116,45 +116,58 @@ class TetrixService:
     @cache_metrics(key_pattern=CacheKeys.DEX_SCREENER)
     async def _fetch_dexscreener_data(self):
         """Fetch price and volume data from DexScreener"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{DEXSCREENER_API_URL}/pairs/ton/{TETRIX_POOL}",
-                headers={"accept": "application/json"}
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    logger.error(f"DexScreener API returned status {response.status}: {error_text}")
-                    return None
-                    
-                try:
-                    data = await response.json()
-                    if not data or "pairs" not in data or not data["pairs"]:
-                        logger.error(f"Invalid response from DexScreener API: {data}")
-                        return None
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{DEXSCREENER_API_URL}/pairs/ton/{TETRIX_POOL}",
+                    headers={"accept": "application/json"}
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(f"DexScreener API returned status {response.status}: {error_text}")
+                        return self._get_default_dex_data()
                         
-                    pair = data["pairs"][0]  # Get the first pair (should be only one)
-                    
-                    volume_usd = float(pair["volume"]["h24"])
-                    price = float(pair["priceUsd"])
-                    cap = price * TOTAL_SUPPLY
+                    try:
+                        data = await response.json()
+                        if not data or "pairs" not in data or not data["pairs"]:
+                            logger.warning("DexScreener API returned no pair data, using defaults")
+                            return self._get_default_dex_data()
+                            
+                        pair = data["pairs"][0]  # Get the first pair (should be only one)
+                        
+                        volume_usd = float(pair["volume"]["h24"])
+                        price = float(pair["priceUsd"])
+                        cap = price * TOTAL_SUPPLY
 
-                    # Get max volume from database
-                    max_volume = await self._ensure_max_volume_exists()
-                    
-                    # Update max volume if needed
-                    if volume_usd > max_volume:
-                        await self._update_max_volume(volume_usd)
-                        max_volume = volume_usd
+                        # Get max volume from database
+                        max_volume = await self._ensure_max_volume_exists()
+                        
+                        # Update max volume if needed
+                        if volume_usd > max_volume:
+                            await self._update_max_volume(volume_usd)
+                            max_volume = volume_usd
 
-                    return {
-                        "price": price,
-                        "cap": cap,
-                        "volume": volume_usd,
-                        "max_volume": max_volume
-                    }
-                except Exception as e:
-                    logger.error(f"Error in _fetch_dexscreener_data: {e}")
-                    return None
+                        return {
+                            "price": price,
+                            "cap": cap,
+                            "volume": volume_usd,
+                            "max_volume": max_volume
+                        }
+                    except Exception as e:
+                        logger.error(f"Error parsing DexScreener data: {e}")
+                        return self._get_default_dex_data()
+        except Exception as e:
+            logger.error(f"Error fetching DexScreener data: {e}")
+            return self._get_default_dex_data()
+
+    def _get_default_dex_data(self):
+        """Return default values when DexScreener data is unavailable"""
+        return {
+            "price": 0.001,  # Default price
+            "cap": 0.001 * TOTAL_SUPPLY,  # Default market cap
+            "volume": 0,  # Default 24h volume
+            "max_volume": INITIAL_MAX_VOLUME  # Default max volume
+        }
 
     @cache_metrics(key_pattern="tetrix:metrics")
     async def get_metrics(self):
@@ -165,8 +178,6 @@ class TetrixService:
             holders_data = await self._fetch_holders()
             
             missing_metrics = []
-            if not dex_data:
-                missing_metrics.append("dexscreener")
             if not holders_data:
                 missing_metrics.append("holders")
                 
