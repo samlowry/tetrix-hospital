@@ -99,9 +99,9 @@ async def lifespan(app: FastAPI):
     await scheduler.start()
 
     # Set up Telegram webhook
-    webhook_success = await setup_telegram_webhook()
-    if not webhook_success:
-        logger.warning("Failed to set up Telegram webhook - bot may not receive updates")
+    # webhook_success = await setup_telegram_webhook()
+    # if not webhook_success:
+    #     logger.warning("Failed to set up Telegram webhook - bot may not receive updates")
 
     yield
 
